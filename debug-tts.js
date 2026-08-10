@@ -2,12 +2,47 @@ const voiceSelect=document.getElementById('voiceMode');
 if(voiceSelect){
   const previous=voiceSelect.value||'auto';
   voiceSelect.innerHTML=`
-    <option value="auto">Automatisch — ElevenLabs eerst</option>
+    <option value="auto">Automatisch — beste gratis stem</option>
     <option value="elevenlabs">ElevenLabs — radio DJ</option>
     <option value="openai">OpenAI — AI-stem</option>
     <option value="device">iPhone-stem</option>`;
   voiceSelect.value=['auto','elevenlabs','openai','device'].includes(previous)?previous:'auto';
 }
+
+let selectedElevenVoice=localStorage.getItem('jfm_eleven_voice')||'';
+let elevenVoiceSelect=null;
+
+async function loadBestFreeVoices(){
+  const info=document.getElementById('voiceInfo');
+  if(!voiceSelect) return;
+  try{
+    const r=await fetch('/api/elevenlabs-voices');
+    if(!r.ok) return;
+    const d=await r.json();
+    const voices=d.voices||[];
+    if(!voices.length) return;
+
+    elevenVoiceSelect=document.createElement('select');
+    elevenVoiceSelect.id='elevenVoice';
+    elevenVoiceSelect.style.marginTop='10px';
+    elevenVoiceSelect.innerHTML=voices.map((v,i)=>{
+      const details=[v.gender,v.age,v.accent,v.use_case].filter(Boolean).join(' · ');
+      return `<option value="${v.voice_id}">${i===0?'★ ':''}${v.name}${details?' — '+details:''}</option>`;
+    }).join('');
+    if(selectedElevenVoice&&voices.some(v=>v.voice_id===selectedElevenVoice)) elevenVoiceSelect.value=selectedElevenVoice;
+    else { selectedElevenVoice=voices[0].voice_id; localStorage.setItem('jfm_eleven_voice',selectedElevenVoice); }
+    elevenVoiceSelect.onchange=()=>{
+      selectedElevenVoice=elevenVoiceSelect.value;
+      localStorage.setItem('jfm_eleven_voice',selectedElevenVoice);
+      const chosen=voices.find(v=>v.voice_id===selectedElevenVoice);
+      if(info) info.textContent=`Gekozen gratis ElevenLabs-stem: ${chosen?.name||'stem'}`;
+    };
+    voiceSelect.insertAdjacentElement('afterend',elevenVoiceSelect);
+    const chosen=voices.find(v=>v.voice_id===selectedElevenVoice)||voices[0];
+    if(info) info.textContent=`Josh FM toont alleen de ${voices.length} best passende gratis ElevenLabs-stemmen. Standaard: ${chosen.name}.`;
+  }catch{}
+}
+loadBestFreeVoices();
 
 async function playAudioResponse(response,label,info){
   const contentType=response.headers.get('content-type')||'';
@@ -37,7 +72,8 @@ async function tryElevenLabs(text,jingle,info){
   if(info) info.textContent='ElevenLabs-stem wordt geladen…';
   try{
     const r=await fetch('/api/tts-elevenlabs',{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,jingle})
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text,jingle,voiceId:selectedElevenVoice||undefined})
     });
     if(await playAudioResponse(r,'ElevenLabs',info)) return {ok:true};
     return {ok:false,error:await providerError(r)};
