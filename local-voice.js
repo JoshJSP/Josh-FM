@@ -1,5 +1,5 @@
 (()=>{
-  const VERSION='mms-nl-pages-v1-20260811';
+  const VERSION='mms-nl-pages-v2-20260811';
   const MODEL='mms-tts-nld-onnx';
   const MODEL_HOST='https://joshjsp.github.io/Josh-FM/';
   const MODEL_BASE=`${MODEL_HOST}${MODEL}/`;
@@ -56,11 +56,12 @@
     state.loading=(async()=>{
       const {AutoModel,Tensor,env}=await loadTransformers();
 
-      // Serve our validated ONNX export from GitHub Pages instead of Hugging Face.
+      // Transformers.js appends the requested filename itself in this build.
+      // Point the remote template only at the model directory.
       env.allowLocalModels=false;
       env.allowRemoteModels=true;
       env.remoteHost=MODEL_HOST;
-      env.remotePathTemplate='{model}/{file}';
+      env.remotePathTemplate='{model}';
       env.useBrowserCache=true;
 
       const vocab=await fetchJson(`${MODEL_BASE}vocab.json`);
