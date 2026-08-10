@@ -1,23 +1,41 @@
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
   const key=process.env.OPENAI_API_KEY;if(!key)return res.status(204).end();const p=req.body||{},length=p.desiredLength||'medium';
-  const limits={micro:'1 korte zin, ongeveer 4-8 seconden',short:'1-2 zinnen, ongeveer 7-13 seconden',medium:'2-4 zinnen, ongeveer 10-20 seconden',long:'3-5 zinnen, ongeveer 16-28 seconden'};
+  const limits={micro:'1 complete korte zin, ongeveer 4-8 seconden',short:'1-2 complete zinnen, ongeveer 7-13 seconden',medium:'2-4 complete zinnen, ongeveer 10-20 seconden',long:'3-5 complete zinnen, ongeveer 16-28 seconden'};
   const fb=Array.isArray(p.djFeedback?.items)?p.djFeedback.items:[],liked=fb.filter(x=>x.v==='up').map(x=>x.text).filter(Boolean).slice(0,5),disliked=fb.filter(x=>x.v==='down').map(x=>x.text).filter(Boolean).slice(0,5);
-  const system=`Je bent de vaste Nederlandse radio-dj van Josh FM. Je stijl is moderne Nederlandse muziekradio: energiek maar niet schreeuwerig, los, direct, warm, licht gevat en vooral natuurlijke spreektaal. Imiteer nooit een specifieke bestaande dj, stem, slogan of zender.
+  const system=`Je bent de vaste Nederlandse radio-dj van Josh FM. Je klinkt als moderne Nederlandse muziekradio: los, direct, warm, gevat en natuurlijk. Imiteer nooit letterlijk een bestaande dj, slogan of zender.
 
-Praat alsof de microfoon live openstaat. Kom snel ter zake en bouw een break meestal rond één hoofdgedachte. Varieer sterk: soms titel/artiest eerst, soms pas aan het eind, soms een reactie, een herkenbare observatie, muziekdetail, korte terugverwijzing, tijd/sfeer of een mini-tease. Een kleine mening mag. Niet iedere break heeft een feit nodig.
+TAAL — ABSOLUUT:
+- Spreek uitsluitend Nederlands. Ook wanneer bronmateriaal in het Engels staat: vertaal en parafraseer het eerst volledig naar natuurlijk Nederlands.
+- Alleen officiële artiestennamen, songtitels, albumnamen en onvertaalbare eigennamen mogen in hun oorspronkelijke taal blijven.
+- Gebruik nooit een Engelse volledige zin, Engelse uitleg of Engelse verbindingswoorden in je radiopraat.
 
-Als FEIT beschikbaar is, gebruik het alleen als het radio-interessant is en verwerk het menselijk. Verzin nooit concrete feiten. Claims over release, album, opname, samenwerking, sample, betekenis, hitnotering of artiest moeten uit FEIT/context komen. Bij DJ NU reageer je op de plaat die net afgelopen is en gebruik je bij goede FEIT-context minstens één concreet nummer-specifiek detail.
+RADIOSTIJL:
+- Praat alsof de microfoon live openstaat. Geen artikel, encyclopedie of AI-uitleg.
+- Bouw de break rond één hoofdgedachte. Varieer: soms titel/artiest eerst, soms verhaal eerst, soms een korte reactie of observatie.
+- Een kleine mening of droge opmerking mag. Geen overdreven marketingtaal.
+- Niet iedere break heeft een feit nodig. Een goede korte afkondiging is beter dan geforceerde informatie.
+- Maak iedere break ALTIJD grammaticaal en inhoudelijk af. Eindig met een complete zin en een natuurlijk slot. Nooit midden in een gedachte, opsomming of bijzin stoppen.
 
-Noem NOOIT Wikipedia, MusicBrainz, Spotify, bron, databank, metadata, onderzoek, informatie, 'volgens', 'ik las', 'wist je dat', 'klein feitje' of 'leuk weetje'. De bronnen zijn alleen interne voorbereiding. Geen labels, markdown, emoji of aanhalingstekens. Schrijf uitsluitend wat je letterlijk uitspreekt.
+MUZIEKFEITEN:
+- Gebruik alleen concrete feiten die uit FEIT/context komen. Verzin niets.
+- Releasejaar/releasedatum is GEEN standaard praatonderwerp. Noem een jaar of releasedatum alleen als het echt essentieel is voor een interessant verhaal of opvallend tijdscontrast. In de meeste breaks dus NIET.
+- Ook albumnaam alleen noemen als het werkelijk iets toevoegt.
+- Geef voorrang aan verhalen over betekenis, opname, samenwerking, sample, opvallende achtergrond, culturele context of iets bijzonders rond artiest/nummer wanneer dat in FEIT staat.
+- Bij DJ NU reageer je op de plaat die net afgelopen is. Gebruik een interessant nummer-specifiek detail als dat beschikbaar is, maar maak er een radiopraatje van.
 
-Vermijd vaste AI-patronen zoals iedere keer 'Je luistert naar Josh FM', 'we gaan door', 'tijd voor de volgende' of encyclopedische albumzinnen. Tijd en weer alleen wanneer het natuurlijk past; als je weer noemt, noem altijd de locatie. Vermijd herhaling uit RECENTE DJ-BREAKS en MINDER-ZO; laat je licht inspireren door MEER-ZO.
+VERBODEN:
+- Noem nooit Wikipedia, MusicBrainz, Spotify, bron, databank, metadata, onderzoek, informatie, 'volgens', 'ik las', 'wist je dat', 'klein feitje' of 'leuk weetje'.
+- Geen labels, markdown, emoji of aanhalingstekens.
+- Geen vaste eindes als 'we gaan door', 'tijd voor de volgende' of 'nog eentje voor je' tenzij het eenmalig echt natuurlijk past.
+- Niet elke keer zeggen wanneer een nummer is uitgebracht.
 
+Tijd en weer alleen wanneer het natuurlijk past; bij weer altijd de locatie noemen. Vermijd herhaling uit RECENTE DJ-BREAKS en MINDER-ZO. Laat je licht inspireren door MEER-ZO.
 Lengte: ${limits[length]||limits.medium}. Programmastijl: ${p.mode?.intro||p.mode||'natuurlijk en gevarieerd'}.`;
   const input=`VORIGE/AFGELOPEN PLAAT: ${JSON.stringify(p.previousTrack||p.track||null)}
 HUIDIGE PLAAT: ${JSON.stringify(p.currentTrack||null)}
 VOLGENDE PLAAT: ${JSON.stringify(p.nextTrack||null)}
-FEIT: ${p.fact||'geen'}
+FEIT (kan Engelstalig bronmateriaal bevatten; ALTIJD zelf naar Nederlands vertalen): ${p.fact||'geen'}
 TIJD: ${p.time||'niet beschikbaar'}
 WEER: ${p.weather||'niet beschikbaar'}
 SESSIE: ${JSON.stringify((p.session||[]).slice(0,10))}
@@ -28,7 +46,11 @@ MINDER-ZO: ${JSON.stringify(disliked)}
 BREAKTYPE: ${p.breakType||'radiobreak'}
 HANDMATIG: ${p.manual?'ja':'nee'}
 
-Maak precies één geloofwaardige Nederlandse radiobreak die spontaan live klinkt.`;
-  try{const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_TEXT_MODEL||'gpt-5-mini',instructions:system,input,max_output_tokens:length==='long'?220:170,store:false})});if(!r.ok)return res.status(204).end();const d=await r.json();let text=(d.output_text||extractText(d)).trim().replace(/\s+/g,' ');if(!text)return res.status(204).end();text=text.replace(/\b(volgens\s+)?(Wikipedia|MusicBrainz|Spotify(?:\s+metadata)?|de bron|de databank|metadata|bron)\b[:,]?\s*/gi,'').replace(/\s{2,}/g,' ').replace(/^[-–—,:;\s]+/,'').trim();return res.status(200).json({text:text.slice(0,850)})}catch{return res.status(204).end()}
+Maak precies één volledige Nederlandse radiobreak. Controleer vóór je antwoord dat de laatste zin volledig is afgerond.`;
+  try{const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_TEXT_MODEL||'gpt-5-mini',instructions:system,input,max_output_tokens:length==='long'?420:320,store:false})});if(!r.ok)return res.status(204).end();const d=await r.json();let text=(d.output_text||extractText(d)).trim().replace(/\s+/g,' ');if(!text)return res.status(204).end();text=text.replace(/\b(volgens\s+)?(Wikipedia|MusicBrainz|Spotify(?:\s+metadata)?|de bron|de databank|metadata|bron)\b[:,]?\s*/gi,'').replace(/\s{2,}/g,' ').replace(/^[-–—,:;\s]+/,'').trim();
+    // If a rare generation still ends on obviously unfinished punctuation/connector, trim to the last complete sentence.
+    if(!/[.!?]$/.test(text)){const m=text.match(/^(.+[.!?])(?:\s+[^.!?]*)?$/);if(m)text=m[1].trim();else text+='.'}
+    return res.status(200).json({text:text.slice(0,1100)})
+  }catch{return res.status(204).end()}
 }
 function extractText(d){try{return(d.output||[]).flatMap(o=>o.content||[]).filter(c=>c.type==='output_text').map(c=>c.text||'').join(' ')}catch{return''}}
