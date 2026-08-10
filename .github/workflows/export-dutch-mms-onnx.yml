@@ -9,11 +9,20 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   export:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -43,3 +52,26 @@ jobs:
           path: dist/mms-tts-nld-onnx/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Prepare GitHub Pages payload
+        run: |
+          touch dist/.nojekyll
+          cat > dist/index.html <<'EOF'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>Josh FM Local Voice Model</title>
+          <h1>Josh FM Local Voice Model</h1>
+          <p>Dutch MMS neural TTS model for local browser inference.</p>
+          EOF
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
