@@ -1,4 +1,4 @@
-const CACHE='josh-fm-v3-connect-2';
+const CACHE='josh-fm-v3-piper-1';
 const CORE=['./','./index.html','./styles.css','./app.js','./bugfix-playback.js','./start-sequence.js','./dj-resume.js','./discovery.js','./debug-tts.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./spotify-recovery.js','./dj-now-queue.js','./manifest.webmanifest'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)))});
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))])));
