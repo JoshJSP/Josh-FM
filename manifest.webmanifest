@@ -4,16 +4,9 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#08090b",
-  "theme_color": "#08090b",
+  "background_color": "#05070c",
+  "theme_color": "#05070c",
   "lang": "nl-NL",
   "description": "Je persoonlijke Nederlandse AI-radioshow bovenop Spotify.",
-  "icons": [
-    {
-      "src": "logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ]
+  "icons": [{"src":"logo.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
 }
