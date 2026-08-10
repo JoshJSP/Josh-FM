@@ -1,50 +1,24 @@
-// Keep Spotify Connect recoverable after iPhone gives audio focus to the DJ voice.
+// Single stable Spotify Connect controller for Josh FM. No Web Playback SDK.
 (()=>{
-  const wait=ms=>new Promise(r=>setTimeout(r,ms));
-  const key='jfm_spotify_device_id';
-  function rememberFromState(s){const id=s?.device?.id;if(id)localStorage.setItem(key,id);return id||''}
+  const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const DEVICE_KEY='jfm_spotify_device_id',PENDING='jfm_start_after_spotify';
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  let starting=false,resuming=false;
+  function info(t){const q=$('queueInfo');if(q)q.textContent=t}
+  function remember(s){const id=s?.device?.id;if(id)localStorage.setItem(DEVICE_KEY,id);return id||''}
   async function devices(){try{return (await api('/me/player/devices'))?.devices||[]}catch{return[]}}
-  async function chooseDevice(){
-    const list=await devices();
-    const stored=localStorage.getItem(key)||'';
-    const pick=list.find(d=>d.is_active)||list.find(d=>d.id===stored)||list.find(d=>d.type==='Smartphone')||list[0];
-    if(pick?.id)localStorage.setItem(key,pick.id);
-    return pick?.id||stored;
-  }
-  async function transfer(deviceId,play=true){
-    if(!deviceId)return false;
-    try{await api('/me/player',{method:'PUT',body:{device_ids:[deviceId],play:!!play}});await wait(500);return true}catch(e){console.warn('Spotify transfer failed',e);return false}
-  }
-  window.jfmEnsureSpotifyDevice=async function(play=true){
-    try{const s=await api('/me/player');if(s?.device?.id){rememberFromState(s);if(!play||s.is_playing)return s.device.id}}
-    catch{}
-    const id=await chooseDevice();
-    if(id)await transfer(id,play);
-    return id;
-  };
-  window.jfmPlayUri=async function(uri){
-    let id=await window.jfmEnsureSpotifyDevice(false);
-    for(let i=0;i<4;i++){
-      const suffix=id?`?device_id=${encodeURIComponent(id)}`:'';
-      try{await api('/me/player/play'+suffix,{method:'PUT',body:uri?{uris:[uri]}:undefined})}catch(e){
-        if(/No active device/i.test(String(e?.message||e))){id=await chooseDevice();if(id)await transfer(id,false);continue}
-      }
-      await wait(550+i*250);
-      try{const s=await api('/me/player');if(s?.device?.id)rememberFromState(s);if(s?.is_playing&&(!uri||s.item?.uri===uri)){playback=s;try{renderPlayback(s)}catch{};return true}}
-      catch{}
-      if(id)await transfer(id,true);
-    }
-    return false;
-  };
-  const originalRefresh=window.refresh;
-  if(typeof originalRefresh==='function')window.refresh=refresh=async function(...args){const out=await originalRefresh.apply(this,args);try{rememberFromState(playback)}catch{}return out};
-  const play=document.getElementById('play');
-  if(play)play.onclick=async()=>{
-    try{
-      if(playback?.is_playing){await api('/me/player/pause',{method:'PUT'});setTimeout(()=>refresh().catch(()=>{}),300);return}
-      const ok=await window.jfmPlayUri(null);
-      if(!ok){const q=document.getElementById('queueInfo');if(q)q.textContent='Spotify is niet actief. Open Spotify één keer en kom terug naar Josh FM.'}
-      setTimeout(()=>refresh().catch(()=>{}),350);
-    }catch(e){console.warn('Josh FM play recovery',e)}
-  };
+  async function chooseDevice(){try{const s=await api('/me/player');if(s?.device?.id){remember(s);return s.device.id}}catch{}const list=await devices(),stored=localStorage.getItem(DEVICE_KEY)||'';const d=list.find(x=>x.is_active)||list.find(x=>x.id===stored)||list.find(x=>x.type==='Smartphone')||list[0];if(d?.id)localStorage.setItem(DEVICE_KEY,d.id);return d?.id||''}
+  async function transfer(id,play=false){if(!id)return false;try{await api('/me/player',{method:'PUT',body:{device_ids:[id],play:!!play}});await wait(350);return true}catch{return false}}
+  async function ensureDevice(play=false){const id=await chooseDevice();if(!id)return'';await transfer(id,play);return id}
+  async function playUri(uri){if(resuming)return false;resuming=true;try{let id=await ensureDevice(false);if(!id)return false;for(let i=0;i<3;i++){try{await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:uri?{uris:[uri]}:undefined})}catch{}await wait(450+i*250);const s=await api('/me/player').catch(()=>null);if(s?.device?.id)remember(s);if(s?.is_playing&&(!uri||s.item?.uri===uri)){playback=s;try{renderPlayback(s)}catch{};return true}id=await chooseDevice()||id;await transfer(id,false)}return false}finally{resuming=false}}
+  async function startQueue(){if(starting)return;starting=true;const b=$('start');if(b){b.disabled=true;b.textContent='Josh FM start…'}try{const linked=await window.JFMAuth?.reconcile?.();if(linked===false)throw Error('Spotify is niet gekoppeld.');if(!queue?.length){info('Radioset wordt gemaakt…');await buildSet()}if(!queue?.length)throw Error('Geen nummers gevonden voor je radioset.');let id=await chooseDevice();if(!id&&isIOS){sessionStorage.setItem(PENDING,'1');info('Spotify wordt kort geopend om je iPhone als afspeelapparaat te activeren. Ga daarna terug naar Josh FM.');location.assign('spotify:');return}if(!id)throw Error('Geen Spotify-afspeelapparaat gevonden. Open Spotify één keer en probeer opnieuw.');await transfer(id,false);if($('jingles')?.checked&&typeof speakText==='function'){info('Josh FM-jingle…');try{await Promise.race([speakText('Josh FM. Jouw muziek, jouw radioshow.',true),wait(5000)])}catch{}await wait(150);id=await chooseDevice()||id;await transfer(id,false)}const uris=queue.slice(0,30).map(x=>x.uri).filter(Boolean);if(!uris.length)throw Error('Geen afspeelbare Spotify-tracks gevonden.');info('Muziek wordt gestart…');await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris}});await wait(550);let s=await api('/me/player').catch(()=>null);if(!s?.is_playing){await playUri(uris[0]);s=await api('/me/player').catch(()=>null)}if(!s?.is_playing)throw Error('Spotify reageert niet op afspelen. Open Spotify kort en probeer opnieuw.');playback=s;remember(s);try{renderPlayback(s)}catch{};session=[];try{renderHistory()}catch{};try{scheduleTalk()}catch{};try{startPolling()}catch{};info(`Josh FM is live · ${queue.length} tracks klaar.`)}catch(e){info('Starten lukte niet: '+String(e?.message||e))}finally{starting=false;if(b){b.disabled=false;b.textContent='Start Josh FM'}}}
+  async function playPause(){try{const s=await api('/me/player').catch(()=>playback);if(s?.is_playing){await api('/me/player/pause',{method:'PUT'});setTimeout(()=>refresh().catch(()=>{}),250);return}const ok=await playUri(null);if(!ok)info('Spotify is niet actief. Open Spotify één keer en probeer opnieuw.');setTimeout(()=>refresh().catch(()=>{}),300)}catch(e){info('Afspelen lukte niet: '+String(e?.message||e))}}
+  async function next(){try{if(playback?.item?.id)recordSkip(playback.item.id);const id=await ensureDevice(false);await api('/me/player/next'+(id?'?device_id='+encodeURIComponent(id):''),{method:'POST'});await wait(300);await playUri(null);setTimeout(()=>refresh().catch(()=>{}),300)}catch(e){info('Volgende nummer lukte niet: '+String(e?.message||e))}}
+  async function prev(){try{const id=await ensureDevice(false);await api('/me/player/previous'+(id?'?device_id='+encodeURIComponent(id):''),{method:'POST'});await wait(300);await playUri(null);setTimeout(()=>refresh().catch(()=>{}),300)}catch(e){info('Vorige nummer lukte niet: '+String(e?.message||e))}}
+  function own(id,fn){const old=$(id);if(!old)return;const b=old.cloneNode(true);old.replaceWith(b);b.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();fn()})}
+  own('start',startQueue);own('play',playPause);own('next',next);own('prev',prev);
+  async function resumePending(){if(document.visibilityState!=='visible'||sessionStorage.getItem(PENDING)!=='1')return;sessionStorage.removeItem(PENDING);info('Spotify is actief · Josh FM start…');await wait(800);startQueue()}
+  document.addEventListener('visibilitychange',resumePending);window.addEventListener('pageshow',()=>setTimeout(resumePending,150));window.addEventListener('focus',()=>setTimeout(resumePending,150));
+  const oldRefresh=window.refresh;if(typeof oldRefresh==='function')window.refresh=refresh=async function(...a){const out=await oldRefresh.apply(this,a);try{remember(playback)}catch{}return out};
+  window.JFMPlayback={start:startQueue,playUri,ensureDevice,chooseDevice,transfer};window.jfmPlayUri=playUri;window.jfmEnsureSpotifyDevice=ensureDevice;
 })();
