@@ -9,6 +9,17 @@
   function enable(ok){['start','play','prev','next','djNow','skipTalk','searchBtn','rebuild'].forEach(id=>{const e=$(id);if(e)e.disabled=!ok})}
   function rememberPKCE(v,s){localStorage.setItem(PKCE_V,v);localStorage.setItem(PKCE_S,s);sessionStorage.setItem('jfm_verifier',v);sessionStorage.setItem('jfm_state',s)}
   function clearPKCE(){localStorage.removeItem(PKCE_V);localStorage.removeItem(PKCE_S);sessionStorage.removeItem('jfm_verifier');sessionStorage.removeItem('jfm_state')}
+  function syncIOSPosition(state,track){
+    if(!('mediaSession'in navigator)||typeof navigator.mediaSession.setPositionState!=='function')return;
+    try{
+      // Spotify SDK values are milliseconds; Media Session requires seconds.
+      const durationMs=Number(track?.duration_ms)||0,positionMs=Number(state?.position)||0;
+      if(durationMs<=0)return;
+      const duration=Math.max(.001,durationMs/1000),position=Math.max(0,Math.min(duration-.001,positionMs/1000));
+      navigator.mediaSession.setPositionState({duration,playbackRate:1,position});
+      navigator.mediaSession.playbackState=state?.paused?'paused':'playing';
+    }catch{}
+  }
 
   async function connectSpotify(){
     const id=spotifyClientId||$('clientId')?.value.trim();if(!id)throw Error('Spotify Client ID ontbreekt.');
@@ -63,7 +74,7 @@
         player.addListener('player_state_changed',state=>{
           if(!state)return;const t=state.track_window?.current_track;if(!t)return;
           const fake={item:{id:t.id,uri:t.uri,name:t.name,duration_ms:t.duration_ms,artists:(t.artists||[]).map(a=>({name:a.name})),album:{name:t.album?.name||'',images:t.album?.images||[]},external_urls:{spotify:t.id?`https://open.spotify.com/track/${t.id}`:''}},progress_ms:state.position,is_playing:!state.paused,device:{id:deviceId,name:'Josh FM'}};
-          playback=fake;try{renderPlayback(fake)}catch{}
+          playback=fake;try{renderPlayback(fake)}catch{};syncIOSPosition(state,t);
         });
       });
       const ok=await player.connect();if(!ok)throw Error('Spotify Web Player kon niet verbinden.');return ready;
@@ -85,7 +96,6 @@
     if(starting)return;starting=true;const b=$('start');if(b){b.disabled=true;b.textContent='Josh FM start…'};
     try{
       if(!player||!deviceId){message('Spotify-speler wordt klaargemaakt…');await initPlayer()}
-      // Required on iPhone: keep this in the direct click path before playback transfer.
       try{await player.activateElement()}catch{}
       if(!queue?.length){message('Radioset wordt gemaakt…');await buildSet()}
       const uris=(queue||[]).slice(0,30).map(x=>x.uri).filter(Boolean);if(!uris.length)throw Error('Geen afspeelbare nummers gevonden.');
