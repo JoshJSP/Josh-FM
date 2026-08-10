@@ -19,8 +19,9 @@ RADIOSTIJL:
 
 MUZIEKFEITEN:
 - Gebruik alleen concrete feiten die uit FEIT/context komen. Verzin niets.
-- Releasejaar/releasedatum is GEEN standaard praatonderwerp. Noem een jaar of releasedatum alleen als het echt essentieel is voor een interessant verhaal of opvallend tijdscontrast. In de meeste breaks dus NIET.
-- Ook albumnaam alleen noemen als het werkelijk iets toevoegt.
+- Jaartallen en releasedata mogen gewoon genoemd worden wanneer ze onderdeel zijn van een interessant verhaal, vergelijking of tijdscontext.
+- Maak releasejaar of releasedatum alleen niet tot een automatisch standaardfeit in iedere break. Varieer dus bewust.
+- Ook albumnaam alleen noemen als het iets toevoegt.
 - Geef voorrang aan verhalen over betekenis, opname, samenwerking, sample, opvallende achtergrond, culturele context of iets bijzonders rond artiest/nummer wanneer dat in FEIT staat.
 - Bij DJ NU reageer je op de plaat die net afgelopen is. Gebruik een interessant nummer-specifiek detail als dat beschikbaar is, maar maak er een radiopraatje van.
 
@@ -28,7 +29,6 @@ VERBODEN:
 - Noem nooit Wikipedia, MusicBrainz, Spotify, bron, databank, metadata, onderzoek, informatie, 'volgens', 'ik las', 'wist je dat', 'klein feitje' of 'leuk weetje'.
 - Geen labels, markdown, emoji of aanhalingstekens.
 - Geen vaste eindes als 'we gaan door', 'tijd voor de volgende' of 'nog eentje voor je' tenzij het eenmalig echt natuurlijk past.
-- Niet elke keer zeggen wanneer een nummer is uitgebracht.
 
 Tijd en weer alleen wanneer het natuurlijk past; bij weer altijd de locatie noemen. Vermijd herhaling uit RECENTE DJ-BREAKS en MINDER-ZO. Laat je licht inspireren door MEER-ZO.
 Lengte: ${limits[length]||limits.medium}. Programmastijl: ${p.mode?.intro||p.mode||'natuurlijk en gevarieerd'}.`;
@@ -48,7 +48,6 @@ HANDMATIG: ${p.manual?'ja':'nee'}
 
 Maak precies één volledige Nederlandse radiobreak. Controleer vóór je antwoord dat de laatste zin volledig is afgerond.`;
   try{const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_TEXT_MODEL||'gpt-5-mini',instructions:system,input,max_output_tokens:length==='long'?420:320,store:false})});if(!r.ok)return res.status(204).end();const d=await r.json();let text=(d.output_text||extractText(d)).trim().replace(/\s+/g,' ');if(!text)return res.status(204).end();text=text.replace(/\b(volgens\s+)?(Wikipedia|MusicBrainz|Spotify(?:\s+metadata)?|de bron|de databank|metadata|bron)\b[:,]?\s*/gi,'').replace(/\s{2,}/g,' ').replace(/^[-–—,:;\s]+/,'').trim();
-    // If a rare generation still ends on obviously unfinished punctuation/connector, trim to the last complete sentence.
     if(!/[.!?]$/.test(text)){const m=text.match(/^(.+[.!?])(?:\s+[^.!?]*)?$/);if(m)text=m[1].trim();else text+='.'}
     return res.status(200).json({text:text.slice(0,1100)})
   }catch{return res.status(204).end()}
