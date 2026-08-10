@@ -7,6 +7,8 @@ import onnxruntime as ort
 import soundfile as sf
 import torch
 from transformers import VitsModel, AutoTokenizer
+from optimum.onnxruntime import ORTModelForCausalLM
+from optimum.exporters.onnx import main_export
 
 MODEL_ID = 'facebook/mms-tts-nld'
 OUT = Path('dist/mms-tts-nld-onnx')
@@ -31,33 +33,16 @@ inputs = tokenizer(TEST_TEXT, return_tensors='pt')
 input_ids = inputs['input_ids']
 attention_mask = inputs.get('attention_mask', torch.ones_like(input_ids))
 
-class BrowserVits(torch.nn.Module):
-    def __init__(self, wrapped):
-        super().__init__()
-        self.wrapped = wrapped
+# Use Optimum's exporter instead of torch.onnx.export
+print('Exporting ONNX via Optimum...')
+main_export(
+    model_name_or_path=MODEL_ID,
+    output=str(ONNX_DIR),
+    task='text-to-speech',
+    opset=17,
+)
 
-    def forward(self, input_ids, attention_mask):
-        result = self.wrapped(input_ids=input_ids, attention_mask=attention_mask)
-        return result.waveform
-
-wrapper = BrowserVits(model)
 onnx_path = ONNX_DIR / 'model.onnx'
-print('Exporting ONNX...')
-with torch.no_grad():
-    torch.onnx.export(
-        wrapper,
-        (input_ids, attention_mask),
-        onnx_path,
-        input_names=['input_ids', 'attention_mask'],
-        output_names=['waveform'],
-        dynamic_axes={
-            'input_ids': {0: 'batch', 1: 'sequence'},
-            'attention_mask': {0: 'batch', 1: 'sequence'},
-            'waveform': {0: 'batch', 1: 'samples'},
-        },
-        opset_version=17,
-        do_constant_folding=True,
-    )
 
 print('Checking ONNX structure...')
 onnx_model = onnx.load(str(onnx_path))
