@@ -1,0 +1,10 @@
+{
+  "name": "Josh FM — AI Radio",
+  "short_name": "Josh FM",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#08090b",
+  "theme_color": "#08090b",
+  "lang": "nl-NL",
+  "description": "Je persoonlijke Nederlandse AI-radioshow bovenop Spotify."
+}
