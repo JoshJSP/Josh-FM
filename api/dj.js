@@ -1,21 +1,17 @@
 export default async function handler(req,res){
   if(req.method!=='POST') return res.status(405).json({error:'Method not allowed'});
-  const key=process.env.OPENAI_API_KEY;
-  if(!key) return res.status(204).end();
-  const p=req.body||{};
-  const length=p.desiredLength||'medium';
+  const key=process.env.OPENAI_API_KEY;if(!key)return res.status(204).end();const p=req.body||{},length=p.desiredLength||'medium';
   const limits={micro:'1 korte zin, ongeveer 5-9 seconden',short:'1-2 zinnen, ongeveer 8-14 seconden',medium:'2-4 zinnen, ongeveer 12-22 seconden',long:'3-6 zinnen, ongeveer 20-35 seconden'};
   const system=`Je bent de vaste Nederlandse radiopresentator van Josh FM, een persoonlijke AI-radiozender voor één luisteraar.
-Je persoonlijkheid: jong, muzikaal nieuwsgierig, relaxed, slim, droog gevoel voor humor, soms een uitgesproken maar lichte mening. Nooit schreeuwerig, glad, overdreven commercieel of geforceerd hip.
+Persoonlijkheid: jong, muzikaal nieuwsgierig, relaxed, slim, droog gevoel voor humor, soms een lichte mening. Nooit schreeuwerig, glad, overdreven commercieel of geforceerd hip.
 Schrijf ALLEEN wat de presentator uitspreekt. Geen labels, markdown, emoji of aanhalingstekens.
-Maak iedere break duidelijk anders van opbouw. Je hoeft NIET altijd het nummer of de artiest te noemen. Je mag eerst een observatie, mini-verhaal, mening, tijd, weer of sfeer neerzetten en pas later onthullen over welke plaat het gaat. Soms mag je helemaal niet over muziek praten.
-Gebruik muziekfeitelijke informatie ALLEEN als die letterlijk in FEIT staat. Herschrijf die volledig in natuurlijke radio-taal; noem het niet 'een feitje', 'Wikipedia', 'bron' of 'weetje'. Verzin nooit concrete feiten, prijzen, hitlijsten, samples, schrijvers of gebeurtenissen.
+Maak iedere break duidelijk anders. Je hoeft NIET altijd het nummer of de artiest te noemen. Je mag eerst een observatie, mini-verhaal, mening, tijd, weer of sfeer neerzetten en pas later onthullen over welke plaat het gaat. Soms mag je helemaal niet over muziek praten.
+Gebruik muziekfeitelijke informatie ALLEEN als die letterlijk in FEIT staat. Herschrijf die volledig natuurlijk; noem het niet 'een feitje', 'Wikipedia', 'bron' of 'weetje'. Verzin nooit concrete feiten, prijzen, hitlijsten, samples, schrijvers of gebeurtenissen.
 Meningen, humor, vergelijkingen en sfeerbeschrijvingen mogen creatief zijn zolang ze geen nieuwe feitelijke claims bevatten.
 Als je WEER gebruikt en er staat een locatie in, noem die locatie. Gebruik tijd/weer niet in iedere break.
-Gebruik PREVIOUS/CURRENT/NEXT en sessiecontext om soms creatieve bruggetjes te maken. Een verzoeknummer mag je af en toe als verzoek benoemen, maar niet steeds hetzelfde.
-Vermijd formuleringen en onderwerpen die in RECENTE DJ-BREAKS al voorkomen.
-Lengte voor deze break: ${limits[length]||limits.medium}.
-Programmastijl: ${p.mode?.intro||p.mode||'natuurlijk en gevarieerd'}.`;
+Gebruik PREVIOUS/CURRENT/NEXT en sessiecontext om creatieve bruggetjes te maken. Verzoeken mag je af en toe benoemen.
+Vermijd formuleringen en onderwerpen uit RECENTE DJ-BREAKS en vermijd stijlkenmerken uit MINDER-ZO. Laat je juist licht inspireren door MEER-ZO zonder zinnen te kopiëren.
+Lengte: ${limits[length]||limits.medium}. Programmastijl: ${p.mode?.intro||p.mode||'natuurlijk en gevarieerd'}.`;
   const input=`PREVIOUS: ${JSON.stringify(p.previousTrack||p.track||null)}
 CURRENT: ${JSON.stringify(p.currentTrack||null)}
 NEXT: ${JSON.stringify(p.nextTrack||null)}
@@ -24,18 +20,13 @@ TIJD: ${p.time||'niet beschikbaar'}
 WEER: ${p.weather||'niet beschikbaar'}
 SESSIE: ${JSON.stringify((p.session||[]).slice(0,10))}
 RECENTE DJ-BREAKS: ${JSON.stringify((p.recentDJ||[]).slice(0,10))}
-VERZOEK HUIDIGE/VOLGENDE: ${JSON.stringify(p.requests||{})}
+MEER-ZO: ${JSON.stringify((p.djFeedback?.liked||[]).slice(0,5))}
+MINDER-ZO: ${JSON.stringify((p.djFeedback?.disliked||[]).slice(0,5))}
+VERZOEKEN: ${JSON.stringify(p.requests||{})}
 BREAKTYPE: ${p.breakType||'vrije radiobreak'}
 HANDMATIG: ${p.manual?'ja':'nee'}
 
 Maak precies één natuurlijke Nederlandse radiobreak. Durf creatief te structureren en laat muziek soms gewoon voor zichzelf spreken.`;
-  try{
-    const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_TEXT_MODEL||'gpt-5-mini',instructions:system,input,max_output_tokens:length==='long'?240:180,store:false})});
-    if(!r.ok) return res.status(204).end();
-    const d=await r.json();
-    const text=(d.output_text||extractText(d)).trim().replace(/\s+/g,' ');
-    if(!text) return res.status(204).end();
-    return res.status(200).json({text:text.slice(0,900)});
-  }catch{return res.status(204).end()}
+  try{const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_TEXT_MODEL||'gpt-5-mini',instructions:system,input,max_output_tokens:length==='long'?240:180,store:false})});if(!r.ok)return res.status(204).end();const d=await r.json(),text=(d.output_text||extractText(d)).trim().replace(/\s+/g,' ');if(!text)return res.status(204).end();return res.status(200).json({text:text.slice(0,900)})}catch{return res.status(204).end()}
 }
-function extractText(d){try{return (d.output||[]).flatMap(o=>o.content||[]).filter(c=>c.type==='output_text').map(c=>c.text||'').join(' ')}catch{return ''}}
+function extractText(d){try{return(d.output||[]).flatMap(o=>o.content||[]).filter(c=>c.type==='output_text').map(c=>c.text||'').join(' ')}catch{return''}}
