@@ -27,7 +27,7 @@ jobs:
       - name: Install export dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install 'transformers>=4.45,<5' 'optimum[onnxruntime]>=1.23' 'onnx>=1.16' 'onnxruntime>=1.19' 'torch>=2.4' 'huggingface_hub>=0.25' 'soundfile>=0.12' 'numpy<2.1'
+          pip install 'transformers>=4.45,<5' 'optimum[onnxruntime]>=1.23' 'onnx>=1.16' 'onnxruntime>=1.19' 'onnxscript>=0.1' 'torch>=2.4' 'huggingface_hub>=0.25' 'soundfile>=0.12' 'numpy<2.1'
 
       - name: Export and validate Dutch model
         run: python scripts/export_mms_nld_onnx.py
