@@ -24,7 +24,13 @@ Maak precies één korte Nederlandse radio-break. Als er geen FEIT is, geef dan 
     const r=await fetch('https://api.openai.com/v1/responses',{
       method:'POST',
       headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
-      body:JSON.stringify({model:process.env.OPENAI_TEXT_MODEL||'gpt-5-mini',instructions:system,input,max_output_tokens:160})
+      body:JSON.stringify({
+        model:process.env.OPENAI_TEXT_MODEL||'gpt-5-mini',
+        instructions:system,
+        input,
+        max_output_tokens:160,
+        store:false
+      })
     });
     if(!r.ok) return res.status(502).json({error:'OpenAI text error'});
     const d=await r.json();
