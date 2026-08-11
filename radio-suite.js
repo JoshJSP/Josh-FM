@@ -24,5 +24,6 @@
  // Fish Audio is the only AI voice owner. Do not load legacy Kokoro/Piper controllers here.
  // Spotify recovery remains isolated so voice failures can never block playback recovery.
  const loadScript=(src,id)=>{if(document.getElementById(id))return;const x=document.createElement('script');x.id=id;x.src=src;x.defer=true;document.body.appendChild(x)};
- loadScript('./spotify-recovery.js?v=2','jfm-spotify-recovery');
+ loadScript('./spotify-recovery.js?v=3','jfm-spotify-recovery');
+ loadScript('./station-queue.js?v=1','jfm-station-queue');
 })();
