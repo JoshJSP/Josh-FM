@@ -2,9 +2,9 @@
 (()=>{
   const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
   const btn=$('djNow'),player=()=>window.jfmSpotifyPlayer||null;
-  let lock=false,polling=false,armed=null,prepToken=0,transitionSeq=0;
+  let lock=false,polling=false,armed=null,prepToken=0,transitionSeq=0,autoPrepared=null,autoPreparing=false,lastAutoPrepId='';
   const log=[];
-  function trace(stage,extra={}){const item={at:Date.now(),seq:transitionSeq,stage,...extra};log.unshift(item);if(log.length>40)log.length=40;window.JFMDJTransitionLog=log}
+  function trace(stage,extra={}){const item={at:Date.now(),seq:transitionSeq,stage,...extra};log.unshift(item);if(log.length>60)log.length=60;window.JFMDJTransitionLog=log}
   function status(text,bad=false){const q=$('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}}
   function setArmed(on){if(!btn)return;btn.dataset.queued=on?'1':'0';const b=btn.querySelector('b'),s=btn.querySelector('span');if(b)b.textContent=on?'🎙️ DJ staat klaar':'🎙️ DJ nu';if(s)s.textContent=on?'Praat na dit nummer':'Laat hem iets vertellen'}
   async function live(){try{return await api('/me/player')}catch{return null}}
@@ -54,7 +54,7 @@
     }catch(e){trace('transition-error',{message:String(e?.message||e)});try{if(uri)await startExact(uri);else await setVolume(1)}catch{await setVolume(1)}status('DJ-fout · muziekherstel uitgevoerd.',true);return false
     }finally{await setVolume(1);djBusy=false;lock=false}
   }
-  window.JFMDJTransition={version:'unified-v1',transition,log:()=>[...log],get busy(){return lock}};
+  window.JFMDJTransition={version:'unified-v2-prefetch',transition,log:()=>[...log],get busy(){return lock},get prefetched(){return autoPrepared?{trackId:autoPrepared.trackId,ready:true}:null}};
 
   async function prepareArmed(){const a=armed;if(!a)return;const token=++prepToken;try{const pack=await makePack(a.track,true);if(token!==prepToken||!armed||armed.id!==a.id)return;armed.prepared=pack;try{await window.prepareSpeech?.(pack.text,false)}catch{}trace('manual-prepared',{track:a.id})}catch(e){trace('manual-prepare-error',{message:String(e?.message||e)})}}
   if(btn)btn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();if(lock||djBusy||!playback?.item?.id)return;const id=playback.item.id;if(armed?.id===id){armed=null;prepToken++;setArmed(false);trace('manual-disarmed');return}armed={id,track:trackObj(playback.item),resumeUri:exactNext(id),prepared:null};setArmed(true);trace('manual-armed',{id,resumeUri:armed.resumeUri});prepareArmed()},true);
@@ -62,9 +62,22 @@
   async function runArmed(){if(!armed||lock)return false;const a=armed;armed=null;setArmed(false);return transition({track:a.track,manual:true,resumeUri:a.resumeUri||exactNext(a.id),rewindCurrent:false,prepared:a.prepared,label:'DJ Nu'})}
   setInterval(async()=>{if(polling||lock||!armed)return;polling=true;try{const s=await live();if(!s?.item)return;playback=s;try{renderPlayback(s)}catch{};if(s.item.id!==armed.id){await setVolume(0);await runArmed();return}const dur=Number(s.item.duration_ms||armed.track?.duration||0),left=dur-Number(s.progress_ms||0);if(s.is_playing&&dur>0&&left<=2200)await runArmed()}finally{polling=false}},220);
 
+  function autoBreakDue(){try{return !skipNextTalk&&Number(tracksSinceTalk)+1>=Number(nextTalkAt)}catch{return false}}
+  async function prefetchAutomatic(state){
+    if(autoPreparing||lock||armed||!state?.item?.id||!autoBreakDue())return;
+    const id=state.item.id;if(lastAutoPrepId===id&&autoPrepared?.trackId===id)return;
+    const dur=Number(state.item.duration_ms||0),left=dur-Number(state.progress_ms||0);if(!state.is_playing||dur<=0||left>25000||left<3500)return;
+    autoPreparing=true;lastAutoPrepId=id;const track=trackObj(state.item);trace('auto-prefetch-start',{id,left});
+    try{const pack=await makePack(track,false);if(playback?.item?.id!==id){trace('auto-prefetch-stale',{id});return}autoPrepared={trackId:id,pack,at:Date.now()};try{await window.prepareSpeech?.(pack.text,false)}catch{}trace('auto-prefetch-ready',{id,chars:pack.text?.length||0});status('DJ-break staat alvast klaar · muziek speelt door.')}
+    catch(e){autoPrepared=null;trace('auto-prefetch-error',{id,message:String(e?.message||e)})}
+    finally{autoPreparing=false}
+  }
+  setInterval(async()=>{if(lock||armed||autoPreparing)return;try{const s=await live();if(s?.item){playback=s;await prefetchAutomatic(s)}}catch{}},1800);
+
   window.djBreak=djBreak=async function(track=null,manual=false){
     if(lock||djBusy)return false;
-    const uri=await currentUri(),target=track||(playback?.item?trackObj(playback.item):null);
-    return transition({track:target,manual,resumeUri:uri,rewindCurrent:true,label:manual?'Manual break':'Automatic break'})
+    const uri=await currentUri(),target=track||(playback?.item?trackObj(playback.item):null),targetId=target?.id||'';
+    let prepared=null;if(!manual&&autoPrepared&&autoPrepared.trackId===targetId){prepared=autoPrepared.pack;autoPrepared=null;trace('auto-prefetch-consumed',{targetId})}
+    return transition({track:target,manual,resumeUri:uri,rewindCurrent:true,prepared,label:manual?'Manual break':'Automatic break'})
   };
 })();
