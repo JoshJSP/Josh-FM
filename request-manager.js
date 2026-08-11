@@ -5,13 +5,13 @@
   let requests=load(),arming=false;
   const events=[];
   function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(x)?x.filter(r=>r&&r.uri&&r.status!=='played').slice(0,MAX_ACTIVE):[]}catch{return[]}}
-  function save(){try{localStorage.setItem(KEY,JSON.stringify(requests.slice(0,MAX_ACTIVE)))}catch{}render()}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(requests.slice(0,MAX_ACTIVE)))}catch{}render();try{window.dispatchEvent(new CustomEvent('jfm:requests-change',{detail:{requests:requests.map(r=>({...r}))}}))}catch{}}
   function trace(stage,extra={}){events.unshift({at:now(),stage,...extra});if(events.length>60)events.length=60}
   const artistKey=t=>String(t?.artists?.[0]||'').toLowerCase().trim();
   function currentTrack(){try{return playback?.item?trackObj(playback.item):null}catch{return null}}
   function upcoming(){try{return window.jfmUpcoming?.()||[]}catch{return[]}}
   function chooseDelay(track){
-    const current=currentTrack(),future=upcoming();let delay=2+Math.floor(Math.random()*2); // normally 2–3 songs
+    const current=currentTrack(),future=upcoming();let delay=2+Math.floor(Math.random()*2);
     const a=artistKey(track);if(a){
       if(a===artistKey(current))delay=Math.max(delay,3);
       for(let i=0;i<Math.min(5,future.length);i++)if(a===artistKey(future[i]))delay=Math.max(delay,i+3);
@@ -61,7 +61,7 @@
     }catch(e){trace('request-arm-error',{uri:r.uri,error:String(e?.message||e)});status('Request kon nog niet worden klaargezet · Josh FM probeert het bij de volgende track opnieuw.')}
     finally{arming=false}
   }
-  function onTrackChange(trackId=''){
+  function onTrackChange(){
     const cur=currentTrack(),uri=cur?.uri||'';
     const played=requests.find(r=>r.uri===uri&&(r.status==='armed'||r.status==='planned'));
     if(played){played.status='played';played.playedAt=now();trace('request-played',{uri});requests=requests.filter(r=>r.id!==played.id);save();status(`${played.track?.name||'Request'} draait nu · request afgevinkt.`);return}
@@ -73,7 +73,7 @@
     e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
     add(b.dataset.uri,b).catch(err=>{trace('request-add-error',{error:String(err?.message||err)});status('Request toevoegen lukte niet.')})
   },true);
-  window.addEventListener('jfm:trackchange',e=>onTrackChange(e.detail?.trackId||''));
+  window.addEventListener('jfm:trackchange',()=>onTrackChange());
   setInterval(()=>{render();armDue().catch(()=>{})},4000);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{ensurePanel();render()});else{ensurePanel();render()}
   window.JFMRequests={
