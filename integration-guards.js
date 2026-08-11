@@ -9,9 +9,10 @@
   }
 
   function aliasContracts(){
-    // Backward compatibility for any code that still uses an older controller name.
+    // Only alias controllers when their public contract is genuinely compatible.
     if(window.JFMTop40&&!window.JFMPersonalTop40)window.JFMPersonalTop40=window.JFMTop40;
-    if(window.JFMPlayback&&!window.jfmSpotifyPlayer)window.jfmSpotifyPlayer=window.JFMPlayback;
+    // Never alias JFMPlayback to jfmSpotifyPlayer: the latter is a Web Playback SDK-style
+    // interface (setVolume/getCurrentState/seek), while JFMPlayback is our transport API.
   }
 
   function installBuildSetGuard(){
@@ -20,7 +21,6 @@
     window.buildSet=buildSet=async function(...args){
       const slider=$('discovery'),runtime=window.JFMRuntimeModes?.state?.()||{},battery=!!runtime.battery,data=!!runtime.data;
       const qState=window.JFMStationQueue?.state?.();
-      // In Battery Friendly mode, avoid non-critical background regeneration while hidden if enough music remains.
       if(battery&&document.visibilityState!=='visible'&&qState?.remaining>6){trace('build-deferred',{reason:'battery-background',remaining:qState.remaining});return Array.isArray(queue)?queue:[]}
       let originalValue=null;
       if(data&&slider){originalValue=slider.value;const cap=window.JFMRuntimeModes?.dataBudget?.()?.maxDiscoveryPercent??30;slider.value=String(Math.min(Number(slider.value)||0,cap));trace('discovery-capped',{from:Number(originalValue)||0,to:Number(slider.value)||0})}
@@ -37,5 +37,5 @@
   function install(){enforceFishUI();aliasContracts();installBuildSetGuard();setTimeout(()=>{aliasContracts();installBuildSetGuard();sanity()},1200)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
   window.addEventListener('jfm:runtime-mode',()=>{enforceFishUI();aliasContracts()});
-  window.JFMIntegrationGuards={version:'integration-v1-contracts',sanity,log:()=>[...log],enforceFishUI};
+  window.JFMIntegrationGuards={version:'integration-v2-safe-contracts',sanity,log:()=>[...log],enforceFishUI};
 })();
