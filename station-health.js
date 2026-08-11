@@ -3,9 +3,8 @@
   const $=id=>document.getElementById(id),LOG_MAX=80;
   const log=[];let safe=false,safeReasons=[],lastSnapshot=null,lastTest=null,lastRenderSig='';
   const now=()=>Date.now();
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   function trace(stage,detail={}){log.unshift({at:now(),stage,...detail});if(log.length>LOG_MAX)log.length=LOG_MAX}
-  function level(ok,warn=false){return ok?'PASS':warn?'WARN':'FAIL'}
   function playbackState(){try{return window.JFMPlaybackState?.get?.()||null}catch{return null}}
   function queueState(){try{return window.JFMStationQueue?.state?.()||null}catch{return null}}
   function fishState(){try{return window.JFMDJAudioGuard?.state||null}catch{return null}}
@@ -23,7 +22,6 @@
   function applySafeMode(reasons=currentReasons()){
     const next=reasons.length>0,changed=next!==safe||reasons.join('|')!==safeReasons.join('|');safe=next;safeReasons=[...reasons];
     document.body.classList.toggle('jfm-safe-mode',safe);document.body.dataset.safeMode=safe?'1':'0';
-    // Safe mode is music-first: suppress optional speech/imaging, never pause or alter the Spotify queue itself.
     if(safe){try{window.skipNextTalk=true}catch{};try{window.jfmMusicRun=true}catch{}}
     if(changed){trace(safe?'safe-enter':'safe-exit',{reasons:[...safeReasons]});try{window.dispatchEvent(new CustomEvent('jfm:safe-mode',{detail:{active:safe,reasons:[...safeReasons]}}))}catch{};render()}
     return safe
@@ -56,7 +54,7 @@
     add('mediaSession'in navigator?'PASS':'WARN','Media Session','mediaSession'in navigator?'Ondersteund':'Browser ondersteunt dit niet');
     add(window.JFMPWA?'PASS':'WARN','PWA platform',window.JFMPWA?.version||'Niet geladen');
     add(window.JFMRuntimeModes?'PASS':'WARN','Runtime modes',window.JFMRuntimeModes?.version||'Niet geladen');
-    add(window.JFMPersonalTop40?'PASS':'WARN','Personal Top 40',window.JFMPersonalTop40?.version||'Niet geladen');
+    add(window.JFMTop40?'PASS':'WARN','Personal Top 40',window.JFMTop40?.version||'Niet geladen');
     const reasons=currentReasons();add(reasons.length?'WARN':'PASS','Safe Mode',reasons.length?reasons.join(' · '):'Geen degradatie actief');
     const rank={FAIL:0,WARN:1,PASS:2};results.sort((a,b)=>rank[a.level]-rank[b.level]);lastTest={at:now(),results};trace('self-test',{pass:results.filter(x=>x.level==='PASS').length,warn:results.filter(x=>x.level==='WARN').length,fail:results.filter(x=>x.level==='FAIL').length});
     if(out)out.innerHTML=results.map(testRow).join('');if(btn){btn.disabled=false;btn.textContent='Test Josh FM opnieuw'}render();return lastTest
