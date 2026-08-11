@@ -23,7 +23,7 @@ jobs:
 
       - name: JavaScript syntax
         run: |
-          set -e
+          set -euo pipefail
           for f in *.js; do
             echo "Checking $f"
             node --check "$f"
@@ -50,29 +50,77 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import re
-          local=Path('local-voice.js').read_text()
-          debug=Path('debug-tts.js').read_text()
-          sw=Path('sw.js').read_text()
-          version=re.search(r"const VERSION='([^']+)'",local).group(1)
+          local=Path('local-voice.js').read_text(encoding='utf-8')
+          debug=Path('debug-tts.js').read_text(encoding='utf-8')
+          sw=Path('sw.js').read_text(encoding='utf-8')
+          m=re.search(r"const VERSION='([^']+)'",local)
+          if not m: raise SystemExit('local-voice.js VERSION missing')
+          version=m.group(1)
+          cache=re.search(r"const CACHE='([^']+)'",sw)
+          if not cache: raise SystemExit('sw.js CACHE missing')
           print('Local voice version:',version)
+          print('PWA cache:',cache.group(1))
           if version not in debug: raise SystemExit('debug-tts.js does not request current local voice version')
           if version not in sw: raise SystemExit('sw.js does not cache current local voice version')
-          if 'tokenizerSelfTest' not in local: raise SystemExit('tokenizer self-test missing')
+          required=['tokenizerSelfTest','addBlank','blankId=0','AudioContext']
+          missing=[x for x in required if x not in local+debug]
+          if missing: raise SystemExit('Voice safety markers missing: '+', '.join(missing))
           PY
 
-      - name: Verify Pages model files
+      - name: Verify Pages model files and metadata
         run: |
-          set -e
+          set -euo pipefail
           BASE='https://joshjsp.github.io/Josh-FM/mms-tts-nld-onnx'
           for f in config.json tokenizer_config.json vocab.json joshfm-model.json onnx/model.onnx; do
             echo "HEAD $BASE/$f"
-            curl --fail --location --retry 3 --retry-delay 2 --silent --show-error --head "$BASE/$f" >/dev/null
+            curl --fail --location --retry 4 --retry-delay 3 --silent --show-error --head "$BASE/$f" >/dev/null
           done
+          curl --fail --location --retry 4 --retry-delay 3 --silent --show-error "$BASE/joshfm-model.json" -o /tmp/joshfm-model.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/joshfm-model.json',encoding='utf-8'))
+          assert d.get('source_model')=='facebook/mms-tts-nld', d
+          assert int(d.get('sampling_rate',0))>0, d
+          assert int(d.get('samples',0))>=8000, d
+          assert d.get('onnx_file')=='onnx/model.onnx', d
+          print('Pages model metadata OK:',d)
+          PY
 
-      - name: Verify live Vercel app
+      - name: Verify latest code is live on Vercel
         run: |
-          set -e
-          curl --fail --location --retry 6 --retry-delay 5 --silent --show-error 'https://josh-fm.vercel.app/' -o /tmp/joshfm.html
-          grep -q 'Josh FM' /tmp/joshfm.html
-          curl --fail --location --retry 6 --retry-delay 5 --silent --show-error --head 'https://josh-fm.vercel.app/local-voice.js?v=mms-nl-pages-v3-20260811' >/dev/null
-          echo 'Live app reachable.'
+          set -euo pipefail
+          VERSION=$(python - <<'PY'
+          import re
+          s=open('local-voice.js',encoding='utf-8').read()
+          print(re.search(r"const VERSION='([^']+)'",s).group(1))
+          PY
+          )
+          CACHE=$(python - <<'PY'
+          import re
+          s=open('sw.js',encoding='utf-8').read()
+          print(re.search(r"const CACHE='([^']+)'",s).group(1))
+          PY
+          )
+          BASE='https://josh-fm.vercel.app'
+          echo "Waiting for live version $VERSION / cache $CACHE"
+          ok=0
+          for i in $(seq 1 24); do
+            echo "Live deployment check $i/24"
+            if curl --fail --location --silent --show-error --max-time 20 "$BASE/?smoke=${GITHUB_SHA}" -o /tmp/joshfm.html \
+              && curl --fail --location --silent --show-error --max-time 20 "$BASE/local-voice.js?smoke=${GITHUB_SHA}" -o /tmp/live-local.js \
+              && curl --fail --location --silent --show-error --max-time 20 "$BASE/debug-tts.js?smoke=${GITHUB_SHA}" -o /tmp/live-debug.js \
+              && curl --fail --location --silent --show-error --max-time 20 "$BASE/sw.js?smoke=${GITHUB_SHA}" -o /tmp/live-sw.js \
+              && grep -q 'Josh FM' /tmp/joshfm.html \
+              && grep -Fq "$VERSION" /tmp/live-local.js \
+              && grep -Fq "$VERSION" /tmp/live-debug.js \
+              && grep -Fq "$CACHE" /tmp/live-sw.js; then
+              ok=1
+              break
+            fi
+            sleep 10
+          done
+          if [ "$ok" != 1 ]; then
+            echo 'Latest Josh FM code did not become live within the smoke-test window.' >&2
+            exit 1
+          fi
+          echo "Live Vercel app is current: $VERSION / $CACHE"
