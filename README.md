@@ -1,58 +1,95 @@
 # Josh FM v2
 
-Een persoonlijke Nederlandse radioshow bovenop jouw eigen Spotify-account.
+A personal AI radio show on top of your own Spotify account.
 
-## Wat zit erin
+## What is included
 
-- Spotify OAuth PKCE: geen Spotify client secret in de browser.
-- Spotify playback: play/pauze/vorige/volgende en radiosets.
-- Bronnen: Top Tracks, Recent Played, Saved Tracks en eigen/collaboratieve playlists.
-- Spotify Search voor verzoeknummers; verzoek gaat rechtstreeks naar de Spotify queue.
-- Nederlandse DJ die willekeurig praat, niet na ieder nummer.
-- Praatfrequentie: Weinig / Normaal / Radio / Veel.
-- Programma's: Normaal, Ochtend, Chill, Party, Throwback en Late night.
-- Gecontroleerde trackfeitjes: eerst Nederlandse Wikipedia; fallback naar Spotify album/release-metadata.
-- Feitenbron wordt zichtbaar bij het DJ-moment.
-- Tijd en optioneel lokaal weer.
-- Josh FM station-ID/jingles.
-- Lokale skiphistorie; vaak geskipt materiaal krijgt minder prioriteit in een nieuwe radioset.
-- Gratis Nederlandse apparaatstem.
-- Optionele natuurlijkere AI-DJ + AI-stem via OpenAI serverless endpoints.
-- PWA / Zet op beginscherm op iPhone.
+- Spotify OAuth PKCE: no Spotify client secret in the browser.
+- Spotify playback: play/pause/previous/next and generated radio sets.
+- Sources: Top Tracks, Recently Played, Saved Tracks and owned/collaborative playlists.
+- Spotify Search for requests; requests can be added directly to the Spotify queue.
+- English AI DJ that talks naturally between selected tracks, not after every song.
+- Talk frequency: Low / Normal / Radio / High.
+- Programs: Normal, Morning, Chill, Party, Throwback and Late Night.
+- Track facts with source-aware fallbacks.
+- Time and optional local weather context.
+- Josh FM station IDs/jingles.
+- Local skip history so frequently skipped material can be deprioritized.
+- Browser/device TTS fallback.
+- OpenAI serverless endpoint for DJ copy.
+- Fish Audio serverless endpoint for the main DJ voice.
+- PWA / Add to Home Screen on iPhone.
 
-## Belangrijke Spotify-2026 beperking
+## AI architecture
 
-Development Mode vereist voor de app-eigenaar Spotify Premium en nieuwe apps hebben maximaal vijf geautoriseerde gebruikers. Dat is prima voor persoonlijk gebruik.
+Josh FM keeps API secrets on the server.
 
-Playlist-inhoud is in Development Mode in 2026 alleen beschikbaar voor playlists die de ingelogde gebruiker bezit of waarop die gebruiker collaborator is. Josh FM v2 houdt hier rekening mee.
+- `/api/dj` generates the English DJ script with OpenAI when `OPENAI_API_KEY` is configured.
+- `/api/tts` turns the script into MP3 speech with Fish Audio.
+- Fish Audio voice ID: `b347db033a6549378b48d00acb0d06cd`.
+- Fish Audio model: `s2-pro` by default.
+- No Fish Audio key is stored in the repository or browser.
 
-Spotify Content wordt niet gemixt, gewijzigd of gebroadcast. De DJ-break pauzeert Spotify, praat, en hervat Spotify daarna.
+## Environment variables
 
-## Snelste installatie
+### Required for Fish Audio voice
+
+`FISH_AUDIO_API_KEY`
+
+Add this only as a secret/environment variable on the deployment platform. Never put it in `app.js`, commit it to GitHub, or expose it in frontend code.
+
+### Optional Fish Audio overrides
+
+`FISH_AUDIO_VOICE_ID`
+
+Defaults to:
+
+`b347db033a6549378b48d00acb0d06cd`
+
+`FISH_AUDIO_MODEL`
+
+Defaults to:
+
+`s2-pro`
+
+### DJ text generation
+
+`OPENAI_API_KEY`
+
+Used only by `/api/dj` for the AI-written radio breaks. Without it, Josh FM can fall back to local script generation.
+
+Optional:
+
+`OPENAI_TEXT_MODEL`
+
+## Spotify setup
 
 ### 1. Spotify Developer app
-Maak één Spotify Developer-app, kopieer de Client ID.
 
-### 2. Zet Josh FM online
-Deploy de map naar een HTTPS-host. Vercel is de eenvoudigste optie voor de optionele `/api/dj` en `/api/tts` serverless functies.
+Create a Spotify Developer app and copy the Client ID.
+
+### 2. Deploy Josh FM
+
+Deploy this repository to an HTTPS host. Vercel is the intended setup for the serverless `/api/dj` and `/api/tts` routes.
 
 ### 3. Redirect URL
-Open de online Josh FM. Onder Instellingen toont hij zijn exacte Redirect URL.
-Voeg die URL exact toe in Spotify Developer Dashboard -> Redirect URIs.
+
+Open the deployed Josh FM. In Settings it shows the exact Redirect URL. Add that URL exactly in Spotify Developer Dashboard under Redirect URIs.
 
 ### 4. Client ID
-Plak de Spotify Client ID in Josh FM en kies `Koppel Spotify`.
 
-### 5. Optioneel AI
-Zonder OpenAI-key werkt Josh FM al: de tekst heeft een lokale fallback en de stem gebruikt iOS/browser TTS.
-Wil je de beste versie, voeg in Vercel de environment variable `OPENAI_API_KEY` toe. De key staat dan niet in de browser.
+Add the Spotify Client ID to Josh FM and connect Spotify.
+
+### 5. Fish Audio
+
+The Fish Audio integration and selected voice are already configured in the code. The final required step is adding `FISH_AUDIO_API_KEY` to the deployment environment and redeploying.
 
 ## iPhone
 
-Open de gedeployde URL in Safari -> Deel -> `Zet op beginscherm`.
+Open the deployed URL in Safari, tap Share, then Add to Home Screen.
 
-iOS kan webapps die lang in de achtergrond staan bevriezen. De betrouwbaarste radiosessie is daarom met Josh FM geopend op de voorgrond of recent actief. De muziek zelf blijft via Spotify lopen.
+iOS can freeze web apps that remain in the background for a long time. Spotify playback itself can continue, but the most reliable DJ experience is with Josh FM active or recently active.
 
 ## Privacy
 
-Spotify tokens, voorkeuren en skiphistorie worden lokaal in de browser opgeslagen. De OpenAI serverless routes krijgen alleen de DJ-context die nodig is om een break/stem te maken. Zet nooit een OpenAI API-key in `app.js`.
+Spotify tokens, preferences and skip history are stored locally in the browser. Serverless routes receive only the context required to generate DJ copy or speech. API keys must remain server-side.
