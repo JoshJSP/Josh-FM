@@ -2,11 +2,12 @@
 (()=>{
   const TEST_KEY='jfm_test_spotify_client_id';
   const CLIENT_KEY='jfm_client_id';
+  const DEFAULT_CLIENT_ID='d505870719c6439d9ea3c53108330fe1';
   const input=document.getElementById('clientId');
   if(!input)return;
   const label=input.closest('label');
 
-  function selected(){return String(input.value||localStorage.getItem(TEST_KEY)||'').trim()}
+  function selected(){return String(input.value||localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID).trim()}
   function persist(value){
     const id=String(value||'').trim();
     if(!id)return'';
@@ -17,8 +18,8 @@
   }
   function expose(){
     label?.classList.remove('hidden');
-    const saved=localStorage.getItem(TEST_KEY)||'';
-    if(saved&&input.value!==saved)input.value=saved;
+    const saved=localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID;
+    if(!input.value||input.value!==saved)input.value=saved;
     input.placeholder='Eigen Spotify Client ID voor deze test';
     input.autocomplete='off';
     input.readOnly=false;
@@ -27,8 +28,8 @@
   // app.js may fill/hide this field after /api/config resolves. Keep the manual test field visible.
   const observer=new MutationObserver(()=>{
     expose();
-    const saved=localStorage.getItem(TEST_KEY)||'';
-    if(saved)persist(saved)
+    const saved=localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID;
+    persist(saved)
   });
   if(label)observer.observe(label,{attributes:true,subtree:true,childList:true});
 
@@ -41,8 +42,7 @@
     if(typeof callback==='function'){
       const originalCallback=callback;
       callback=async function(...args){
-        const saved=localStorage.getItem(TEST_KEY)||'';
-        if(saved)persist(saved);
+        persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);
         return originalCallback.apply(this,args)
       }
     }
@@ -64,9 +64,8 @@
   }catch{}
 
   expose();
-  const saved=localStorage.getItem(TEST_KEY)||'';
-  if(saved)persist(saved);
+  persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);
   setTimeout(expose,250);
   setTimeout(expose,1500);
-  window.JFMSpotifyTestConfig={version:'spotify-test-v2-authoritative',selected:()=>localStorage.getItem(TEST_KEY)||'',clear:()=>localStorage.removeItem(TEST_KEY)};
+  window.JFMSpotifyTestConfig={version:'spotify-test-v3-prefilled',defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
 })();
