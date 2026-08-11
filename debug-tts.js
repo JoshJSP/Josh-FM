@@ -1,38 +1,113 @@
 const voiceSelect=document.getElementById('voiceMode');
 const info=document.getElementById('voiceInfo');
-const KOKORO_MODEL='onnx-community/Kokoro-82M-v1.0-ONNX';
-const KOKORO_VERSION='kokoro-en-v6-ios-timeout-20260811';
-const DJ_HOSTS=['am_michael','af_heart','bm_george','bf_emma','am_fenrir','am_puck'];
-const LOAD_TIMEOUT=90000,GENERATE_TIMEOUT=30000;
-let selectedMode=localStorage.getItem('jfm_voice_mode')||'kokoro';
-let selectedLanguage=localStorage.getItem('jfm_dj_language')||'en';
-function setDJLanguage(code){selectedLanguage=String(code||'en').toLowerCase().startsWith('nl')?'nl':'en';localStorage.setItem('jfm_dj_language',selectedLanguage);window.JFMDJLanguage=selectedLanguage;return selectedLanguage}
-window.JFMSetDJLanguage=setDJLanguage;setDJLanguage(selectedLanguage);
-function voiceLanguageForMode(mode){return mode==='kokoro'||mode==='device'?'en':selectedLanguage}
-function syncLanguageToVoice(){setDJLanguage(voiceLanguageForMode(selectedMode))}
-function currentHost(){const slot=Math.floor(new Date().getHours()/2)%DJ_HOSTS.length;return {voice:DJ_HOSTS[slot],slot,start:slot*2,end:slot*2+2}}
+const FISH_VOICE_ID='b347db033a6549378b48d00acb0d06cd';
+const FISH_VERSION='fish-audio-s2-pro-v1-20260811';
+let selectedMode=localStorage.getItem('jfm_voice_mode')||'fish';
+if(!['fish','device'].includes(selectedMode))selectedMode='fish';
+let selectedLanguage='en';
+function setDJLanguage(){selectedLanguage='en';localStorage.setItem('jfm_dj_language','en');window.JFMDJLanguage='en';return'en'}
+window.JFMSetDJLanguage=setDJLanguage;setDJLanguage();
+function currentHost(){return{voice:'Fish Audio',id:FISH_VOICE_ID,slot:0,start:0,end:24}}
 window.JFMCurrentDJHost=currentHost;
-if(voiceSelect){voiceSelect.innerHTML='<option value="kokoro">Kokoro — rotating English AI DJs (free)</option><option value="device">iPhone English voice — fallback</option>';if(!['kokoro','device'].includes(selectedMode))selectedMode='kokoro';voiceSelect.value=selectedMode;localStorage.setItem('jfm_voice_mode',selectedMode);syncLanguageToVoice();voiceSelect.onchange=()=>{selectedMode=voiceSelect.value;localStorage.setItem('jfm_voice_mode',selectedMode);syncLanguageToVoice();if(info)info.textContent=selectedMode==='kokoro'?`Kokoro selected — DJ ${currentHost().voice} is on air until the next 2-hour change.`:'iPhone English voice selected — English DJ text and jingles active.'}}
-function localizeKnownJingle(text){const s=String(text||'').trim();const en=selectedLanguage==='en';const pairs=[['Josh FM. Jouw muziek, jouw radioshow.','Josh FM. Your music, your radio show.'],['Je luistert naar Josh FM.','You are listening to Josh FM.'],['Dit is Josh FM.','This is Josh FM.'],['Josh FM.','Josh FM.']];for(const [nl,enText] of pairs){if(s===nl||s===enText)return en?enText:nl}return s}
-window.JFMJingleText=(type='station')=>{const en=selectedLanguage==='en';const dict={station:[en?'This is Josh FM.':'Dit is Josh FM.',en?'You are listening to Josh FM.':'Je luistert naar Josh FM.'],show:[en?'Josh FM. Your music, your radio show.':'Josh FM. Jouw muziek, jouw radioshow.'],next:[en?'Stay right here. More music is coming up next.':'Blijf hier. Er komt zo meer muziek aan.']};const a=dict[type]||dict.station;return a[Math.floor(Math.random()*a.length)]};
-const AC=window.AudioContext||window.webkitAudioContext;let djContext=AC?new AC():null,djGain=null,audioUnlocked=false;if(djContext){djGain=djContext.createGain();djGain.gain.value=1;djGain.connect(djContext.destination)}
-async function unlockAudio(){try{if(djContext?.state==='suspended')await djContext.resume();const b=djContext?.createBuffer(1,1,24000),s=djContext?.createBufferSource();if(s&&b){s.buffer=b;s.connect(djGain);s.start(0)}audioUnlocked=!!djContext&&djContext.state==='running'}catch{audioUnlocked=false}}
-document.addEventListener('pointerdown',unlockAudio,{capture:true});document.addEventListener('touchstart',unlockAudio,{capture:true});
-function withTimeout(promise,ms,label){let timer;return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} timed out after ${Math.round(ms/1000)} seconds`)),ms)})]).finally(()=>clearTimeout(timer))}
-function bestEnglishVoice(){const voices=speechSynthesis.getVoices();const preferred=['Samantha','Daniel','Karen','Moira','Tessa','Alex'];for(const name of preferred){const v=voices.find(x=>x.name===name&&x.lang?.toLowerCase().startsWith('en'));if(v)return v}return voices.find(x=>x.lang?.toLowerCase()==='en-us')||voices.find(x=>x.lang?.toLowerCase()==='en-gb')||voices.find(x=>x.lang?.toLowerCase().startsWith('en'))||null}
-async function speakDevice(text,jingle=false){if(!('speechSynthesis'in window))return false;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=selectedLanguage==='nl'?'nl-NL':'en-US';u.rate=jingle?1.03:.97;u.pitch=jingle?1:.94;u.volume=1;const v=selectedLanguage==='en'?bestEnglishVoice():speechSynthesis.getVoices().find(x=>x.lang?.toLowerCase().startsWith('nl'));if(v)u.voice=v;if(info)info.textContent=`iPhone fallback — ${v?.name||u.lang} ✓`;return await new Promise(resolve=>{let done=false;const finish=ok=>{if(done)return;done=true;resolve(ok)};u.onend=()=>finish(true);u.onerror=()=>finish(false);speechSynthesis.speak(u);setTimeout(()=>finish(false),30000)})}catch{return false}}
-let progressWrap=null,progressFill=null,progressLabel=null,progressTimer=null;
-function ensureProgress(){if(progressWrap)return;const btn=document.getElementById('testVoice');if(!btn)return;progressWrap=document.createElement('div');progressWrap.style.cssText='display:none;margin-top:12px';progressWrap.innerHTML='<div style="height:9px;background:#252a32;border-radius:99px;overflow:hidden"><div id="voiceProgressFill" style="height:100%;width:0%;background:#eef1f5;border-radius:99px;transition:width .35s ease"></div></div><div id="voiceProgressLabel" style="margin-top:7px;font-size:12px;color:#8b93a0">Stem voorbereiden…</div>';btn.insertAdjacentElement('afterend',progressWrap);progressFill=progressWrap.querySelector('#voiceProgressFill');progressLabel=progressWrap.querySelector('#voiceProgressLabel')}
-function setProgress(p,label){ensureProgress();if(!progressWrap)return;progressWrap.style.display='block';progressFill.style.width=Math.max(0,Math.min(100,p))+'%';if(label)progressLabel.textContent=label}
-function startLoadingProgress(){clearInterval(progressTimer);let p=8;setProgress(p,'AI-model laden… 8%');progressTimer=setInterval(()=>{p=Math.min(82,p+(p<45?5:p<70?3:1));setProgress(p,`AI-model laden… ${p}%`)},900)}
-function finishProgress(ok,label){clearInterval(progressTimer);setProgress(100,label||(ok?'Stem klaar ✓':'Fallback-stem klaar'));if(!ok&&progressFill)progressFill.style.opacity='.65'}
-let kokoro=null,kokoroLoading=null,kokoroFailed='',kokoroDisabledUntil=0;
-async function loadKokoro(){if(Date.now()<kokoroDisabledUntil)throw new Error('Kokoro temporarily disabled after an iPhone timeout');if(kokoro)return kokoro;if(kokoroLoading)return kokoroLoading;kokoroLoading=(async()=>{try{if(info)info.textContent='Loading natural English DJ voices…';const mod=await withTimeout(import('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm'),20000,'Kokoro library');kokoro=await withTimeout(mod.KokoroTTS.from_pretrained(KOKORO_MODEL,{dtype:'q8',device:'wasm'}),LOAD_TIMEOUT,'Kokoro model load');if(info)info.textContent=`Kokoro ready — ${currentHost().voice} is on air ✓`;return kokoro}catch(e){kokoroFailed=String(e?.message||e).slice(0,220);kokoroLoading=null;kokoroDisabledUntil=Date.now()+5*60*1000;throw e}})();return kokoroLoading}
-async function playBlob(blob,label){if(!blob?.size||!djContext)return false;try{if(djContext.state==='suspended')await djContext.resume();const arr=await blob.arrayBuffer(),buffer=await djContext.decodeAudioData(arr.slice(0)),source=djContext.createBufferSource();source.buffer=buffer;source.connect(djGain);if(info)info.textContent=`${label} playing ✓`;await new Promise((resolve,reject)=>{source.onended=resolve;try{source.start(0)}catch(e){reject(e)}});return true}catch(e){kokoroFailed='Audio playback failed: '+String(e?.message||e).slice(0,180);return false}}
-async function playProducedJingle(){if(selectedLanguage!=='en')return false;try{const id=1+Math.floor(Math.random()*10);const r=await withTimeout(fetch(`/api/jingle?id=${id}`,{cache:'force-cache'}),8000,'Jingle download');if(!r.ok)throw new Error(`jingle ${r.status}`);const blob=await r.blob();if(!blob.size)throw new Error('empty jingle');return await playBlob(blob,`Josh FM produced jingle ${id}`)}catch(e){kokoroFailed='Produced jingle fallback: '+String(e?.message||e).slice(0,160);return false}}
-async function kokoroAudioBlob(audio){if(audio?.toBlob){const b=await audio.toBlob();if(b?.size)return b}if(audio?.toWav){const wav=await audio.toWav();return new Blob([wav],{type:'audio/wav'})}throw new Error('Kokoro returned audio in an unsupported format')}
-async function speakKokoro(text,jingle=false){try{if(selectedLanguage!=='en')return false;const tts=await loadKokoro();const voices=tts.list_voices?.()||{};const names=Array.isArray(voices)?voices.map(v=>v.id||v.name||v):Object.keys(voices);const scheduled=currentHost().voice;const voice=names.includes(scheduled)?scheduled:(DJ_HOSTS.find(v=>names.includes(v))||names[0]||'am_michael');if(info)info.textContent=`Kokoro generating ${voice}…`;const audio=await withTimeout(tts.generate(text,{voice,speed:jingle?1.04:1.0}),GENERATE_TIMEOUT,`Kokoro ${voice} generation`);const blob=await withTimeout(kokoroAudioBlob(audio),10000,'Kokoro WAV conversion');if(!await playBlob(blob,`Kokoro ${voice}`))throw new Error(kokoroFailed||'Kokoro audio could not play');if(info)info.textContent=`Josh FM DJ — ${voice} (changes every 2 hours) ✓`;return true}catch(e){kokoroFailed=String(e?.message||e).slice(0,220);kokoroDisabledUntil=Date.now()+5*60*1000;if(info)info.textContent=`Kokoro stopped: ${kokoroFailed}. Switching to iPhone voice.`;return false}}
-window.prepareSpeech=async function(text,jingle=false){text=jingle?localizeKnownJingle(text):text;if(jingle&&selectedLanguage==='en')return true;if((voiceSelect?.value||selectedMode)!=='kokoro'||selectedLanguage!=='en')return false;try{await loadKokoro();return true}catch{return false}};
-window.speakText=async function(text,jingle=false){await unlockAudio();text=jingle?localizeKnownJingle(text):text;if(jingle&&selectedLanguage==='en'&&await playProducedJingle())return true;const mode=voiceSelect?.value||selectedMode;if(mode==='kokoro'&&selectedLanguage==='en'&&await speakKokoro(text,jingle))return true;return speakDevice(text,jingle)};
-window.JFMDJAudio={context:djContext,unlock:unlockAudio,getErrors:()=>kokoroFailed?[kokoroFailed]:[],version:KOKORO_VERSION,get language(){return selectedLanguage},get host(){return currentHost()}};
-const testButton=document.getElementById('testVoice');ensureProgress();if(testButton)testButton.onclick=async()=>{testButton.disabled=true;startLoadingProgress();await unlockAudio();const text=selectedLanguage==='nl'?'Dit is Josh FM. Je luistert naar je persoonlijke radiostation. Er komt zo meer muziek aan.':`This is Josh FM. ${currentHost().voice} is your DJ for this two-hour show. More music is coming up next.`;let ok=false;try{setProgress(12,'AI-model voorbereiden…');if((voiceSelect?.value||selectedMode)==='kokoro'){await loadKokoro();clearInterval(progressTimer);setProgress(86,'Model geladen — stem genereren…');ok=await speakKokoro(text);if(!ok){setProgress(94,'Kokoro reageert niet — iPhone fallback starten…');ok=await speakDevice(text);finishProgress(ok,ok?'Kokoro timeout — iPhone fallback werkt ✓':'Stemtest mislukt')}}else{setProgress(75,'iPhone-stem voorbereiden…');ok=await speakDevice(text);finishProgress(ok,ok?'iPhone-stem werkt ✓':'Stemtest mislukt')}if(ok&&(voiceSelect?.value||selectedMode)==='kokoro'&&Date.now()>=kokoroDisabledUntil)finishProgress(true,'Kokoro stemtest voltooid ✓')}catch(e){kokoroFailed=String(e?.message||e).slice(0,220);clearInterval(progressTimer);setProgress(92,'AI-model timeout — iPhone fallback starten…');ok=await speakDevice(text);finishProgress(ok,ok?'AI-model timeout — iPhone fallback werkt ✓':'Stemtest mislukt')}finally{testButton.disabled=false}return ok};
+if(voiceSelect){
+  voiceSelect.innerHTML='<option value="fish">Fish Audio — English AI DJ</option><option value="device">iPhone English voice — fallback</option>';
+  voiceSelect.value=selectedMode;
+  localStorage.setItem('jfm_voice_mode',selectedMode);
+  voiceSelect.onchange=()=>{
+    selectedMode=voiceSelect.value;
+    localStorage.setItem('jfm_voice_mode',selectedMode);
+    try{const s=JSON.parse(localStorage.getItem('jfm_settings')||'{}');s.voiceMode=selectedMode;localStorage.setItem('jfm_settings',JSON.stringify(s))}catch{}
+    if(info)info.textContent=selectedMode==='fish'?'Fish Audio selected — your English Josh FM DJ voice is active.':'iPhone English voice selected — used as fallback.';
+  };
+}
+if(info)info.textContent='Fish Audio is the primary Josh FM voice. The iPhone English voice is the fallback.';
+function localizeKnownJingle(text){
+  const s=String(text||'').trim();
+  const pairs=[
+    ['Josh FM. Jouw muziek, jouw radioshow.','Josh FM. Your music, your radio show.'],
+    ['Je luistert naar Josh FM.','You are listening to Josh FM.'],
+    ['Dit is Josh FM.','This is Josh FM.'],
+    ['Josh FM.','Josh FM.']
+  ];
+  for(const[nl,en]of pairs)if(s===nl||s===en)return en;
+  return s;
+}
+window.JFMJingleText=(type='station')=>{
+  const dict={station:['This is Josh FM.','You are listening to Josh FM.'],show:['Josh FM. Your music, your radio show.'],next:['Stay right here. More music is coming up next.']};
+  const a=dict[type]||dict.station;return a[Math.floor(Math.random()*a.length)]
+};
+const AC=window.AudioContext||window.webkitAudioContext;
+let djContext=AC?new AC():null,djGain=null,audioUnlocked=false,lastError='';
+if(djContext){djGain=djContext.createGain();djGain.gain.value=1;djGain.connect(djContext.destination)}
+async function unlockAudio(){
+  try{
+    if(djContext?.state==='suspended')await djContext.resume();
+    if(djContext){const b=djContext.createBuffer(1,1,24000),s=djContext.createBufferSource();s.buffer=b;s.connect(djGain);s.start(0)}
+    audioUnlocked=!!djContext&&djContext.state==='running';
+  }catch{audioUnlocked=false}
+  return audioUnlocked
+}
+document.addEventListener('pointerdown',unlockAudio,{capture:true});
+document.addEventListener('touchstart',unlockAudio,{capture:true});
+function bestEnglishVoice(){
+  if(!('speechSynthesis'in window))return null;
+  const voices=speechSynthesis.getVoices(),preferred=['Samantha','Daniel','Karen','Moira','Tessa','Alex'];
+  for(const name of preferred){const v=voices.find(x=>x.name===name&&x.lang?.toLowerCase().startsWith('en'));if(v)return v}
+  return voices.find(x=>x.lang?.toLowerCase()==='en-us')||voices.find(x=>x.lang?.toLowerCase()==='en-gb')||voices.find(x=>x.lang?.toLowerCase().startsWith('en'))||null
+}
+async function speakDevice(text,jingle=false){
+  if(!('speechSynthesis'in window))return false;
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);u.lang='en-US';u.rate=jingle?1.03:.97;u.pitch=jingle?1:.94;u.volume=1;
+    const v=bestEnglishVoice();if(v)u.voice=v;
+    if(info)info.textContent=`iPhone fallback — ${v?.name||u.lang}`;
+    return await new Promise(resolve=>{let done=false;const finish=ok=>{if(done)return;done=true;resolve(ok)};u.onend=()=>finish(true);u.onerror=()=>finish(false);speechSynthesis.speak(u);setTimeout(()=>finish(false),30000)})
+  }catch{return false}
+}
+async function playBlob(blob,label='Fish Audio'){
+  if(!blob?.size)return false;
+  try{
+    if(djContext){
+      if(djContext.state==='suspended')await djContext.resume();
+      const arr=await blob.arrayBuffer(),buffer=await djContext.decodeAudioData(arr.slice(0)),source=djContext.createBufferSource();
+      source.buffer=buffer;source.connect(djGain);if(info)info.textContent=`${label} playing ✓`;
+      await new Promise((resolve,reject)=>{source.onended=resolve;try{source.start(0)}catch(e){reject(e)}});return true
+    }
+    const url=URL.createObjectURL(blob),audio=new Audio(url);await audio.play();await new Promise(resolve=>{audio.onended=resolve});URL.revokeObjectURL(url);return true
+  }catch(e){lastError=String(e?.message||e).slice(0,220);return false}
+}
+async function fishAudio(text,jingle=false){
+  try{
+    if(info)info.textContent='Fish Audio is generating the DJ voice…';
+    const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:String(text||'').slice(0,1200),jingle:!!jingle})});
+    if(!r.ok){
+      let detail=`HTTP ${r.status}`;try{const d=await r.json();detail=d.detail||d.error||detail}catch{}
+      throw new Error(detail)
+    }
+    const blob=await r.blob();if(!blob.size)throw new Error('Fish Audio returned empty audio');
+    const ok=await playBlob(blob,'Fish Audio');if(!ok)throw new Error(lastError||'Audio playback failed');
+    if(info)info.textContent='Fish Audio — Josh FM DJ ✓';return true
+  }catch(e){lastError=String(e?.message||e).slice(0,240);if(info)info.textContent=`Fish Audio failed: ${lastError}. Using iPhone fallback.`;return false}
+}
+window.prepareSpeech=async()=>{await unlockAudio();return true};
+window.speakText=async function(text,jingle=false){
+  await unlockAudio();text=jingle?localizeKnownJingle(text):String(text||'');
+  const mode=voiceSelect?.value||selectedMode;
+  if(mode==='fish'&&await fishAudio(text,jingle))return true;
+  return speakDevice(text,jingle)
+};
+window.JFMDJAudio={context:djContext,unlock:unlockAudio,getErrors:()=>lastError?[lastError]:[],version:FISH_VERSION,get language(){return'en'},get host(){return currentHost()}};
+const testButton=document.getElementById('testVoice');
+if(testButton)testButton.onclick=async()=>{
+  testButton.disabled=true;const old=testButton.textContent;testButton.textContent='Stem laden…';await unlockAudio();
+  const text='This is Josh FM. Your personal AI radio station is on air, with more music coming up next.';
+  let ok=false;
+  try{
+    if((voiceSelect?.value||selectedMode)==='fish'){
+      ok=await fishAudio(text,false);
+      if(!ok)ok=await speakDevice(text,false)
+    }else ok=await speakDevice(text,false);
+  }finally{testButton.disabled=false;testButton.textContent=old}
+  return ok
+};
