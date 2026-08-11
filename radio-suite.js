@@ -31,6 +31,7 @@
    await loadScript('./playback-state.js?v=1','jfm-playback-state');
    await loadScript('./spotify-recovery.js?v=5','jfm-spotify-recovery');
    await loadScript('./station-queue.js?v=1','jfm-station-queue');
-   autoMode();renderShow();window.jfmRenderNext?.();
+   await loadScript('./live-ui.js?v=1','jfm-live-ui');
+   autoMode();renderShow();window.jfmRenderNext?.();window.JFMLiveUI?.render?.();
  }catch(e){console.warn('Josh FM controller load',e)}})();
 })();
