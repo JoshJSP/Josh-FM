@@ -40,13 +40,29 @@ function direct(list){return directWithContext(list,[])}
 function kind(t){try{return window.JFMRotation?.category?.(t)||'Voor jou'}catch{}if(isRequest(t))return'Verzoek';if(t?._discovery)return'Ontdekking';return'Voor jou'}
 function why(t){try{return window.JFMRotation?.reason?.(t)||''}catch{return''}}
 function baseUpcoming(){const current=playback?.item?.id,idx=(queue||[]).findIndex(t=>t.id===current);if(idx>=0)return(queue||[]).slice(idx+1,idx+7);return(queue||[]).filter(t=>t.id!==current).slice(0,6)}
-function upcoming(){
+
+// Keep the visible schedule stable while a song is playing. Polling, health checks or temporary
+// request state changes must never reshuffle STRAKS/LATER. We only invalidate on a real track change,
+// an intentional radioset rebuild, or a materially new request insertion.
+let upcomingCache=[],upcomingForTrack='',upcomingRevision=0,lastRequestSig='';
+function requestSig(){try{return(window.JFMRequests?.list?.()||[]).filter(r=>['queued','scheduled','armed'].includes(r.status)).map(r=>`${r.track?.uri||r.track?.id||''}:${r.status}`).join('|')}catch{return''}}
+function computeUpcoming(){
   const items=baseUpcoming();
   try{
     const armed=window.JFMRequests?.list?.().find(r=>r.status==='armed');
     if(armed?.track?.uri){const t={...armed.track,_request:true};const dedup=items.filter(x=>x.uri!==t.uri&&x.id!==t.id);return[t,...dedup].slice(0,6)}
   }catch{}
   return items
+}
+function invalidateUpcoming(reason='manual'){
+  upcomingRevision++;upcomingCache=[];upcomingForTrack='';
+  try{window.dispatchEvent(new CustomEvent('jfm:upcoming-invalidated',{detail:{reason,revision:upcomingRevision}}))}catch{}
+}
+function upcoming(){
+  const current=playback?.item?.id||'';
+  if(upcomingCache.length&&upcomingForTrack===current)return[...upcomingCache];
+  upcomingCache=computeUpcoming();upcomingForTrack=current;lastRequestSig=requestSig();
+  return[...upcomingCache]
 }
 window.jfmUpcoming=upcoming;
 function renderWhy(){
@@ -56,13 +72,13 @@ function renderWhy(){
 }
 function renderNext(){const box=$('directorQueue');if(!box)return;const items=upcoming();if(!items.length){box.innerHTML='<p class="muted">Start Josh FM om de programmering te zien.</p>';if($('nextUp'))$('nextUp').textContent='—';renderWhy();return}box.innerHTML=items.map((t,i)=>`<div class="director-track"><span class="director-num">${i+1}</span>${t.image?`<img src="${esc(t.image)}" alt="">`:''}<div class="director-meta"><b>${esc(t.name)}</b><span>${esc((t.artists||[]).join(', '))}</span></div><em>${esc(kind(t))}</em></div>`).join('');const n=items[0];if($('nextUp'))$('nextUp').textContent=n?`${n.name} · ${(n.artists||[]).join(', ')}`:'—';renderWhy()}
 window.jfmRenderNext=renderNext;
-const oldBuild=buildSet;buildSet=window.buildSet=async function(){const list=await oldBuild();try{window.JFMRotation?.annotateAll?.(queue||list||[])}catch{}queue=direct(queue||list||[]);renderNext();return queue};
+const oldBuild=buildSet;buildSet=window.buildSet=async function(){const list=await oldBuild();try{window.JFMRotation?.annotateAll?.(queue||list||[])}catch{}queue=direct(queue||list||[]);invalidateUpcoming('radioset-rebuild');renderNext();return queue};
 $('searchResults')?.addEventListener('click',e=>{const btn=e.target.closest?.('.result');if(!btn)return;const uri=btn.dataset.uri;if(!uri)return;const m=memory(),id=uri.split(':').pop();m.requests[uri]=(m.requests[uri]||0)+1;if(id)m.requests[id]=(m.requests[id]||0)+1;save(m)},true);
-let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(!id||id===seen)return;seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);renderNext()},5000);
-window.addEventListener('jfm:trackchange',()=>renderNext());
-window.addEventListener('jfm:requests-change',()=>renderNext());
+let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(!id||id===seen)return;seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);invalidateUpcoming('trackchange');renderNext()},5000);
+window.addEventListener('jfm:trackchange',()=>{invalidateUpcoming('trackchange-event');renderNext()});
+window.addEventListener('jfm:requests-change',()=>{const sig=requestSig();if(sig!==lastRequestSig){lastRequestSig=sig;invalidateUpcoming('request-change')}renderNext()});
 $('loveTrack')?.addEventListener('click',()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)+1;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryWins[id]=(m.discoveryWins[id]||0)+1;save(m);$('loveTrack').textContent='♥ Onthouden';setTimeout(()=>$('loveTrack').textContent='♥ Meer zoals dit',1000);renderWhy()});
 $('banTrack')?.addEventListener('click',async()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)-3;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryLosses[id]=(m.discoveryLosses[id]||0)+1;save(m);try{await window.JFMPlayback?.next?.()||control('next')}catch{}});
-window.JFMProgramDirector={version:'director-v5-rotation',direct,directWithContext,score:fitScore,upcoming,kind,why,isRequest};
+window.JFMProgramDirector={version:'director-v6-sticky-upcoming',direct,directWithContext,score:fitScore,upcoming,kind,why,isRequest,invalidateUpcoming};
 setInterval(renderNext,5000);setTimeout(renderNext,1200);
 })();
