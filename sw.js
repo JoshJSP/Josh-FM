@@ -1,5 +1,5 @@
-const CACHE='josh-fm-v11-smart-requests';
-const CORE=['./','./index.html','./styles.css','./app.js','./stability-core.js','./dj-resume.js','./discovery.js','./debug-tts.js','./dj-audio-guard.js','./request-manager.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./playback-state.js','./spotify-recovery.js','./station-queue.js','./dj-now-queue.js','./manifest.webmanifest','./logo.svg'];
+const CACHE='josh-fm-v12-station-clock';
+const CORE=['./','./index.html','./styles.css','./app.js','./stability-core.js','./dj-resume.js','./discovery.js','./debug-tts.js','./dj-audio-guard.js','./request-manager.js','./station-clock.js','./station-clock-bridge.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./playback-state.js','./spotify-recovery.js','./station-queue.js','./dj-now-queue.js','./manifest.webmanifest','./logo.svg'];
 
 async function cacheCore(){
   const cache=await caches.open(CACHE);
