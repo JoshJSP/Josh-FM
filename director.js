@@ -5,7 +5,7 @@ const memory=()=>{try{return JSON.parse(localStorage.getItem(memoryKey)||'{"play
 const save=m=>localStorage.setItem(memoryKey,JSON.stringify(m));
 const artistKey=t=>(t?.artists?.[0]||'').toLowerCase().trim();
 const yr=t=>Number(String(t?.release||'').slice(0,4))||0;
-const isRequest=t=>{const m=memory();return!!(t&&(m.requests[t.id]||m.requests[t.uri]))};
+const isRequest=t=>{if(!t)return false;try{if(window.JFMRequests?.isRequest?.(t))return true}catch{}const m=memory();return!!(m.requests[t.id]||m.requests[t.uri])};
 window.jfmDirectorMemory=memory;window.jfmIsRequest=isRequest;
 
 function baseScore(t){
@@ -32,16 +32,26 @@ function directWithContext(list,context=[]){
   return out
 }
 function direct(list){return directWithContext(list,[])}
-function kind(t){if(isRequest(t))return'Verzoek';if(t._discovery)return'Ontdekking';return'Voor jou'}
-function upcoming(){const current=playback?.item?.id,idx=(queue||[]).findIndex(t=>t.id===current);if(idx>=0)return(queue||[]).slice(idx+1,idx+7);return(queue||[]).filter(t=>t.id!==current).slice(0,6)}
+function kind(t){if(isRequest(t))return'Verzoek';if(t?._discovery)return'Ontdekking';return'Voor jou'}
+function baseUpcoming(){const current=playback?.item?.id,idx=(queue||[]).findIndex(t=>t.id===current);if(idx>=0)return(queue||[]).slice(idx+1,idx+7);return(queue||[]).filter(t=>t.id!==current).slice(0,6)}
+function upcoming(){
+  const items=baseUpcoming();
+  try{
+    const armed=window.JFMRequests?.list?.().find(r=>r.status==='armed');
+    if(armed?.track?.uri){const t={...armed.track,_request:true};const dedup=items.filter(x=>x.uri!==t.uri&&x.id!==t.id);return[t,...dedup].slice(0,6)}
+  }catch{}
+  return items
+}
 window.jfmUpcoming=upcoming;
 function renderNext(){const box=$('directorQueue');if(!box)return;const items=upcoming();if(!items.length){box.innerHTML='<p class="muted">Start Josh FM om de programmering te zien.</p>';if($('nextUp'))$('nextUp').textContent='—';return}box.innerHTML=items.map((t,i)=>`<div class="director-track"><span class="director-num">${i+1}</span>${t.image?`<img src="${esc(t.image)}" alt="">`:''}<div class="director-meta"><b>${esc(t.name)}</b><span>${esc((t.artists||[]).join(', '))}</span></div><em>${kind(t)}</em></div>`).join('');const n=items[0];if($('nextUp'))$('nextUp').textContent=n?`${n.name} · ${(n.artists||[]).join(', ')}`:'—'}
 window.jfmRenderNext=renderNext;
 const oldBuild=buildSet;buildSet=window.buildSet=async function(){const list=await oldBuild();queue=direct(queue||list||[]);renderNext();return queue};
-$('searchResults')?.addEventListener('click',e=>{const btn=e.target.closest?.('.result');if(!btn)return;const uri=btn.dataset.uri;if(!uri)return;const m=memory();m.requests[uri]=(m.requests[uri]||0)+1;save(m);const em=btn.querySelector('em');if(em)em.textContent='✓ verzoek'},true);
+$('searchResults')?.addEventListener('click',e=>{const btn=e.target.closest?.('.result');if(!btn)return;const uri=btn.dataset.uri;if(!uri)return;const m=memory(),id=uri.split(':').pop();m.requests[uri]=(m.requests[uri]||0)+1;if(id)m.requests[id]=(m.requests[id]||0)+1;save(m)},true);
 let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(!id||id===seen)return;seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);renderNext()},5000);
+window.addEventListener('jfm:trackchange',()=>renderNext());
+window.addEventListener('jfm:requests-change',()=>renderNext());
 $('loveTrack')?.addEventListener('click',()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)+1;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryWins[id]=(m.discoveryWins[id]||0)+1;save(m);$('loveTrack').textContent='♥ Onthouden';setTimeout(()=>$('loveTrack').textContent='♥ Meer zoals dit',1000)});
-$('banTrack')?.addEventListener('click',async()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)-3;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryLosses[id]=(m.discoveryLosses[id]||0)+1;save(m);try{await control('next')}catch{}});
-window.JFMProgramDirector={version:'director-v3-continuous',direct,directWithContext,score:fitScore,upcoming,kind};
+$('banTrack')?.addEventListener('click',async()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)-3;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryLosses[id]=(m.discoveryLosses[id]||0)+1;save(m);try{await window.JFMPlayback?.next?.()||control('next')}catch{}});
+window.JFMProgramDirector={version:'director-v4-requests',direct,directWithContext,score:fitScore,upcoming,kind,isRequest};
 setInterval(renderNext,5000);setTimeout(renderNext,1200);
 })();
