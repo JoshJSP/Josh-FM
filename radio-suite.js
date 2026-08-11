@@ -20,22 +20,16 @@
  function authGuard(){const text=($('queueInfo')?.textContent||'').toLowerCase();if(text.includes('opnieuw gekoppeld')||text.includes('niet gekoppeld')||text.includes('spotify-login')){$('setup')?.classList.remove('hidden');if($('connect'))$('connect').disabled=false}}
  setInterval(authGuard,600);window.addEventListener('pageshow',authGuard);setTimeout(authGuard,800);
  window.JFMRadioSuite={state:()=>s,save,autoMode,renderShow,djFeedback:loadDj};
-
- // Load feature guards/controllers in a deterministic order.
- const loadScript=(src,id)=>new Promise((resolve,reject)=>{
-   if(document.getElementById(id))return resolve();
-   const x=document.createElement('script');x.id=id;x.src=src;x.onload=()=>resolve();x.onerror=()=>reject(new Error(`Kon ${src} niet laden`));document.body.appendChild(x)
- });
- (async()=>{
-   try{
-     await loadScript('./station-clock.js?v=1','jfm-station-clock');
-     await loadScript('./station-clock-bridge.js?v=1','jfm-station-clock-bridge');
-     await loadScript('./dj-audio-guard.js?v=2','jfm-dj-audio-guard');
-     await loadScript('./request-manager.js?v=1','jfm-request-manager');
-     await loadScript('./playback-state.js?v=1','jfm-playback-state');
-     await loadScript('./spotify-recovery.js?v=5','jfm-spotify-recovery');
-     await loadScript('./station-queue.js?v=1','jfm-station-queue');
-     autoMode();renderShow();
-   }catch(e){console.warn('Josh FM controller load',e)}
- })();
+ const loadScript=(src,id)=>new Promise((resolve,reject)=>{if(document.getElementById(id))return resolve();const x=document.createElement('script');x.id=id;x.src=src;x.onload=()=>resolve();x.onerror=()=>reject(new Error(`Kon ${src} niet laden`));document.body.appendChild(x)});
+ (async()=>{try{
+   await loadScript('./station-clock.js?v=1','jfm-station-clock');
+   await loadScript('./station-clock-bridge.js?v=1','jfm-station-clock-bridge');
+   await loadScript('./rotation-engine.js?v=1','jfm-rotation-engine');
+   await loadScript('./dj-audio-guard.js?v=2','jfm-dj-audio-guard');
+   await loadScript('./request-manager.js?v=1','jfm-request-manager');
+   await loadScript('./playback-state.js?v=1','jfm-playback-state');
+   await loadScript('./spotify-recovery.js?v=5','jfm-spotify-recovery');
+   await loadScript('./station-queue.js?v=1','jfm-station-queue');
+   autoMode();renderShow();window.jfmRenderNext?.();
+ }catch(e){console.warn('Josh FM controller load',e)}})();
 })();
