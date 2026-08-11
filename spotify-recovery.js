@@ -47,25 +47,34 @@
   }
   async function ensureDevice(play=false){const id=await chooseDevice();if(!id)return'';await transfer(id,play);return id}
 
-  async function hardPlay(uri,preferredId='',positionMs=null){
+  async function hardPlay(target='',preferredId='',positionMs=null){
     if(resuming)return false;resuming=true;
     try{
+      const uris=Array.isArray(target)?target.filter(Boolean):(target?[target]:[]),expectedUri=uris[0]||'';
       let id=preferredId||storedDevice()||await chooseDevice();if(!id)return false;
       for(let i=0;i<5;i++){
         await transfer(id,false);
         try{
-          const body=uri?{uris:[uri],...(Number.isFinite(Number(positionMs))?{position_ms:Math.max(0,Number(positionMs)||0)}:{})}:undefined;
+          const body=uris.length?{uris,...(Number.isFinite(Number(positionMs))?{position_ms:Math.max(0,Number(positionMs)||0)}:{})}:undefined;
           await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body});
         }catch{}
         await wait(380+i*180);
         const s=await api('/me/player').catch(()=>null);if(s?.device?.id)remember(s);
-        if(s?.is_playing&&(!uri||s.item?.uri===uri)){playback=s;remember(s);setExpectedLive(true);try{renderPlayback(s)}catch{};syncStartButton(true);return true}
+        if(s?.is_playing&&(!expectedUri||s.item?.uri===expectedUri)){playback=s;remember(s);setExpectedLive(true);try{renderPlayback(s)}catch{};syncStartButton(true);return true}
         const fresh=await chooseDevice({preferActive:false});if(fresh)id=fresh
       }
       health.failures++;saveState();return false
     }finally{resuming=false}
   }
   async function playUri(uri){return hardPlay(uri)}
+  function expectedNext(afterId){try{const q=Array.isArray(queue)?queue:[],i=q.findIndex(t=>t?.id===afterId);return i>=0?q[i+1]||null:null}catch{return null}}
+  async function waitForTrackChange(beforeId,tries=8){
+    for(let i=0;i<tries;i++){
+      await wait(170+i*35);const s=await api('/me/player').catch(()=>null);
+      if(s?.item?.id&&s.item.id!==beforeId){playback=s;remember(s);try{renderPlayback(s)}catch{};return s}
+    }
+    return null
+  }
 
   async function recover(reason='unknown',{force=false}={}){
     if(recovering||starting||djBusy||window.JFMDJTransition?.busy)return false;
@@ -103,7 +112,7 @@
         info('Josh FM-jingle…');try{await Promise.race([speakText('Josh FM. Your music, your radio show.',true),wait(5000)])}catch{}await wait(250);id=await chooseDevice({preferActive:false})||id
       }
       const uris=queue.slice(0,30).map(x=>x.uri).filter(Boolean);if(!uris.length)throw Error('Geen afspeelbare Spotify-tracks gevonden.');
-      info('Muziek wordt gestart…');const ok=await hardPlay(uris[0],id,0);if(!ok)throw Error('Spotify reageert niet op afspelen. Open Spotify kort en probeer opnieuw.');
+      info('Muziek wordt gestart…');const ok=await hardPlay(uris,id,0);if(!ok)throw Error('Spotify reageert niet op afspelen. Open Spotify kort en probeer opnieuw.');
       const s=await api('/me/player').catch(()=>null);if(s){playback=s;remember(s);try{renderPlayback(s)}catch{}}
       session=[];try{renderHistory()}catch{};try{scheduleTalk()}catch{};try{startPolling()}catch{};
       setExpectedLive(true);info(`Josh FM is live · ${queue.length} tracks klaar.`);syncStartButton(true)
@@ -117,8 +126,24 @@
       setExpectedLive(true);const ok=await hardPlay(null);if(!ok){setExpectedLive(false);info('Spotify is niet actief. Open Spotify één keer en probeer opnieuw.')}setTimeout(()=>refresh().catch(()=>{}),300)
     }catch(e){setExpectedLive(false);info('Afspelen lukte niet: '+String(e?.message||e))}
   }
-  async function next(){try{if(playback?.item?.id)recordSkip(playback.item.id);setExpectedLive(true);const id=await chooseDevice();await api('/me/player/next'+(id?'?device_id='+encodeURIComponent(id):''),{method:'POST'});await wait(250);await hardPlay(null,id);setTimeout(()=>refresh().catch(()=>{}),300)}catch(e){info('Volgende nummer lukte niet: '+String(e?.message||e))}}
-  async function prev(){try{setExpectedLive(true);const id=await chooseDevice();await api('/me/player/previous'+(id?'?device_id='+encodeURIComponent(id):''),{method:'POST'});await wait(250);await hardPlay(null,id);setTimeout(()=>refresh().catch(()=>{}),300)}catch(e){info('Vorige nummer lukte niet: '+String(e?.message||e))}}
+  async function next(){
+    try{
+      const live=await api('/me/player').catch(()=>null),beforeId=live?.item?.id||playback?.item?.id||'';
+      if(beforeId)recordSkip(beforeId);setExpectedLive(true);
+      const id=live?.device?.id||await chooseDevice();
+      await api('/me/player/next'+(id?'?device_id='+encodeURIComponent(id):''),{method:'POST'});
+      let changed=await waitForTrackChange(beforeId);
+      if(!changed){
+        const fallback=expectedNext(beforeId);
+        if(!fallback?.uri)throw Error('Spotify heeft geen volgende track in de huidige radioset.');
+        const ok=await hardPlay(fallback.uri,id,0);if(!ok)throw Error('De volgende track kon niet worden gestart.');
+        changed=await api('/me/player').catch(()=>null)
+      }else if(!changed.is_playing){await api('/me/player/play'+(id?'?device_id='+encodeURIComponent(id):''),{method:'PUT'}).catch(()=>{})}
+      if(changed){playback=changed;remember(changed);try{renderPlayback(changed)}catch{}}
+      setTimeout(()=>refresh().catch(()=>{}),350)
+    }catch(e){info('Volgende nummer lukte niet: '+String(e?.message||e))}
+  }
+  async function prev(){try{setExpectedLive(true);const live=await api('/me/player').catch(()=>null),id=live?.device?.id||await chooseDevice();await api('/me/player/previous'+(id?'?device_id='+encodeURIComponent(id):''),{method:'POST'});await wait(300);setTimeout(()=>refresh().catch(()=>{}),250)}catch(e){info('Vorige nummer lukte niet: '+String(e?.message||e))}}
   function own(id,fn){const old=$(id);if(!old)return;const b=old.cloneNode(true);old.replaceWith(b);if(id==='start'){b.disabled=false;b.classList.remove('hidden');b.style.display=''}b.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();fn()})}
   own('start',startQueue);own('play',playPause);own('next',next);own('prev',prev);
 
@@ -142,6 +167,6 @@
     }finally{watching=false}
   },15000);
   setInterval(()=>syncStartButton(),700);setTimeout(()=>syncStartButton(),50);setTimeout(()=>syncStartButton(),1000);
-  window.JFMPlayback={version:'recovery-v3',start:startQueue,playUri,hardPlay,recover,ensureDevice,chooseDevice,transfer,storedDevice,syncStartButton,get health(){return{...health,recovering,hiddenWasPlaying}}};
+  window.JFMPlayback={version:'recovery-v4-context',start:startQueue,playUri,hardPlay,recover,ensureDevice,chooseDevice,transfer,storedDevice,syncStartButton,get health(){return{...health,recovering,hiddenWasPlaying}}};
   window.jfmPlayUri=playUri;window.jfmEnsureSpotifyDevice=ensureDevice;
 })();
