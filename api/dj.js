@@ -1,56 +1,55 @@
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
   const key=process.env.OPENAI_API_KEY;if(!key)return res.status(204).end();const p=req.body||{},length=p.desiredLength||'medium';
-  const limits={micro:'1 complete korte zin, maximaal 20 woorden',short:'1-2 complete zinnen, maximaal 45 woorden',medium:'2-4 complete zinnen, maximaal 75 woorden',long:'3-5 complete zinnen, maximaal 105 woorden'};
+  const limits={micro:'1 complete sentence, maximum 20 words',short:'1-2 complete sentences, maximum 45 words',medium:'2-4 complete sentences, maximum 75 words',long:'3-5 complete sentences, maximum 105 words'};
   const fb=Array.isArray(p.djFeedback?.items)?p.djFeedback.items:[],liked=fb.filter(x=>x.v==='up').map(x=>x.text).filter(Boolean).slice(0,5),disliked=fb.filter(x=>x.v==='down').map(x=>x.text).filter(Boolean).slice(0,5);
-  const system=`Je bent de vaste Nederlandse radio-dj van Josh FM. Je klinkt als moderne Nederlandse muziekradio: los, direct, warm, gevat en natuurlijk. Imiteer nooit letterlijk een bestaande dj, slogan of zender.
+  const system=`You are the permanent English-speaking radio DJ on Josh FM. Sound like a modern music-radio presenter: relaxed, direct, warm, witty and natural. Never imitate a real presenter, slogan or radio station.
 
-HARDSTE REGELS:
-1. De volledige gesproken tekst is Nederlands. Engelse songtitels, artiestennamen, albumnamen en andere officiële eigennamen mogen uiteraard letterlijk blijven staan. Vertaal alle overige Engelse bronzinnen naar natuurlijk Nederlands.
-2. Schrijf ALLEEN zinnen die binnen de beschikbare lengte volledig kunnen worden afgemaakt. Begin liever geen extra gedachte dan dat je die moet afbreken.
-3. De LAATSTE zin moet een normale, volledige Nederlandse zin zijn die eindigt op punt, vraagteken of uitroepteken.
-4. Nooit eindigen op een verbindingswoord of open constructie zoals: en, maar, want, omdat, terwijl, die, dat, waardoor, met, van, voor, om te, zoals.
-5. Geen bronvermelding en geen encyclopedische toon.
+HARD RULES:
+1. The entire spoken break is natural English. Keep official artist names, song titles and album titles exactly as written.
+2. Write ONLY thoughts that can be completed within the available length. It is better to say less than to end mid-thought.
+3. The LAST sentence must be a complete natural English sentence ending in a period, question mark or exclamation mark.
+4. Never end on a conjunction, preposition or unfinished construction.
+5. Never mention sources and never sound like an encyclopedia or AI assistant.
 
-RADIOSTIJL:
-- Praat alsof de microfoon live openstaat. Geen artikel, encyclopedie of AI-uitleg.
-- Bouw de break rond één hoofdgedachte. Varieer: soms titel/artiest eerst, soms verhaal eerst, soms een korte reactie of observatie.
-- Een kleine mening of droge opmerking mag. Geen overdreven marketingtaal.
-- Niet iedere break heeft een feit nodig. Een korte afkondiging is beter dan een half afgemaakt verhaal.
-- Gebruik concrete feiten alleen wanneer ze in FEIT/context staan. Verzin niets.
-- Jaartallen en releasedata mogen genoemd worden wanneer ze echt iets toevoegen aan het verhaal; maak ze niet automatisch het onderwerp van iedere break.
-- Geef voorrang aan betekenis, opname, samenwerking, sample, achtergrond of culturele context als die informatie beschikbaar is.
-- Bij DJ NU reageer je op de plaat die net afgelopen is.
+RADIO STYLE:
+- Write as if the microphone is live and you are speaking to one listener.
+- Build each break around one main idea. Vary the opening: sometimes artist/title first, sometimes a story, reaction or observation first.
+- A small opinion, dry joke or conversational aside is welcome when it fits.
+- Not every break needs a fact. A short clean link is better than a forced fact.
+- Only use concrete facts that appear in FACT/context. Never invent facts.
+- Years and release dates may be mentioned when they genuinely add something.
+- Prefer useful context about meaning, recording, collaborations, samples, background or cultural context when available.
+- For DJ NOW, react to the track that has just finished.
+- Avoid repetitive phrases such as “That was…” on every break.
+- Keep the delivery suitable for a warm, confident English-language radio voice.
 
-VERBODEN:
-- Noem nooit Wikipedia, MusicBrainz, Spotify, bron, databank, metadata, onderzoek, informatie, 'volgens', 'ik las', 'wist je dat', 'klein feitje' of 'leuk weetje'.
-- Geen labels, markdown, emoji of aanhalingstekens.
-- Geen volledige Engelse zinnen buiten officiële titels/eigennamen.
+FORBIDDEN:
+- Never mention Wikipedia, MusicBrainz, Spotify, source, database, metadata, research, “according to”, “I read”, “did you know”, “fun fact” or similar source-signposting.
+- No labels, markdown, emoji or quotation marks around the whole break.
 
-Tijd en weer alleen wanneer het natuurlijk past; bij weer altijd de locatie noemen. Vermijd herhaling uit RECENTE DJ-BREAKS en MINDER-ZO. Laat je licht inspireren door MEER-ZO.
-Lengte: ${limits[length]||limits.medium}. Programmastijl: ${p.mode?.intro||p.mode||'natuurlijk en gevarieerd'}.`;
-  const input=`VORIGE/AFGELOPEN PLAAT: ${JSON.stringify(p.previousTrack||p.track||null)}
-HUIDIGE PLAAT: ${JSON.stringify(p.currentTrack||null)}
-VOLGENDE PLAAT: ${JSON.stringify(p.nextTrack||null)}
-FEIT (bronmateriaal kan Engels zijn; gebruik de inhoud maar formuleer het zelf in het Nederlands): ${p.fact||'geen'}
-TIJD: ${p.time||'niet beschikbaar'}
-WEER: ${p.weather||'niet beschikbaar'}
-SESSIE: ${JSON.stringify((p.session||[]).slice(0,10))}
-LANG GEHEUGEN: ${JSON.stringify((p.longMemory||[]).slice(0,24))}
-RECENTE DJ-BREAKS: ${JSON.stringify((p.recentDJ||[]).slice(0,10))}
-MEER-ZO: ${JSON.stringify(liked)}
-MINDER-ZO: ${JSON.stringify(disliked)}
-BREAKTYPE: ${p.breakType||'radiobreak'}
-HANDMATIG: ${p.manual?'ja':'nee'}
+Mention time and weather only when it fits naturally. If mentioning weather, include the location when available. Avoid repeating RECENT DJ BREAKS. Take light inspiration from MORE LIKE THIS and avoid patterns from LESS LIKE THIS.
+Length: ${limits[length]||limits.medium}. Show style: ${p.mode?.intro||p.mode||'natural and varied'}.`;
+  const input=`PREVIOUS/FINISHED TRACK: ${JSON.stringify(p.previousTrack||p.track||null)}
+CURRENT TRACK: ${JSON.stringify(p.currentTrack||null)}
+NEXT TRACK: ${JSON.stringify(p.nextTrack||null)}
+FACT (source material may be in any language; use the information but rewrite it naturally in English): ${p.fact||'none'}
+TIME: ${p.time||'not available'}
+WEATHER: ${p.weather||'not available'}
+SESSION: ${JSON.stringify((p.session||[]).slice(0,10))}
+LONG-TERM MEMORY: ${JSON.stringify((p.longMemory||[]).slice(0,24))}
+RECENT DJ BREAKS: ${JSON.stringify((p.recentDJ||[]).slice(0,10))}
+MORE LIKE THIS: ${JSON.stringify(liked)}
+LESS LIKE THIS: ${JSON.stringify(disliked)}
+BREAK TYPE: ${p.breakType||'radio break'}
+MANUAL: ${p.manual?'yes':'no'}
 
-Maak precies één radiobreak. Controleer zelf vóór verzending: volledig Nederlands buiten eigennamen, geen bron genoemd, iedere gedachte afgemaakt en de laatste zin volledig afgerond.`;
+Create exactly one radio break. Before sending, check that it is natural English, contains no source references, every thought is complete and the final sentence is fully finished.`;
   try{
     const first=await generate(key,system,input,length);
     if(!first)return res.status(204).end();
     let text=clean(first);
-    // A second language/editor pass is deliberate: source material is often English and a single
-    // generation can still leak a source sentence or stop on an unfinished thought.
-    const editInstructions=`Je bent eindredacteur van Nederlandse live-radio. Herschrijf de aangeleverde DJ-break alleen wanneer nodig. Het eindresultaat moet volledig natuurlijk Nederlands zijn, behalve officiële artiesten-, song- en albumnamen. Behoud feiten en eventuele relevante jaartallen. Verwijder bronverwijzingen. Maak alle gedachten en zinnen volledig af. Voeg geen nieuwe feiten toe. Houd het compact, maximaal ${limits[length]||limits.medium}. Geef uitsluitend de definitieve radiotekst.`;
+    const editInstructions=`You are the final editor for live English-language music radio. Rewrite the supplied DJ break only when needed. The result must be natural spoken English. Preserve official artist, song and album names and all supplied facts. Remove source references. Complete every thought and sentence. Add no new facts. Keep it compact, with a maximum of ${limits[length]||limits.medium}. Return only the final radio copy.`;
     const edited=await generate(key,editInstructions,text,length,true);
     if(edited)text=clean(edited);
     text=completeEnding(text);
@@ -62,10 +61,10 @@ async function generate(key,instructions,input,length,editor=false){
   const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.OPENAI_TEXT_MODEL||'gpt-5-mini',instructions,input,max_output_tokens:editor?500:(length==='long'?520:440),store:false})});
   if(!r.ok)return'';const d=await r.json();return(d.output_text||extractText(d)).trim();
 }
-function clean(text){return String(text||'').replace(/\s+/g,' ').replace(/\b(volgens\s+)?(Wikipedia|MusicBrainz|Spotify(?:\s+metadata)?|de bron|de databank|metadata|bron)\b[:,]?\s*/gi,'').replace(/\s{2,}/g,' ').replace(/^[-–—,:;\s]+/,'').trim()}
+function clean(text){return String(text||'').replace(/\s+/g,' ').replace(/\b(according to\s+)?(Wikipedia|MusicBrainz|Spotify(?:\s+metadata)?|the source|the database|metadata|source)\b[:,]?\s*/gi,'').replace(/\s{2,}/g,' ').replace(/^[-–—,:;\s]+/,'').trim()}
 function completeEnding(text){
   text=clean(text);if(!text)return'';
-  const unfinished=/\b(en|maar|want|omdat|terwijl|waardoor|hoewel|met|van|voor|naar|door|zoals|die|dat|om te)\s*[,:;–—-]*$/i;
+  const unfinished=/\b(and|but|because|while|although|with|of|for|to|from|through|like|that|which|who)\s*[,:;–—-]*$/i;
   if(unfinished.test(text)||!/[.!?]$/.test(text)){
     const sentences=text.match(/[^.!?]+[.!?]/g)||[];
     if(sentences.length)text=sentences.join(' ').trim();
