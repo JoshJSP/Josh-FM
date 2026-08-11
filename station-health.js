@@ -1,7 +1,7 @@
 // Josh FM Station Health — central diagnostics, music-first safe mode and non-destructive self test.
 (()=>{
   const $=id=>document.getElementById(id),LOG_MAX=80;
-  const log=[];let safe=false,safeReasons=[],lastSnapshot=null,lastTest=null,lastRenderSig='';
+  const log=[];let safe=false,safeReasons=[],lastSnapshot=null,lastTest=null,lastRenderSig='',safeSavedFlags=null;
   const now=()=>Date.now();
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   function trace(stage,detail={}){log.unshift({at:now(),stage,...detail});if(log.length>LOG_MAX)log.length=LOG_MAX}
@@ -20,8 +20,10 @@
     return reasons
   }
   function applySafeMode(reasons=currentReasons()){
-    const next=reasons.length>0,changed=next!==safe||reasons.join('|')!==safeReasons.join('|');safe=next;safeReasons=[...reasons];
-    document.body.classList.toggle('jfm-safe-mode',safe);document.body.dataset.safeMode=safe?'1':'0';
+    const next=reasons.length>0,changed=next!==safe||reasons.join('|')!==safeReasons.join('|');
+    if(next&&!safe){safeSavedFlags={skipNextTalk:!!window.skipNextTalk,musicRun:!!window.jfmMusicRun}}
+    if(!next&&safe&&safeSavedFlags){try{window.skipNextTalk=!!safeSavedFlags.skipNextTalk}catch{};try{window.jfmMusicRun=!!safeSavedFlags.musicRun}catch{};safeSavedFlags=null}
+    safe=next;safeReasons=[...reasons];document.body.classList.toggle('jfm-safe-mode',safe);document.body.dataset.safeMode=safe?'1':'0';
     if(safe){try{window.skipNextTalk=true}catch{};try{window.jfmMusicRun=true}catch{}}
     if(changed){trace(safe?'safe-enter':'safe-exit',{reasons:[...safeReasons]});try{window.dispatchEvent(new CustomEvent('jfm:safe-mode',{detail:{active:safe,reasons:[...safeReasons]}}))}catch{};render()}
     return safe
@@ -55,24 +57,17 @@
     add(window.JFMPWA?'PASS':'WARN','PWA platform',window.JFMPWA?.version||'Niet geladen');
     add(window.JFMRuntimeModes?'PASS':'WARN','Runtime modes',window.JFMRuntimeModes?.version||'Niet geladen');
     add(window.JFMTop40?'PASS':'WARN','Personal Top 40',window.JFMTop40?.version||'Niet geladen');
+    const contract=window.JFMIntegrationGuards?.sanity?.();add(contract?.missing?.length?'WARN':'PASS','Controller-contracten',contract?.missing?.length?`Ontbreekt: ${contract.missing.join(', ')}`:'Alle kerncontrollers aanwezig');
     const reasons=currentReasons();add(reasons.length?'WARN':'PASS','Safe Mode',reasons.length?reasons.join(' · '):'Geen degradatie actief');
     const rank={FAIL:0,WARN:1,PASS:2};results.sort((a,b)=>rank[a.level]-rank[b.level]);lastTest={at:now(),results};trace('self-test',{pass:results.filter(x=>x.level==='PASS').length,warn:results.filter(x=>x.level==='WARN').length,fail:results.filter(x=>x.level==='FAIL').length});
     if(out)out.innerHTML=results.map(testRow).join('');if(btn){btn.disabled=false;btn.textContent='Test Josh FM opnieuw'}render();return lastTest
   }
-  function installSelfTestOwner(){
-    const old=$('selfTest');if(!old)return false;const b=old.cloneNode(true);old.replaceWith(b);b.addEventListener('click',()=>runSelfTest().catch(e=>{trace('self-test-error',{error:String(e?.message||e)});b.disabled=false;b.textContent='Test Josh FM opnieuw'}));window.JFMSelfTest={version:'selftest-v2-health',run:runSelfTest};return true
-  }
-  function ensureHealthSummary(){
-    let box=$('jfmHealthSummary');if(box)return box;const out=$('selfTestResults');if(!out)return null;box=document.createElement('div');box.id='jfmHealthSummary';box.className='jfm-health-summary';out.insertAdjacentElement('beforebegin',box);return box
-  }
-  function render(){
-    const box=ensureHealthSummary();if(!box)return;const s=snapshot(),sig=JSON.stringify({safe:s.safeMode,reasons:s.safeReasons,playing:s.playback?.isPlaying,queue:s.queue?.remaining,fish:s.fish?.available,show:s.show?.id,online:s.online});if(sig===lastRenderSig)return;lastRenderSig=sig;
-    const queueText=s.queue?`${s.queue.remaining??'—'} vooruit`:'—',fishText=s.fish?(s.fish.available?'OK':'BACKOFF'):'—',playText=s.playback?(s.playback.isPlaying?'SPEELT':s.playback.expectedLive?'HERSTEL':'PAUZE'):'—';
-    box.innerHTML=`<div class="jfm-health-head"><b>${safe?'SAFE MODE':'STATION OK'}</b><span>${safe?esc(safeReasons.join(' · ')):'Muziek, queue en DJ worden bewaakt.'}</span></div><div class="jfm-health-grid"><span>Playback <b>${esc(playText)}</b></span><span>Queue <b>${esc(queueText)}</b></span><span>Fish <b>${esc(fishText)}</b></span><span>Show <b>${esc(s.show?.name||'—')}</b></span></div>`
-  }
+  function installSelfTestOwner(){const old=$('selfTest');if(!old)return false;const b=old.cloneNode(true);old.replaceWith(b);b.addEventListener('click',()=>runSelfTest().catch(e=>{trace('self-test-error',{error:String(e?.message||e)});b.disabled=false;b.textContent='Test Josh FM opnieuw'}));window.JFMSelfTest={version:'selftest-v3-contracts',run:runSelfTest};return true}
+  function ensureHealthSummary(){let box=$('jfmHealthSummary');if(box)return box;const out=$('selfTestResults');if(!out)return null;box=document.createElement('div');box.id='jfmHealthSummary';box.className='jfm-health-summary';out.insertAdjacentElement('beforebegin',box);return box}
+  function render(){const box=ensureHealthSummary();if(!box)return;const s=snapshot(),sig=JSON.stringify({safe:s.safeMode,reasons:s.safeReasons,playing:s.playback?.isPlaying,queue:s.queue?.remaining,fish:s.fish?.available,show:s.show?.id,online:s.online});if(sig===lastRenderSig)return;lastRenderSig=sig;const queueText=s.queue?`${s.queue.remaining??'—'} vooruit`:'—',fishText=s.fish?(s.fish.available?'OK':'BACKOFF'):'—',playText=s.playback?(s.playback.isPlaying?'SPEELT':s.playback.expectedLive?'HERSTEL':'PAUZE'):'—';box.innerHTML=`<div class="jfm-health-head"><b>${safe?'SAFE MODE':'STATION OK'}</b><span>${safe?esc(safeReasons.join(' · ')):'Muziek, queue en DJ worden bewaakt.'}</span></div><div class="jfm-health-grid"><span>Playback <b>${esc(playText)}</b></span><span>Queue <b>${esc(queueText)}</b></span><span>Fish <b>${esc(fishText)}</b></span><span>Show <b>${esc(s.show?.name||'—')}</b></span></div>`}
   function poll(){applySafeMode();render()}
   ['online','offline','jfm:dj-audio-health','jfm:trackchange','jfm:playback-state','jfm:show-change','jfm:requests-change'].forEach(e=>window.addEventListener(e,poll));
   function install(){let tries=0;const own=()=>{if(installSelfTestOwner()){poll();return}if(++tries<20)setTimeout(own,250)};own();setInterval(poll,7000)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
-  window.JFMStationHealth={version:'health-v1-safe-mode',snapshot,runSelfTest,applySafeMode,get safeMode(){return safe},get reasons(){return[...safeReasons]},get lastTest(){return lastTest},log:()=>[...log]};
+  window.JFMStationHealth={version:'health-v2-safe-restore',snapshot,runSelfTest,applySafeMode,get safeMode(){return safe},get reasons(){return[...safeReasons]},get lastTest(){return lastTest},log:()=>[...log]};
 })();
