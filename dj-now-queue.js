@@ -4,6 +4,7 @@
   const btn=$('djNow'),player=()=>window.jfmSpotifyPlayer||null;
   let lock=false,polling=false,armed=null,prepToken=0,transitionSeq=0,autoPrepared=null,autoPreparing=false,lastAutoPrepId='';
   const log=[];
+  const IMAGING_KEY='jfm_imaging_history_v1';
   function trace(stage,extra={}){const item={at:Date.now(),seq:transitionSeq,stage,...extra};log.unshift(item);if(log.length>60)log.length=60;window.JFMDJTransitionLog=log}
   function status(text,bad=false){const q=$('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}}
   function setArmed(on){if(!btn)return;btn.dataset.queued=on?'1':'0';const b=btn.querySelector('b'),s=btn.querySelector('span');if(b)b.textContent=on?'🎙️ DJ staat klaar':'🎙️ DJ nu';if(s)s.textContent=on?'Praat na dit nummer':'Laat hem iets vertellen'}
@@ -36,9 +37,28 @@
     await setVolume(1);trace('resume-failed',{uri});return false
   }
   async function makePack(track,manual){const[fact,weather]=await Promise.all([getFact(track),getWeather()]);const text=await makeDJScript(track,fact,weather,manual);return{text,fact,weather}}
+
+  function imagingHistory(){try{return JSON.parse(localStorage.getItem(IMAGING_KEY)||'[]')}catch{return[]}}
+  function rememberImaging(type,text){const h=imagingHistory();h.unshift({type,text,at:Date.now()});localStorage.setItem(IMAGING_KEY,JSON.stringify(h.slice(0,24)))}
+  function recentImaging(type,minutes=12){const cut=Date.now()-minutes*60000;return imagingHistory().some(x=>x.type===type&&x.at>cut)}
+  function freshPick(type,options){const recentText=imagingHistory().slice(0,8).map(x=>x.text);const fresh=options.filter(x=>!recentText.includes(x));const pool=fresh.length?fresh:options;const text=pool[Math.floor(Math.random()*pool.length)]||options[0]||'Josh FM.';rememberImaging(type,text);return text}
+  function currentShow(){try{return window.JFMRadioClock?.showName?.()||'Josh FM'}catch{return'Josh FM'}}
+  function currentPhase(){try{return window.JFMRadioClock?.clockPhase?.()||'open'}catch{return'open'}}
+  function requestTrack(){try{return typeof window.jfmIsRequest==='function'&&window.jfmIsRequest(playback?.item?trackObj(playback.item):null)}catch{return false}}
+  function chooseImaging({manual=false}={}){
+    if(manual)return null;
+    const phase=currentPhase(),show=currentShow();
+    if(phase==='top'&&!recentImaging('top',45))return{type:'top',text:freshPick('top',[`This is ${show}. Josh FM.`,`Josh FM. ${show} is on air.`,`On the hour, on Josh FM. ${show}.`])};
+    if(requestTrack()&&!recentImaging('request',10))return{type:'request',text:freshPick('request',['Your request, on Josh FM.','You asked for it. Josh FM.','Request line to the radio. This is Josh FM.'])};
+    if((phase==='q1'||phase==='half'||phase==='q3')&&!recentImaging('show',18))return{type:'show',text:freshPick('show',[`${show}. On Josh FM.`,`You’re with ${show}, on Josh FM.`,`Stay right here with ${show}.`])};
+    if(phase==='sweep'&&!recentImaging('sweep',8))return{type:'sweep',text:freshPick('sweep',['More music, less interruption. Josh FM.','Your music keeps moving. Josh FM.','One station, your soundtrack. Josh FM.','Josh FM. Keep it right here.'])};
+    if(!recentImaging('short',12)&&Math.random()<.22)return{type:'short',text:freshPick('short',['Josh FM.','This is Josh FM.','You’re listening to Josh FM.'])};
+    return null
+  }
+
   async function renderAndSpeak(pack,{manual=false,jingle=true}={}){
     const text=pack?.text||'';if($('djText'))$('djText').textContent=text;$('factSource')?.classList.add('hidden');
-    if(jingle&&$('jingles')?.checked&&Math.random()<.18&&!manual){try{await speakText('Josh FM.',true)}catch(e){trace('jingle-error',{message:String(e?.message||e)})}}
+    if(jingle&&$('jingles')?.checked&&!manual){const imaging=chooseImaging({manual});if(imaging){try{trace('imaging-start',{type:imaging.type,text:imaging.text});await speakText(imaging.text,true);trace('imaging-end',{type:imaging.type})}catch(e){trace('jingle-error',{message:String(e?.message||e),type:imaging.type})}}}
     trace('speak-start',{chars:text.length});const ok=await speakText(text,false);trace('speak-end',{ok:ok!==false});return ok!==false
   }
   async function transition({track,manual=false,resumeUri='',rewindCurrent=false,prepared=null,label='DJ'}={}){
@@ -54,7 +74,7 @@
     }catch(e){trace('transition-error',{message:String(e?.message||e)});try{if(uri)await startExact(uri);else await setVolume(1)}catch{await setVolume(1)}status('DJ-fout · muziekherstel uitgevoerd.',true);return false
     }finally{await setVolume(1);djBusy=false;lock=false}
   }
-  window.JFMDJTransition={version:'unified-v2-prefetch',transition,log:()=>[...log],get busy(){return lock},get prefetched(){return autoPrepared?{trackId:autoPrepared.trackId,ready:true}:null}};
+  window.JFMDJTransition={version:'unified-v3-imaging',transition,log:()=>[...log],imagingHistory:()=>imagingHistory(),get busy(){return lock},get prefetched(){return autoPrepared?{trackId:autoPrepared.trackId,ready:true}:null}};
 
   async function prepareArmed(){const a=armed;if(!a)return;const token=++prepToken;try{const pack=await makePack(a.track,true);if(token!==prepToken||!armed||armed.id!==a.id)return;armed.prepared=pack;try{await window.prepareSpeech?.(pack.text,false)}catch{}trace('manual-prepared',{track:a.id})}catch(e){trace('manual-prepare-error',{message:String(e?.message||e)})}}
   if(btn)btn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();if(lock||djBusy||!playback?.item?.id)return;const id=playback.item.id;if(armed?.id===id){armed=null;prepToken++;setArmed(false);trace('manual-disarmed');return}armed={id,track:trackObj(playback.item),resumeUri:exactNext(id),prepared:null};setArmed(true);trace('manual-armed',{id,resumeUri:armed.resumeUri});prepareArmed()},true);
