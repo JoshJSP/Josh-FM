@@ -19,4 +19,20 @@ let lastHour=new Date().getHours();setInterval(()=>{const h=new Date().getHours(
 // Add simple feedback directly to the latest DJ moment. This trains style locally without accounts or paid storage.
 function installFeedback(){const text=$('djText');if(!text||$('djFeedback'))return;const card=text.closest('.card');if(!card)return;const row=document.createElement('div');row.id='djFeedback';row.className='dj-feedback';row.innerHTML='<span>Hoe was deze break?</span><div><button type="button" data-v="up">👍 Goed</button><button type="button" data-v="down">👎 Minder</button></div>';card.appendChild(row);row.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const f=feedback(),v=b.dataset.v,last=String(window.jfmLastDJText||text.textContent||'').trim();if(v==='up')f.up=(f.up||0)+1;else{f.down=(f.down||0)+1;if(last){f.avoid=f.avoid||[];f.avoid.unshift(last);f.avoid=f.avoid.slice(0,10)}}f.items=f.items||[];f.items.unshift({v,text:last,at:Date.now()});f.items=f.items.slice(0,30);save(FB,f);row.querySelectorAll('button').forEach(x=>x.classList.toggle('selected',x===b));const span=row.querySelector('span');if(span)span.textContent=v==='up'?'Onthouden — meer in deze stijl':'Onthouden — deze stijl minder'})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installFeedback);else installFeedback();
+
+// The selected voice is the source of truth for spoken language.
+// Kokoro and the current device fallback are English, so every generated DJ break must be English too.
+try{
+  const oldMake=window.makeDJScript||makeDJScript;
+  if(typeof oldMake==='function'){
+    window.makeDJScript=makeDJScript=async function(track,fact,weather,manual){
+      const mode=document.getElementById('voiceMode')?.value||localStorage.getItem('jfm_voice_mode')||'kokoro';
+      const voiceLang=(mode==='kokoro'||mode==='device')?'en':((window.JFMDJLanguage||localStorage.getItem('jfm_dj_language')||'en').startsWith('nl')?'nl':'en');
+      window.JFMDJLanguage=voiceLang;localStorage.setItem('jfm_dj_language',voiceLang);
+      // Existing fact providers can return Dutch copy; omit that copy for an English presenter.
+      const result=await oldMake(track,voiceLang==='en'?null:fact,weather,manual);
+      return result;
+    };
+  }
+}catch(e){console.warn('DJ language sync',e)}
 })();
