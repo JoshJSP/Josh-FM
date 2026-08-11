@@ -19,9 +19,8 @@
  setInterval(authGuard,600);window.addEventListener('pageshow',authGuard);setTimeout(authGuard,800);
  window.JFMRadioSuite={state:()=>s,save,autoMode,djFeedback:loadDj};
 
- // Load the non-blocking Kokoro worker controller and the stable Spotify Connect controller.
- // These are kept outside the core bundle so a failed local voice can never block Start Josh FM.
+ // Fish Audio is the only AI voice owner. Do not load legacy Kokoro/Piper controllers here.
+ // Spotify recovery remains isolated so voice failures can never block playback recovery.
  const loadScript=(src,id)=>{if(document.getElementById(id))return;const x=document.createElement('script');x.id=id;x.src=src;x.defer=true;document.body.appendChild(x)};
- loadScript('./kokoro-controller.js?v=2','jfm-kokoro-controller');
  loadScript('./spotify-recovery.js?v=2','jfm-spotify-recovery');
 })();
