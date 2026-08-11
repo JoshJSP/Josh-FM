@@ -26,7 +26,7 @@
 
   function ensureWorker(){
     if(worker)return worker;
-    worker=new Worker('./kokoro-worker.js?v=2',{type:'module'});
+    worker=new Worker('./kokoro-worker.js?v=3',{type:'module'});
     worker.onmessage=e=>{
       const m=e.data||{},x=pending.get(m.id);if(!x)return;
       clearTimeout(x.timer);pending.delete(m.id);
@@ -45,9 +45,18 @@
     });
   }
 
+  function chunks(text){
+    const clean=String(text||'').replace(/\s+/g,' ').trim();
+    if(clean.length<=90)return [clean];
+    const sentences=clean.match(/[^.!?]+[.!?]?/g)||[clean];
+    const out=[];let cur='';
+    for(const s0 of sentences){const s=s0.trim();if(!s)continue;if((cur+' '+s).trim().length<=90){cur=(cur+' '+s).trim();continue}if(cur)out.push(cur);if(s.length<=90){cur=s;continue}const words=s.split(' ');cur='';for(const w of words){if((cur+' '+w).trim().length>90){if(cur)out.push(cur);cur=w}else cur=(cur+' '+w).trim()}}
+    if(cur)out.push(cur);return out.filter(Boolean);
+  }
+
   async function load(){
     if(ready)return true;
-    progress(15,'AI-stemmodel laden…');
+    progress(15,'Kokoro q4-model laden…');
     const r=await ask('load',{},isIOS?70000:90000);
     ready=!!r.ok;
     progress(70,`Stemmodel geladen · ${host()}`);
@@ -91,13 +100,15 @@
     if(lang()!=='en')return false;
     try{
       await load();
-      progress(82,`DJ ${host()} maakt de testzin…`);
-      if(info)info.textContent=`Kokoro worker generating ${host()}…`;
-      const r=await ask('generate',{text,voice:host(),speed:jingle?1.04:1.0},isIOS?22000:30000);
-      progress(95,'Audio afspelen…');
-      await playArrayBuffer(r.buffer,r.mime);
-      progress(100,`Stem werkt ✓ · ${host()}`);
-      if(info)info.textContent=`Josh FM DJ — ${host()} ✓`;
+      const parts=chunks(text);const voice=host();
+      for(let i=0;i<parts.length;i++){
+        progress(74+Math.round((i/Math.max(1,parts.length))*20),`DJ ${voice} maakt deel ${i+1}/${parts.length}…`);
+        if(info)info.textContent=`Kokoro q4 generating ${voice} · ${i+1}/${parts.length}`;
+        const r=await ask('generate',{text:parts[i],voice,speed:jingle?1.04:1.0},isIOS?18000:30000);
+        await playArrayBuffer(r.buffer,r.mime);
+      }
+      progress(100,`Stem werkt ✓ · ${voice}`);
+      if(info)info.textContent=`Josh FM DJ — ${voice} · Kokoro q4 ✓`;
       return true;
     }catch(e){
       lastError=String(e?.message||e);
@@ -123,9 +134,9 @@
 
   if(test)test.onclick=async()=>{
     test.disabled=true;progress(5,'Stemtest starten…');
-    const text=lang()==='nl'?'Dit is Josh FM. Je luistert naar je persoonlijke radiostation.':`This is Josh FM. ${host()} is your DJ for this two-hour show.`;
+    const text=lang()==='nl'?'Dit is Josh FM.':`This is Josh FM. ${host()} is on air.`;
     let ok=false;
-    try{ok=await window.speakText(text,false);progress(100,ok?(ready?'Stemtest voltooid ✓':'Fallback-stem werkt ✓'):'Stemtest mislukt')}catch(e){progress(100,'Stemtest mislukt');if(info)info.textContent=String(e?.message||e)}finally{test.disabled=false}
+    try{ok=await window.speakText(text,false);progress(100,ok?(ready?'Kokoro stemtest voltooid ✓':'Fallback-stem werkt ✓'):'Stemtest mislukt')}catch(e){progress(100,'Stemtest mislukt');if(info)info.textContent=String(e?.message||e)}finally{test.disabled=false}
     return ok;
   };
 
