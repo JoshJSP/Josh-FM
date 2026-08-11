@@ -7,9 +7,9 @@
  document.querySelectorAll('link[rel="apple-touch-icon"]').forEach(x=>x.remove());const touch=document.createElement('link');touch.rel='apple-touch-icon';touch.sizes='512x512';touch.href='/api/icon?v=6';document.head.appendChild(touch);const fav=document.createElement('link');fav.rel='icon';fav.type='image/png';fav.href='/api/icon?v=6';document.head.appendChild(fav);
  function rememberTrack(t){if(!t?.id||s.lastIds[0]===t.id)return;s.tracks++;s.lastIds.unshift(t.id);s.lastIds=s.lastIds.slice(0,100);const a=(t.artists?.[0]?.name||t.artists?.[0]||'').toLowerCase();if(a){s.lastArtists.unshift(a);s.lastArtists=s.lastArtists.slice(0,50)}save(s);renderStats()}
  function renderStats(){[['statTracks',s.tracks],['statDiscoveries',s.discoveries],['statRequests',s.requests],['statHours',(s.minutes/60).toFixed(1)+' u']].forEach(([id,v])=>{const e=$(id);if(e)e.textContent=v})}
- function autoMode(){if(localStorage.getItem('jfm_auto_program')==='0')return;const h=new Date().getHours();let m=h<10?'morning':h>=23?'late':h>=20?'chill':'normal';if([5,6].includes(new Date().getDay())&&h>=19)m='party';if(settings?.mode!==m&&typeof setMode==='function')setMode(m)}
+ function autoMode(){if(localStorage.getItem('jfm_auto_program')==='0')return;const fromClock=window.JFMStationClock?.preferredMode?.();if(fromClock){if(settings?.mode!==fromClock&&typeof setMode==='function')setMode(fromClock);return}const h=new Date().getHours();let m=h<10?'morning':h>=23?'late':h>=20?'chill':'normal';if(settings?.mode!==m&&typeof setMode==='function')setMode(m)}
  function ensureShowPill(){const live=document.querySelector('.live');if(!live)return null;let e=$('showMini');if(!e){e=document.createElement('span');e.id='showMini';e.className='show-mini';e.style.cssText='margin-left:auto;opacity:.82;font-size:11px;font-weight:800;letter-spacing:.03em';live.appendChild(e)}return e}
- function renderShow(){const clock=window.JFMRadioClock,e=ensureShowPill();if(!e)return;const show=clock?.showName?.()||'Josh FM',phase=clock?.clockPhase?.()||'open';e.textContent=show;e.dataset.phase=phase;e.title=`Radio clock: ${phase}`;document.body.dataset.show=show;document.body.dataset.clockPhase=phase}
+ function renderShow(){const central=window.JFMStationClock?.current?.(),clock=window.JFMRadioClock,e=ensureShowPill();if(!e)return;const show=central?.show?.name||clock?.showName?.()||'Josh FM',phase=central?.phase||clock?.clockPhase?.()||'open';e.textContent=show;e.dataset.phase=phase;e.title=`Radio clock: ${phase}`;document.body.dataset.show=central?.show?.id||show;document.body.dataset.clockPhase=phase}
  setInterval(()=>{if(playback?.is_playing){s.minutes++;save(s);renderStats()}},60000);let seen='';setInterval(()=>{const t=playback?.item;if(t?.id&&t.id!==seen){seen=t.id;rememberTrack(t)}renderShow()},5000);
  let hour=new Date().getHours();setInterval(()=>{const h=new Date().getHours();if(h!==hour){hour=h;window.jfmHourMarker=true}renderShow()},15000);
  document.addEventListener('click',e=>{const b=e.target.closest?.('.result');if(!b)return;setTimeout(()=>{try{const uri=b.dataset.uri,id=uri?.split(':').pop();if(id){const m=JSON.parse(localStorage.getItem('jfm_director_memory')||'{"plays":{},"likes":{},"requests":{}}');m.requests=m.requests||{};m.requests[id]=(m.requests[id]||0)+1;m.requests[uri]=(m.requests[uri]||0)+1;localStorage.setItem('jfm_director_memory',JSON.stringify(m));s.requests++;save(s);renderStats()}}catch{}},200)},true);
@@ -28,11 +28,14 @@
  });
  (async()=>{
    try{
+     await loadScript('./station-clock.js?v=1','jfm-station-clock');
+     await loadScript('./station-clock-bridge.js?v=1','jfm-station-clock-bridge');
      await loadScript('./dj-audio-guard.js?v=2','jfm-dj-audio-guard');
      await loadScript('./request-manager.js?v=1','jfm-request-manager');
      await loadScript('./playback-state.js?v=1','jfm-playback-state');
      await loadScript('./spotify-recovery.js?v=5','jfm-spotify-recovery');
      await loadScript('./station-queue.js?v=1','jfm-station-queue');
+     autoMode();renderShow();
    }catch(e){console.warn('Josh FM controller load',e)}
  })();
 })();
