@@ -1,11 +1,11 @@
 // Josh FM PWA platform layer — media session, sleep timer, connectivity and update UX.
 (()=>{
   const $=id=>document.getElementById(id),SLEEP_KEY='jfm_sleep_timer_v1';
-  let sleepTimer=null,sleepState=loadSleep(),waitingWorker=null,lastTrackId='';
+  let sleepTimer=null,sleepState=loadSleep(),waitingWorker=null;
 
+  function ensureStyles(){if(document.querySelector('link[data-jfm-pwa]'))return;const l=document.createElement('link');l.rel='stylesheet';l.href='./pwa-platform.css';l.dataset.jfmPwa='1';document.head.appendChild(l)}
   function loadSleep(){try{return JSON.parse(localStorage.getItem(SLEEP_KEY)||'null')}catch{return null}}
   function saveSleep(x){sleepState=x;try{x?localStorage.setItem(SLEEP_KEY,JSON.stringify(x)):localStorage.removeItem(SLEEP_KEY)}catch{};renderSleep()}
-  function safe(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
   function currentTrack(){
     try{if(playback?.item)return trackObj(playback.item)}catch{}
@@ -41,7 +41,7 @@
     sleepTimer=setTimeout(()=>stopPlayback('sleep').catch(()=>{}),Math.min(left,2147483647));
   }
   function setMinutes(minutes){saveSleep({mode:'time',at:Date.now()+Number(minutes)*60000,minutes:Number(minutes)});scheduleSleep()}
-  function stopAfterTrack(){const t=currentTrack();saveSleep({mode:'after-track',trackId:t?.id||'',setAt:Date.now()})}
+  function stopAfterTrack(){const t=currentTrack();if(!t?.id)return;saveSleep({mode:'after-track',trackId:t.id,setAt:Date.now()})}
   function cancelSleep(){clearTimer();saveSleep(null)}
   function onTrackChange(id){
     if(sleepState?.mode==='after-track'&&sleepState.trackId&&id&&id!==sleepState.trackId)stopPlayback('track-end').catch(()=>{});
@@ -78,14 +78,14 @@
     try{
       const reg=await navigator.serviceWorker.ready;if(reg.waiting)showUpdate(reg);
       reg.addEventListener('updatefound',()=>{const nw=reg.installing;if(!nw)return;nw.addEventListener('statechange',()=>{if(nw.state==='installed'&&navigator.serviceWorker.controller)showUpdate(reg)})});
-      navigator.serviceWorker.addEventListener('controllerchange',()=>location.reload());
+      let reloading=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;location.reload()});
       setInterval(()=>reg.update().catch(()=>{}),30*60*1000)
     }catch{}
   }
 
-  function install(){installSleepCard();installMediaActions();scheduleSleep();renderSleep();renderNetwork();updateMediaSession();installServiceWorkerUX()}
+  function install(){ensureStyles();installSleepCard();installMediaActions();scheduleSleep();renderSleep();renderNetwork();updateMediaSession();installServiceWorkerUX()}
   window.addEventListener('jfm:trackchange',e=>onTrackChange(e.detail?.trackId||''));window.addEventListener('jfm:playback-state',updateMediaSession);window.addEventListener('online',renderNetwork);window.addEventListener('offline',renderNetwork);
   setInterval(()=>{renderSleep();updateMediaSession()},5000);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
-  window.JFMPWA={version:'pwa-v1-media-sleep-update',setSleepMinutes:setMinutes,stopAfterTrack,cancelSleep,get sleep(){return sleepState},updateMediaSession,showUpdate,setConnectivityNote};
+  window.JFMPWA={version:'pwa-v2-media-sleep-update',setSleepMinutes:setMinutes,stopAfterTrack,cancelSleep,get sleep(){return sleepState},updateMediaSession,showUpdate,setConnectivityNote};
 })();
