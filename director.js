@@ -10,10 +10,13 @@ window.jfmDirectorMemory=memory;window.jfmIsRequest=isRequest;
 
 function baseScore(t){
   const m=memory(),skips=(typeof skipMap==='function'?skipMap():{});
-  return Math.random()*2.4-(skips[t.id]||0)*3.4-(m.plays[t.id]||0)*.3+(m.likes[t.id]||0)*4.6+(m.requests[t.id]||m.requests[t.uri]||0)*6.4+(m.discoveryWins[t.id]||0)*3.2-(m.discoveryLosses[t.id]||0)*4.2
+  let s=Math.random()*2.4-(skips[t.id]||0)*3.4-(m.plays[t.id]||0)*.3+(m.likes[t.id]||0)*4.6+(m.requests[t.id]||m.requests[t.uri]||0)*6.4+(m.discoveryWins[t.id]||0)*3.2-(m.discoveryLosses[t.id]||0)*4.2;
+  try{s+=window.JFMRotation?.score?.(t,[])||0}catch{}
+  return s
 }
 function fitScore(t,out){
   let s=baseScore(t);const a=artistKey(t),recent=out.slice(-6),last=recent[recent.length-1];
+  try{s+=window.JFMRotation?.score?.(t,out)||0}catch{}
   if(!last)return s;
   for(let back=1;back<=recent.length;back++){
     const prev=recent[recent.length-back];
@@ -27,12 +30,15 @@ function fitScore(t,out){
   return s
 }
 function directWithContext(list,context=[]){
-  const pool=[...list],prefix=(context||[]).filter(Boolean).slice(-6),out=[];
-  while(pool.length){let best=0,bestS=-Infinity;const scoring=[...prefix,...out];for(let i=0;i<pool.length;i++){const s=fitScore(pool[i],scoring);if(s>bestS){bestS=s;best=i}}out.push(pool.splice(best,1)[0])}
+  let pool=[...list];
+  try{const filtered=pool.filter(t=>!window.JFMRotation?.isHardBlocked?.(t));if(filtered.length>=Math.min(8,pool.length))pool=filtered}catch{}
+  const prefix=(context||[]).filter(Boolean).slice(-8),out=[];
+  while(pool.length){let best=0,bestS=-Infinity;const scoring=[...prefix,...out];for(let i=0;i<pool.length;i++){const s=fitScore(pool[i],scoring);if(s>bestS){bestS=s;best=i}}const chosen=pool.splice(best,1)[0];try{window.JFMRotation?.annotate?.(chosen)}catch{}out.push(chosen)}
   return out
 }
 function direct(list){return directWithContext(list,[])}
-function kind(t){if(isRequest(t))return'Verzoek';if(t?._discovery)return'Ontdekking';return'Voor jou'}
+function kind(t){try{return window.JFMRotation?.category?.(t)||'Voor jou'}catch{}if(isRequest(t))return'Verzoek';if(t?._discovery)return'Ontdekking';return'Voor jou'}
+function why(t){try{return window.JFMRotation?.reason?.(t)||''}catch{return''}}
 function baseUpcoming(){const current=playback?.item?.id,idx=(queue||[]).findIndex(t=>t.id===current);if(idx>=0)return(queue||[]).slice(idx+1,idx+7);return(queue||[]).filter(t=>t.id!==current).slice(0,6)}
 function upcoming(){
   const items=baseUpcoming();
@@ -43,15 +49,20 @@ function upcoming(){
   return items
 }
 window.jfmUpcoming=upcoming;
-function renderNext(){const box=$('directorQueue');if(!box)return;const items=upcoming();if(!items.length){box.innerHTML='<p class="muted">Start Josh FM om de programmering te zien.</p>';if($('nextUp'))$('nextUp').textContent='—';return}box.innerHTML=items.map((t,i)=>`<div class="director-track"><span class="director-num">${i+1}</span>${t.image?`<img src="${esc(t.image)}" alt="">`:''}<div class="director-meta"><b>${esc(t.name)}</b><span>${esc((t.artists||[]).join(', '))}</span></div><em>${kind(t)}</em></div>`).join('');const n=items[0];if($('nextUp'))$('nextUp').textContent=n?`${n.name} · ${(n.artists||[]).join(', ')}`:'—'}
+function renderWhy(){
+  const current=playback?.item?trackObj(playback.item):null;if(!current)return;const q=(queue||[]).find(t=>t.id===current.id)||current;
+  let e=$('whyTrack');if(!e){const card=$('title')?.closest('.card');if(!card)return;e=document.createElement('p');e.id='whyTrack';e.className='muted';e.style.marginTop='10px';const next=$('nextUp')?.closest('.nextup');if(next)next.insertAdjacentElement('afterend',e);else card.appendChild(e)}
+  const r=why(q);e.textContent=r?`Waarom deze track? ${r}`:''
+}
+function renderNext(){const box=$('directorQueue');if(!box)return;const items=upcoming();if(!items.length){box.innerHTML='<p class="muted">Start Josh FM om de programmering te zien.</p>';if($('nextUp'))$('nextUp').textContent='—';renderWhy();return}box.innerHTML=items.map((t,i)=>`<div class="director-track"><span class="director-num">${i+1}</span>${t.image?`<img src="${esc(t.image)}" alt="">`:''}<div class="director-meta"><b>${esc(t.name)}</b><span>${esc((t.artists||[]).join(', '))}</span></div><em>${esc(kind(t))}</em></div>`).join('');const n=items[0];if($('nextUp'))$('nextUp').textContent=n?`${n.name} · ${(n.artists||[]).join(', ')}`:'—';renderWhy()}
 window.jfmRenderNext=renderNext;
-const oldBuild=buildSet;buildSet=window.buildSet=async function(){const list=await oldBuild();queue=direct(queue||list||[]);renderNext();return queue};
+const oldBuild=buildSet;buildSet=window.buildSet=async function(){const list=await oldBuild();try{window.JFMRotation?.annotateAll?.(queue||list||[])}catch{}queue=direct(queue||list||[]);renderNext();return queue};
 $('searchResults')?.addEventListener('click',e=>{const btn=e.target.closest?.('.result');if(!btn)return;const uri=btn.dataset.uri;if(!uri)return;const m=memory(),id=uri.split(':').pop();m.requests[uri]=(m.requests[uri]||0)+1;if(id)m.requests[id]=(m.requests[id]||0)+1;save(m)},true);
 let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(!id||id===seen)return;seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);renderNext()},5000);
 window.addEventListener('jfm:trackchange',()=>renderNext());
 window.addEventListener('jfm:requests-change',()=>renderNext());
-$('loveTrack')?.addEventListener('click',()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)+1;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryWins[id]=(m.discoveryWins[id]||0)+1;save(m);$('loveTrack').textContent='♥ Onthouden';setTimeout(()=>$('loveTrack').textContent='♥ Meer zoals dit',1000)});
+$('loveTrack')?.addEventListener('click',()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)+1;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryWins[id]=(m.discoveryWins[id]||0)+1;save(m);$('loveTrack').textContent='♥ Onthouden';setTimeout(()=>$('loveTrack').textContent='♥ Meer zoals dit',1000);renderWhy()});
 $('banTrack')?.addEventListener('click',async()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)-3;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryLosses[id]=(m.discoveryLosses[id]||0)+1;save(m);try{await window.JFMPlayback?.next?.()||control('next')}catch{}});
-window.JFMProgramDirector={version:'director-v4-requests',direct,directWithContext,score:fitScore,upcoming,kind,isRequest};
+window.JFMProgramDirector={version:'director-v5-rotation',direct,directWithContext,score:fitScore,upcoming,kind,why,isRequest};
 setInterval(renderNext,5000);setTimeout(renderNext,1200);
 })();
