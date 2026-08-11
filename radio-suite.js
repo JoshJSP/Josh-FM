@@ -1,10 +1,13 @@
 // Josh FM Radio Suite — memory, stats, hour markers, DJ feedback learning
 (()=>{
- const $=id=>document.getElementById(id),K='jfm_radio_suite',DK='jfm_dj_feedback';
+ const $=id=>document.getElementById(id),K='jfm_radio_suite',DK='jfm_dj_feedback',BUILD='predeploy-2026-08-12-1';
  const load=()=>{try{return JSON.parse(localStorage.getItem(K)||'{}')}catch{return{}}},save=s=>localStorage.setItem(K,JSON.stringify(s));
  const loadDj=()=>{try{return JSON.parse(localStorage.getItem(DK)||'{"up":0,"down":0,"liked":[],"disliked":[]}')}catch{return{up:0,down:0,liked:[],disliked:[]}}},saveDj=d=>localStorage.setItem(DK,JSON.stringify(d));
  let s={minutes:0,tracks:0,discoveries:0,requests:0,likes:0,dislikes:0,lastIds:[],lastArtists:[],startedAt:0,...load()};
- document.querySelectorAll('link[rel="apple-touch-icon"]').forEach(x=>x.remove());const touch=document.createElement('link');touch.rel='apple-touch-icon';touch.sizes='512x512';touch.href='/api/icon?v=6';document.head.appendChild(touch);const fav=document.createElement('link');fav.rel='icon';fav.type='image/png';fav.href='/api/icon?v=6';document.head.appendChild(fav);
+ // Keep favicon and Home Screen branding aligned with the in-app Josh FM logo.
+ document.querySelectorAll('link[rel="apple-touch-icon"]').forEach(x=>x.remove());
+ const touch=document.createElement('link');touch.rel='apple-touch-icon';touch.sizes='512x512';touch.href=`./logo.svg?v=7&build=${BUILD}`;document.head.appendChild(touch);
+ let fav=document.querySelector('link[rel="icon"]');if(!fav){fav=document.createElement('link');fav.rel='icon';document.head.appendChild(fav)}fav.type='image/svg+xml';fav.href=`./logo.svg?v=7&build=${BUILD}`;
  function rememberTrack(t){if(!t?.id||s.lastIds[0]===t.id)return;s.tracks++;s.lastIds.unshift(t.id);s.lastIds=s.lastIds.slice(0,100);const a=(t.artists?.[0]?.name||t.artists?.[0]||'').toLowerCase();if(a){s.lastArtists.unshift(a);s.lastArtists=s.lastArtists.slice(0,50)}save(s);renderStats()}
  function renderStats(){[['statTracks',s.tracks],['statDiscoveries',s.discoveries],['statRequests',s.requests],['statHours',(s.minutes/60).toFixed(1)+' u']].forEach(([id,v])=>{const e=$(id);if(e)e.textContent=v})}
  function autoMode(){if(localStorage.getItem('jfm_auto_program')==='0')return;const fromClock=window.JFMStationClock?.preferredMode?.();if(fromClock){if(settings?.mode!==fromClock&&typeof setMode==='function')setMode(fromClock);return}const h=new Date().getHours();let m=h<10?'morning':h>=23?'late':h>=20?'chill':'normal';if(settings?.mode!==m&&typeof setMode==='function')setMode(m)}
@@ -19,24 +22,25 @@
  autoMode();setInterval(autoMode,10*60*1000);renderStats();setTimeout(renderShow,1400);if($('installHint')&&/iphone|ipad|ipod/i.test(navigator.userAgent))$('installHint').textContent='Op iPhone: open Josh FM vanaf je beginscherm voor de volledige app-ervaring.';
  function authGuard(){const text=($('queueInfo')?.textContent||'').toLowerCase();if(text.includes('opnieuw gekoppeld')||text.includes('niet gekoppeld')||text.includes('spotify-login')){$('setup')?.classList.remove('hidden');if($('connect'))$('connect').disabled=false}}
  setInterval(authGuard,600);window.addEventListener('pageshow',authGuard);setTimeout(authGuard,800);
- window.JFMRadioSuite={state:()=>s,save,autoMode,renderShow,djFeedback:loadDj};
- const loadScript=(src,id)=>new Promise((resolve,reject)=>{if(document.getElementById(id))return resolve();const x=document.createElement('script');x.id=id;x.src=src;x.onload=()=>resolve();x.onerror=()=>reject(new Error(`Kon ${src} niet laden`));document.body.appendChild(x)});
+ window.JFMRadioSuite={state:()=>s,save,autoMode,renderShow,djFeedback:loadDj,build:BUILD};
+ const versioned=src=>{try{const u=new URL(src,location.href);u.searchParams.set('build',BUILD);return u.href}catch{return src+(src.includes('?')?'&':'?')+'build='+encodeURIComponent(BUILD)}};
+ const loadScript=(src,id)=>new Promise((resolve,reject)=>{if(document.getElementById(id))return resolve();const x=document.createElement('script');x.id=id;x.src=versioned(src);x.async=false;x.onload=()=>resolve();x.onerror=()=>reject(new Error(`Kon ${src} niet laden`));document.body.appendChild(x)});
  (async()=>{try{
-   await loadScript('./station-clock.js?v=1','jfm-station-clock');
-   await loadScript('./station-clock-bridge.js?v=1','jfm-station-clock-bridge');
-   await loadScript('./rotation-engine.js?v=1','jfm-rotation-engine');
-   await loadScript('./dj-context.js?v=2','jfm-dj-context');
-   await loadScript('./dj-audio-guard.js?v=2','jfm-dj-audio-guard');
-   await loadScript('./request-manager.js?v=1','jfm-request-manager');
-   await loadScript('./playback-state.js?v=1','jfm-playback-state');
-   await loadScript('./spotify-recovery.js?v=5','jfm-spotify-recovery');
-   await loadScript('./station-queue.js?v=1','jfm-station-queue');
-   await loadScript('./runtime-modes.js?v=2','jfm-runtime-modes');
-   await loadScript('./personal-top40.js?v=1','jfm-personal-top40');
-   await loadScript('./live-ui.js?v=2','jfm-live-ui');
-   await loadScript('./pwa-platform.js?v=2','jfm-pwa-platform');
-   await loadScript('./integration-guards.js?v=1','jfm-integration-guards');
-   await loadScript('./station-health.js?v=1','jfm-station-health');
+   await loadScript('./station-clock.js','jfm-station-clock');
+   await loadScript('./station-clock-bridge.js','jfm-station-clock-bridge');
+   await loadScript('./rotation-engine.js','jfm-rotation-engine');
+   await loadScript('./dj-context.js','jfm-dj-context');
+   await loadScript('./dj-audio-guard.js','jfm-dj-audio-guard');
+   await loadScript('./request-manager.js','jfm-request-manager');
+   await loadScript('./playback-state.js','jfm-playback-state');
+   await loadScript('./spotify-recovery.js','jfm-spotify-recovery');
+   await loadScript('./station-queue.js','jfm-station-queue');
+   await loadScript('./runtime-modes.js','jfm-runtime-modes');
+   await loadScript('./personal-top40.js','jfm-personal-top40');
+   await loadScript('./live-ui.js','jfm-live-ui');
+   await loadScript('./pwa-platform.js','jfm-pwa-platform');
+   await loadScript('./integration-guards.js','jfm-integration-guards');
+   await loadScript('./station-health.js','jfm-station-health');
    autoMode();renderShow();window.jfmRenderNext?.();window.JFMTop40?.render?.();window.JFMLiveUI?.render?.();window.JFMPWA?.updateMediaSession?.();window.JFMRuntimeModes?.apply?.();window.JFMIntegrationGuards?.sanity?.();window.JFMStationHealth?.applySafeMode?.();
- }catch(e){console.warn('Josh FM controller load',e)}})();
+ }catch(e){console.error('Josh FM controller load',e);const q=$('queueInfo');if(q){q.textContent='Josh FM kon een kernonderdeel niet laden. Vernieuw de app of gebruik Update als die verschijnt.';q.style.color='#ffb4b4'}}})();
 })();
