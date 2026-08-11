@@ -11,40 +11,29 @@
   function persist(value){
     const id=String(value||'').trim();
     if(!id)return'';
-    localStorage.setItem(TEST_KEY,id);
-    localStorage.setItem(CLIENT_KEY,id);
-    try{spotifyClientId=id}catch{}
+    if(localStorage.getItem(TEST_KEY)!==id)localStorage.setItem(TEST_KEY,id);
+    if(localStorage.getItem(CLIENT_KEY)!==id)localStorage.setItem(CLIENT_KEY,id);
+    try{if(spotifyClientId!==id)spotifyClientId=id}catch{}
     return id
   }
   function expose(){
-    label?.classList.remove('hidden');
+    if(label?.classList.contains('hidden'))label.classList.remove('hidden');
     const saved=localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID;
-    if(!input.value||input.value!==saved)input.value=saved;
-    input.placeholder='Eigen Spotify Client ID voor deze test';
-    input.autocomplete='off';
-    input.readOnly=false;
+    if(input.value!==saved)input.value=saved;
+    if(input.placeholder!=='Eigen Spotify Client ID voor deze test')input.placeholder='Eigen Spotify Client ID voor deze test';
+    if(input.autocomplete!=='off')input.autocomplete='off';
+    if(input.readOnly)input.readOnly=false;
   }
-
-  // app.js may fill/hide this field after /api/config resolves. Keep the manual test field visible.
-  const observer=new MutationObserver(()=>{
-    expose();
-    const saved=localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID;
-    persist(saved)
-  });
-  if(label)observer.observe(label,{attributes:true,subtree:true,childList:true});
+  function sync(){expose();persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID)}
 
   input.addEventListener('input',()=>{const id=String(input.value||'').trim();if(id)persist(id)});
   input.addEventListener('change',()=>{const id=String(input.value||'').trim();if(id)persist(id)});
 
-  // The normal app boot starts before this file and can receive the Vercel Client ID from /api/config.
   // Before processing Spotify's callback, force the locally selected test ID back in place.
   try{
     if(typeof callback==='function'){
       const originalCallback=callback;
-      callback=async function(...args){
-        persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);
-        return originalCallback.apply(this,args)
-      }
+      callback=async function(...args){persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);return originalCallback.apply(this,args)}
     }
   }catch{}
 
@@ -63,9 +52,12 @@
     }
   }catch{}
 
-  expose();
-  persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);
-  setTimeout(expose,250);
-  setTimeout(expose,1500);
-  window.JFMSpotifyTestConfig={version:'spotify-test-v3-prefilled',defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
+  // No MutationObserver here: changing input attributes from inside the observer can loop on Safari/iOS.
+  sync();
+  setTimeout(sync,250);
+  setTimeout(sync,1200);
+  window.addEventListener('pageshow',sync);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});
+
+  window.JFMSpotifyTestConfig={version:'spotify-test-v4-safari-safe',defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
 })();
