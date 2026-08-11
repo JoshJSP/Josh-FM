@@ -1,11 +1,9 @@
-const CACHE='josh-fm-v19-station-health';
-const CORE=['./','./index.html','./styles.css','./pwa-platform.css','./app.js','./stability-core.js','./dj-resume.js','./discovery.js','./debug-tts.js','./dj-audio-guard.js','./dj-context.js','./request-manager.js','./station-clock.js','./station-clock-bridge.js','./rotation-engine.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./playback-state.js','./spotify-recovery.js','./station-queue.js','./runtime-modes.js','./personal-top40.js','./live-ui.js','./pwa-platform.js','./station-health.js','./dj-now-queue.js','./manifest.webmanifest','./logo.svg'];
+const CACHE='josh-fm-v20-integration-cleanup';
+const CORE=['./','./index.html','./styles.css','./pwa-platform.css','./app.js','./stability-core.js','./dj-resume.js','./discovery.js','./debug-tts.js','./dj-audio-guard.js','./dj-context.js','./request-manager.js','./station-clock.js','./station-clock-bridge.js','./rotation-engine.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./playback-state.js','./spotify-recovery.js','./station-queue.js','./runtime-modes.js','./personal-top40.js','./live-ui.js','./pwa-platform.js','./integration-guards.js','./station-health.js','./dj-now-queue.js','./manifest.webmanifest','./logo.svg'];
 
 async function cacheCore(){
   const cache=await caches.open(CACHE);
-  const jobs=CORE.map(async path=>{
-    try{const r=await fetch(path,{cache:'reload'});if(r.ok)await cache.put(path,r.clone())}catch{}
-  });
+  const jobs=CORE.map(async path=>{try{const r=await fetch(path,{cache:'reload'});if(r.ok)await cache.put(path,r.clone())}catch{}});
   await Promise.allSettled(jobs)
 }
 self.addEventListener('install',event=>{event.waitUntil(cacheCore())});
