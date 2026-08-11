@@ -25,6 +25,7 @@
    await loadScript('./station-clock.js?v=1','jfm-station-clock');
    await loadScript('./station-clock-bridge.js?v=1','jfm-station-clock-bridge');
    await loadScript('./rotation-engine.js?v=1','jfm-rotation-engine');
+   await loadScript('./dj-context.js?v=2','jfm-dj-context');
    await loadScript('./dj-audio-guard.js?v=2','jfm-dj-audio-guard');
    await loadScript('./request-manager.js?v=1','jfm-request-manager');
    await loadScript('./playback-state.js?v=1','jfm-playback-state');
