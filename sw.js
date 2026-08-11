@@ -1,5 +1,5 @@
-const CACHE='josh-fm-v17-runtime-modes';
-const CORE=['./','./index.html','./styles.css','./pwa-platform.css','./app.js','./stability-core.js','./dj-resume.js','./discovery.js','./debug-tts.js','./dj-audio-guard.js','./dj-context.js','./request-manager.js','./station-clock.js','./station-clock-bridge.js','./rotation-engine.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./playback-state.js','./spotify-recovery.js','./station-queue.js','./runtime-modes.js','./live-ui.js','./pwa-platform.js','./dj-now-queue.js','./manifest.webmanifest','./logo.svg'];
+const CACHE='josh-fm-v18-personal-top40';
+const CORE=['./','./index.html','./styles.css','./pwa-platform.css','./app.js','./stability-core.js','./dj-resume.js','./discovery.js','./debug-tts.js','./dj-audio-guard.js','./dj-context.js','./request-manager.js','./station-clock.js','./station-clock-bridge.js','./rotation-engine.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./playback-state.js','./spotify-recovery.js','./station-queue.js','./runtime-modes.js','./personal-top40.js','./live-ui.js','./pwa-platform.js','./dj-now-queue.js','./manifest.webmanifest','./logo.svg'];
 
 async function cacheCore(){
   const cache=await caches.open(CACHE);
