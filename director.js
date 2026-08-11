@@ -26,11 +26,12 @@ function fitScore(t,out){
   if(isRequest(t)){s+=recentRequests?-(6+recentRequests*3):2.5}else if(isRequest(last))s+=1.4;
   return s
 }
-function direct(list){
-  const pool=[...list],out=[];
-  while(pool.length){let best=0,bestS=-Infinity;for(let i=0;i<pool.length;i++){const s=fitScore(pool[i],out);if(s>bestS){bestS=s;best=i}}out.push(pool.splice(best,1)[0])}
+function directWithContext(list,context=[]){
+  const pool=[...list],prefix=(context||[]).filter(Boolean).slice(-6),out=[];
+  while(pool.length){let best=0,bestS=-Infinity;const scoring=[...prefix,...out];for(let i=0;i<pool.length;i++){const s=fitScore(pool[i],scoring);if(s>bestS){bestS=s;best=i}}out.push(pool.splice(best,1)[0])}
   return out
 }
+function direct(list){return directWithContext(list,[])}
 function kind(t){if(isRequest(t))return'Verzoek';if(t._discovery)return'Ontdekking';return'Voor jou'}
 function upcoming(){const current=playback?.item?.id,idx=(queue||[]).findIndex(t=>t.id===current);if(idx>=0)return(queue||[]).slice(idx+1,idx+7);return(queue||[]).filter(t=>t.id!==current).slice(0,6)}
 window.jfmUpcoming=upcoming;
@@ -41,6 +42,6 @@ $('searchResults')?.addEventListener('click',e=>{const btn=e.target.closest?.('.
 let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(!id||id===seen)return;seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);renderNext()},5000);
 $('loveTrack')?.addEventListener('click',()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)+1;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryWins[id]=(m.discoveryWins[id]||0)+1;save(m);$('loveTrack').textContent='♥ Onthouden';setTimeout(()=>$('loveTrack').textContent='♥ Meer zoals dit',1000)});
 $('banTrack')?.addEventListener('click',async()=>{const id=playback?.item?.id;if(!id)return;const m=memory();m.likes[id]=(m.likes[id]||0)-3;const q=(queue||[]).find(t=>t.id===id);if(q?._discovery)m.discoveryLosses[id]=(m.discoveryLosses[id]||0)+1;save(m);try{await control('next')}catch{}});
-window.JFMProgramDirector={version:'director-v2',direct,score:fitScore,upcoming,kind};
+window.JFMProgramDirector={version:'director-v3-continuous',direct,directWithContext,score:fitScore,upcoming,kind};
 setInterval(renderNext,5000);setTimeout(renderNext,1200);
 })();
