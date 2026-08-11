@@ -8,5 +8,8 @@
   "theme_color": "#05070c",
   "lang": "nl-NL",
   "description": "Je persoonlijke Nederlandse AI-radioshow bovenop Spotify.",
-  "icons": [{"src":"logo.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+  "icons": [
+    {"src":"logo.svg?v=7","sizes":"512x512","type":"image/svg+xml","purpose":"any"},
+    {"src":"logo.svg?v=7","sizes":"512x512","type":"image/svg+xml","purpose":"maskable"}
+  ]
 }
