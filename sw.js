@@ -1,5 +1,5 @@
-const CACHE='josh-fm-v7-health-pwa';
-const CORE=['./','./index.html','./styles.css','./app.js','./stability-core.js','./dj-resume.js','./discovery.js','./debug-tts.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./spotify-recovery.js','./dj-now-queue.js','./manifest.webmanifest','./logo.svg'];
+const CACHE='josh-fm-v8-station-queue';
+const CORE=['./','./index.html','./styles.css','./app.js','./stability-core.js','./dj-resume.js','./discovery.js','./debug-tts.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./spotify-recovery.js','./station-queue.js','./dj-now-queue.js','./manifest.webmanifest','./logo.svg'];
 
 async function cacheCore(){
   const cache=await caches.open(CACHE);
