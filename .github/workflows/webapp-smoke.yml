@@ -62,7 +62,7 @@ jobs:
           print('PWA cache:',cache.group(1))
           if version not in debug: raise SystemExit('debug-tts.js does not request current local voice version')
           if version not in sw: raise SystemExit('sw.js does not cache current local voice version')
-          required=['Piper','Ronnie','phonem', 'onnx']
+          required=['Piper','Ronnie','phonem','onnx']
           missing=[x for x in required if x.lower() not in (local+debug).lower()]
           if missing: raise SystemExit('Piper runtime markers missing: '+', '.join(missing))
           if 'AudioContext' not in debug: raise SystemExit('AudioContext playback path missing')
@@ -125,4 +125,4 @@ jobs:
           fi
           echo "Live Vercel app is current: $VERSION / $CACHE"
 
-# manual rerun trigger 2026-08-11 11:12 CEST
+# Piper Ronnie rerun trigger 2026-08-11 12:14 CEST
