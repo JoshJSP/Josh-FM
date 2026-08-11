@@ -1,6 +1,11 @@
-// Automatic DJ breaks use the same Spotify recovery route as the rest of Josh FM.
+// DJ playback ownership lives in dj-now-queue.js.
+//
+// This file intentionally does not wrap window.djBreak anymore. The old wrapper
+// attempted a second Spotify resume after every automatic break, while
+// dj-now-queue.js already pauses, rewinds and restarts the exact URI itself.
+// Keeping one owner prevents double play requests, accidental skips and races on
+// iOS/Spotify Connect. The file remains as a compatibility no-op because older
+// cached index.html versions may still request dj-resume.js.
 (()=>{
-  const source=document.getElementById('factSource');if(source)source.style.display='none';
-  const original=window.djBreak;if(typeof original!=='function')return;
-  window.djBreak=async function(...args){try{return await original.apply(this,args)}finally{if(source)source.style.display='none';try{const s=await api('/me/player').catch(()=>null);if(s?.is_playing)return;if(window.JFMPlayback?.playUri)await window.JFMPlayback.playUri(null);else if(window.jfmPlayUri)await window.jfmPlayUri(null)}catch(e){console.warn('DJ resume',e)}}};
+  window.JFMDJResume={version:'single-owner-v1',owner:'dj-now-queue.js'};
 })();
