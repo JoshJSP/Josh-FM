@@ -1,9 +1,3 @@
-const CACHE='josh-fm-v3-piper-1';
+const CACHE='josh-fm-v4-english-dj-1';
 const CORE=['./','./index.html','./styles.css','./app.js','./bugfix-playback.js','./start-sequence.js','./dj-resume.js','./discovery.js','./debug-tts.js','./director.js','./smart-dj.js','./radio-suite.js','./radio-upgrades.js','./spotify-recovery.js','./dj-now-queue.js','./manifest.webmanifest'];
-self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)))});
-self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))])));
-self.addEventListener('fetch',e=>{
-  const u=new URL(e.request.url);
-  if(e.request.method!=='GET'||u.pathname.startsWith('/api/')||u.hostname.includes('spotify')||u.hostname.includes('wikipedia')||u.hostname.includes('musicbrainz')||u.hostname.includes('open-meteo'))return;
-  e.respondWith(fetch(e.request,{cache:'no-store'}).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request)));
-});
+self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)))});self.addEventListener('activate',e=>e.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))])));self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.pathname.startsWith('/api/')||u.hostname.includes('spotify')||u.hostname.includes('wikipedia')||u.hostname.includes('musicbrainz')||u.hostname.includes('open-meteo'))return;e.respondWith(fetch(e.request,{cache:'no-store'}).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request)))});
