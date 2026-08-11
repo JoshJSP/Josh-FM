@@ -1,0 +1,78 @@
+name: Josh FM Webapp Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '*.js'
+      - '*.html'
+      - '*.css'
+      - 'manifest.webmanifest'
+      - '.github/workflows/webapp-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: JavaScript syntax
+        run: |
+          set -e
+          for f in *.js; do
+            echo "Checking $f"
+            node --check "$f"
+          done
+
+      - name: Verify HTML assets exist
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          html = Path('index.html').read_text(encoding='utf-8')
+          refs = set(re.findall(r'(?:src|href)="([^"?#]+)', html))
+          missing=[]
+          for ref in refs:
+              if ref.startswith(('http://','https://','#','mailto:')): continue
+              p=Path(ref.lstrip('./'))
+              if not p.exists(): missing.append(ref)
+          print('Referenced local assets:', sorted(refs))
+          if missing: raise SystemExit('Missing assets: '+', '.join(missing))
+          PY
+
+      - name: Verify local voice version consistency
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          local=Path('local-voice.js').read_text()
+          debug=Path('debug-tts.js').read_text()
+          sw=Path('sw.js').read_text()
+          version=re.search(r"const VERSION='([^']+)'",local).group(1)
+          print('Local voice version:',version)
+          if version not in debug: raise SystemExit('debug-tts.js does not request current local voice version')
+          if version not in sw: raise SystemExit('sw.js does not cache current local voice version')
+          if 'tokenizerSelfTest' not in local: raise SystemExit('tokenizer self-test missing')
+          PY
+
+      - name: Verify Pages model files
+        run: |
+          set -e
+          BASE='https://joshjsp.github.io/Josh-FM/mms-tts-nld-onnx'
+          for f in config.json tokenizer_config.json vocab.json joshfm-model.json onnx/model.onnx; do
+            echo "HEAD $BASE/$f"
+            curl --fail --location --retry 3 --retry-delay 2 --silent --show-error --head "$BASE/$f" >/dev/null
+          done
+
+      - name: Verify live Vercel app
+        run: |
+          set -e
+          curl --fail --location --retry 6 --retry-delay 5 --silent --show-error 'https://josh-fm.vercel.app/' -o /tmp/joshfm.html
+          grep -q 'Josh FM' /tmp/joshfm.html
+          curl --fail --location --retry 6 --retry-delay 5 --silent --show-error --head 'https://josh-fm.vercel.app/local-voice.js?v=mms-nl-pages-v3-20260811' >/dev/null
+          echo 'Live app reachable.'
