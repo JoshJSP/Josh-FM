@@ -45,7 +45,7 @@ jobs:
           if missing: raise SystemExit('Missing assets: '+', '.join(missing))
           PY
 
-      - name: Verify local voice version consistency
+      - name: Verify Piper voice version consistency
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -62,28 +62,28 @@ jobs:
           print('PWA cache:',cache.group(1))
           if version not in debug: raise SystemExit('debug-tts.js does not request current local voice version')
           if version not in sw: raise SystemExit('sw.js does not cache current local voice version')
-          required=['tokenizerSelfTest','addBlank','blankId=0','AudioContext']
-          missing=[x for x in required if x not in local+debug]
-          if missing: raise SystemExit('Voice safety markers missing: '+', '.join(missing))
+          required=['Piper','Ronnie','phonem', 'onnx']
+          missing=[x for x in required if x.lower() not in (local+debug).lower()]
+          if missing: raise SystemExit('Piper runtime markers missing: '+', '.join(missing))
+          if 'AudioContext' not in debug: raise SystemExit('AudioContext playback path missing')
           PY
 
-      - name: Verify Pages model files and metadata
+      - name: Verify Piper Ronnie model files
         run: |
           set -euo pipefail
-          BASE='https://joshjsp.github.io/Josh-FM/mms-tts-nld-onnx'
-          for f in config.json tokenizer_config.json vocab.json joshfm-model.json onnx/model.onnx; do
+          BASE='https://huggingface.co/rhasspy/piper-voices/resolve/main/nl/nl_NL/ronnie/medium'
+          for f in nl_NL-ronnie-medium.onnx nl_NL-ronnie-medium.onnx.json; do
             echo "HEAD $BASE/$f"
             curl --fail --location --retry 4 --retry-delay 3 --silent --show-error --head "$BASE/$f" >/dev/null
           done
-          curl --fail --location --retry 4 --retry-delay 3 --silent --show-error "$BASE/joshfm-model.json" -o /tmp/joshfm-model.json
+          curl --fail --location --retry 4 --retry-delay 3 --silent --show-error "$BASE/nl_NL-ronnie-medium.onnx.json" -o /tmp/ronnie.json
           python - <<'PY'
           import json
-          d=json.load(open('/tmp/joshfm-model.json',encoding='utf-8'))
-          assert d.get('source_model')=='facebook/mms-tts-nld', d
-          assert int(d.get('sampling_rate',0))>0, d
-          assert int(d.get('samples',0))>=8000, d
-          assert d.get('onnx_file')=='onnx/model.onnx', d
-          print('Pages model metadata OK:',d)
+          d=json.load(open('/tmp/ronnie.json',encoding='utf-8'))
+          assert str(d.get('language',{}).get('code','')).startswith('nl'), d
+          assert int(d.get('audio',{}).get('sample_rate',0))>0, d
+          assert d.get('phoneme_type') in ('espeak','text'), d
+          print('Piper Ronnie config OK:', d.get('language'), d.get('audio'), d.get('phoneme_type'))
           PY
 
       - name: Verify latest code is live on Vercel
