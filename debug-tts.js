@@ -1,7 +1,8 @@
 const voiceSelect=document.getElementById('voiceMode');
 const info=document.getElementById('voiceInfo');
 const FISH_VOICE_ID='b347db033a6549378b48d00acb0d06cd';
-const FISH_VERSION='fish-audio-adaptive-v2-20260811';
+const FISH_VERSION='fish-audio-adaptive-v3-20260811';
+const JFM_BUILD='dev-fish-health-v1';
 let selectedMode=localStorage.getItem('jfm_voice_mode')||'fish';
 if(!['fish','device'].includes(selectedMode))selectedMode='fish';
 let selectedLanguage='en';
@@ -17,6 +18,7 @@ function setInfo(text,state=''){
   if(!info)return;
   info.textContent=text;
   info.dataset.state=state;
+  renderHealth();
 }
 
 if(voiceSelect){
@@ -44,7 +46,7 @@ window.JFMJingleText=(type='station')=>{const dict={station:['This is Josh FM.',
 const AC=window.AudioContext||window.webkitAudioContext;
 let djContext=AC?new AC():null,djGain=null,audioUnlocked=false;
 if(djContext){djGain=djContext.createGain();djGain.gain.value=1;djGain.connect(djContext.destination)}
-async function unlockAudio(){try{if(djContext?.state==='suspended')await djContext.resume();if(djContext){const b=djContext.createBuffer(1,1,24000),s=djContext.createBufferSource();s.buffer=b;s.connect(djGain);s.start(0)}audioUnlocked=!!djContext&&djContext.state==='running'}catch{audioUnlocked=false}return audioUnlocked}
+async function unlockAudio(){try{if(djContext?.state==='suspended')await djContext.resume();if(djContext){const b=djContext.createBuffer(1,1,24000),s=djContext.createBufferSource();s.buffer=b;s.connect(djGain);s.start(0)}audioUnlocked=!!djContext&&djContext.state==='running'}catch{audioUnlocked=false}renderHealth();return audioUnlocked}
 document.addEventListener('pointerdown',unlockAudio,{capture:true});document.addEventListener('touchstart',unlockAudio,{capture:true});
 
 function bestEnglishVoice(){if(!('speechSynthesis'in window))return null;const voices=speechSynthesis.getVoices(),preferred=['Samantha','Daniel','Karen','Moira','Tessa','Alex'];for(const name of preferred){const v=voices.find(x=>x.name===name&&x.lang?.toLowerCase().startsWith('en'));if(v)return v}return voices.find(x=>x.lang?.toLowerCase()==='en-us')||voices.find(x=>x.lang?.toLowerCase()==='en-gb')||voices.find(x=>x.lang?.toLowerCase().startsWith('en'))||null}
@@ -57,9 +59,9 @@ async function checkFishHealth(){
     try{r=await fetch('/api/tts',{method:'GET',cache:'no-store',signal:c.signal})}finally{clearTimeout(timer)}
     const d=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(d?.voice?.detail||d?.detail||d?.error||`HTTP ${r.status}`);
-    lastVoiceTitle=d?.voice?.title||lastVoiceTitle;lastError='';
+    lastVoiceTitle=d?.voice?.title||lastVoiceTitle;lastError='';lastProvider='fish';renderHealth();
     return d;
-  }catch(e){lastError=e?.name==='AbortError'?'Fish health check timed out':String(e?.message||e);throw new Error(lastError)}
+  }catch(e){lastError=e?.name==='AbortError'?'Fish health check timed out':String(e?.message||e);renderHealth();throw new Error(lastError)}
 }
 
 async function fetchFish(text,jingle=false){
@@ -71,7 +73,7 @@ async function fetchFish(text,jingle=false){
   if(provider!=='fish-audio')throw new Error(`Unexpected TTS provider: ${provider||'unknown'}`);
   if(voice&&voice!==FISH_VOICE_ID)throw new Error(`Unexpected Fish voice ID: ${voice}`);
   const blob=await r.blob();if(!blob.size)throw new Error('Fish Audio returned empty audio');
-  lastProvider='fish';lastError='';return{blob,model:lastModel,voice:voice||FISH_VOICE_ID,ms:lastLatency}
+  lastProvider='fish';lastError='';renderHealth();return{blob,model:lastModel,voice:voice||FISH_VOICE_ID,ms:lastLatency}
 }
 
 async function playBlob(blob,label='Fish Audio'){
@@ -79,12 +81,12 @@ async function playBlob(blob,label='Fish Audio'){
   try{
     if(djContext){if(djContext.state==='suspended')await djContext.resume();const arr=await blob.arrayBuffer(),buffer=await djContext.decodeAudioData(arr.slice(0)),source=djContext.createBufferSource();source.buffer=buffer;source.connect(djGain);setInfo(`${label} ON AIR ✓`,'onair');await new Promise((resolve,reject)=>{source.onended=resolve;try{source.start(0)}catch(e){reject(e)}});return true}
     const url=URL.createObjectURL(blob),audio=new Audio(url);await audio.play();await new Promise(resolve=>{audio.onended=resolve});URL.revokeObjectURL(url);return true
-  }catch(e){lastError=String(e?.message||e).slice(0,300);return false}
+  }catch(e){lastError=String(e?.message||e).slice(0,300);renderHealth();return false}
 }
 
 async function prepareFish(text,jingle=false){
   const key=cacheKey(text,jingle);if(speechCache.has(key))return speechCache.get(key);
-  const promise=fetchFish(text,jingle).catch(e=>{speechCache.delete(key);throw e});speechCache.set(key,promise);return promise
+  const promise=fetchFish(text,jingle).catch(e=>{speechCache.delete(key);throw e});speechCache.set(key,promise);renderHealth();return promise
 }
 async function fishAudio(text,jingle=false){
   try{
@@ -97,7 +99,27 @@ async function fishAudio(text,jingle=false){
 
 window.prepareSpeech=async(text='',jingle=false)=>{await unlockAudio();if((voiceSelect?.value||selectedMode)!=='fish'||!String(text||'').trim())return true;try{await prepareFish(jingle?localizeKnownJingle(text):String(text),jingle);setInfo('Fish Audio DJ break is pre-generated ✓','prepared');return true}catch(e){lastError=String(e?.message||e);setInfo(`Fish pre-generation failed: ${lastError}`,'error');return false}};
 window.speakText=async function(text,jingle=false){await unlockAudio();text=jingle?localizeKnownJingle(text):String(text||'');const mode=voiceSelect?.value||selectedMode;if(mode==='fish'){if(await fishAudio(text,jingle))return true;return speakDevice(text,jingle)}return speakDevice(text,jingle)};
-window.JFMDJAudio={context:djContext,unlock:unlockAudio,health:checkFishHealth,prepare:prepareFish,getErrors:()=>lastError?[lastError]:[],get status(){return{provider:lastProvider,model:lastModel,voiceId:FISH_VOICE_ID,voiceTitle:lastVoiceTitle,latencyMs:lastLatency,error:lastError,cacheSize:speechCache.size}},version:FISH_VERSION,get language(){return'en'},get host(){return currentHost()}};
+window.JFMDJAudio={context:djContext,unlock:unlockAudio,health:checkFishHealth,prepare:prepareFish,getErrors:()=>lastError?[lastError]:[],get status(){return{provider:lastProvider,model:lastModel,voiceId:FISH_VOICE_ID,voiceTitle:lastVoiceTitle,latencyMs:lastLatency,error:lastError,cacheSize:speechCache.size,audioUnlocked,build:JFM_BUILD}},version:FISH_VERSION,get language(){return'en'},get host(){return currentHost()}};
+window.JFMBuild=JFM_BUILD;
+
+function installHealthCard(){
+  if(document.getElementById('jfmHealthCard'))return;
+  const settingsPane=document.getElementById('tab-settings');if(!settingsPane)return;
+  const voiceCard=voiceSelect?.closest('.card');const card=document.createElement('article');card.className='card';card.id='jfmHealthCard';
+  card.innerHTML='<div class="kicker">STATION HEALTH</div><div class="row between"><h3 style="margin:0">Josh FM status</h3><span id="jfmHealthBadge" class="accent">CHECKING</span></div><div id="jfmHealthRows" class="muted" style="margin-top:10px;line-height:1.7"></div><button id="jfmHealthRefresh" class="secondary" type="button">Check Fish Audio</button>';
+  if(voiceCard?.nextSibling)settingsPane.insertBefore(card,voiceCard.nextSibling);else settingsPane.appendChild(card);
+  document.getElementById('jfmHealthRefresh')?.addEventListener('click',async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Checking…';try{await checkFishHealth()}catch{}finally{b.disabled=false;b.textContent='Check Fish Audio';renderHealth()}});
+  renderHealth();
+}
+function renderHealth(){
+  const rows=document.getElementById('jfmHealthRows'),badge=document.getElementById('jfmHealthBadge');if(!rows||!badge)return;
+  const fishSelected=(voiceSelect?.value||selectedMode)==='fish';const healthy=fishSelected&&lastProvider==='fish'&&!lastError;
+  badge.textContent=lastError?'ERROR':healthy?'READY':fishSelected?'UNKNOWN':'FALLBACK';
+  const safe=s=>String(s||'—').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  rows.innerHTML=`<div><b>Primary voice:</b> ${fishSelected?'Fish Audio':'iPhone fallback'}</div><div><b>Voice:</b> ${safe(lastVoiceTitle||FISH_VOICE_ID)}</div><div><b>Model:</b> ${safe(lastModel||'adaptive')}</div><div><b>TTS latency:</b> ${lastLatency?`${lastLatency} ms`:'—'}</div><div><b>Audio unlocked:</b> ${audioUnlocked?'yes':'not yet'}</div><div><b>Prepared breaks:</b> ${speechCache.size}</div><div><b>Build:</b> ${JFM_BUILD}</div>${lastError?`<div><b>Last error:</b> ${safe(lastError)}</div>`:''}`;
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installHealthCard);else installHealthCard();
+setInterval(renderHealth,2500);
 
 const testButton=document.getElementById('testVoice');
 if(testButton)testButton.onclick=async()=>{
@@ -108,9 +130,8 @@ if(testButton)testButton.onclick=async()=>{
     if((voiceSelect?.value||selectedMode)==='fish'){
       const h=await checkFishHealth();setInfo(`Fish connected ✓ ${h?.voice?.title||'selected voice'} · testing audio…`,'checking');
       ok=await fishAudio(text,false);
-      // Deliberately no iPhone/Samantha fallback in test mode: this button verifies Fish itself.
       if(!ok)setInfo(`Fish test FAILED — ${lastError}. Samantha was not used.`,'error');
     }else ok=await speakDevice(text,false)
-  }catch(e){lastError=String(e?.message||e);setInfo(`Fish test FAILED — ${lastError}. Samantha was not used.`,'error')}finally{testButton.disabled=false;testButton.textContent=old}
+  }catch(e){lastError=String(e?.message||e);setInfo(`Fish test FAILED — ${lastError}. Samantha was not used.`,'error')}finally{testButton.disabled=false;testButton.textContent=old;renderHealth()}
   return ok
 };
