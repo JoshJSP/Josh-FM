@@ -5,7 +5,7 @@ let tts=null;
 
 async function ensureModel(){
   if(tts) return tts;
-  tts=await KokoroTTS.from_pretrained(MODEL,{dtype:'q8',device:'wasm'});
+  tts=await KokoroTTS.from_pretrained(MODEL,{dtype:'q4',device:'wasm'});
   return tts;
 }
 
