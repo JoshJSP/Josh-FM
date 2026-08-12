@@ -4,7 +4,7 @@
 (()=>{
   const $=id=>document.getElementById(id);
   const PKCE_V='jfm_pkce_verifier_v2',PKCE_S='jfm_pkce_state_v2',STREAM='jfm_streaming_ready_v2',DEVICE='jfm_spotify_device_id';
-  let player=null,deviceId='',initPromise=null,lastEndSignal='';
+  let player=null,deviceId='',initPromise=null,lastEndSignal='',reconnectPromise=null;
   function message(text,bad=false){const el=$('queueInfo');if(el){el.textContent=text;el.style.color=bad?'#ffb4b4':''}}
   function setStatus(ok,text){const s=$('status');if(s){s.classList.toggle('on',ok);s.classList.toggle('off',!ok);s.textContent=text||(ok?'gekoppeld':'offline')}}
   function enable(ok){['start','play','prev','next','djNow','skipTalk','searchBtn','rebuild'].forEach(id=>{const e=$(id);if(e)e.disabled=!ok})}
@@ -41,10 +41,17 @@
       const ok=await player.connect();if(!ok)throw Error('Spotify Web Player kon niet verbinden.');return ready
     })().catch(e=>{initPromise=null;rememberDevice('');message(e.message||String(e),true);throw e});return initPromise
   }
-  async function transfer(play=false){const id=deviceId||await initPlayer();await api('/me/player',{method:'PUT',body:{device_ids:[id],play:!!play}});return id}
-  async function playUris(uris){const id=deviceId||await initPlayer();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris}});return true}
+  async function reconnect(){
+    if(reconnectPromise)return reconnectPromise;
+    reconnectPromise=(async()=>{const old=player;rememberDevice('');initPromise=null;player=null;window.jfmSpotifyPlayer=null;try{old?.disconnect?.()}catch{};await new Promise(r=>setTimeout(r,180));const id=await initPlayer();if(!id)throw Error('Spotify-device kon niet opnieuw worden geregistreerd.');return id})().finally(()=>{reconnectPromise=null});
+    return reconnectPromise
+  }
+  async function isAvailable(id=deviceId){if(!id)return false;try{const d=await api('/me/player/devices');return Array.isArray(d?.devices)&&d.devices.some(x=>x?.id===id&&!x?.is_restricted)}catch{return false}}
+  async function ensureDevice(){let id=deviceId;if(id&&await isAvailable(id))return id;return reconnect()}
+  async function transfer(play=false){const id=await ensureDevice();await api('/me/player',{method:'PUT',body:{device_ids:[id],play:!!play}});return id}
+  async function playUris(uris){const id=await ensureDevice();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris}});return true}
   function ownConnectButton(){const old=$('connect');if(!old||old.dataset.jfmAuthOwner==='1')return;const fresh=old.cloneNode(true);old.replaceWith(fresh);fresh.dataset.jfmAuthOwner='1';fresh.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();connectSpotify().catch(x=>message(x.message||String(x),true))},true)}
   async function reconcile(){try{await repairCallback();const t=await ensure();if(!t){rememberDevice('');setStatus(false,'offline');enable(false);if($('connect'))$('connect').disabled=false;message('Koppel Spotify om Josh FM te starten.');return}if(localStorage.getItem('jfm_auth_requested_streaming')==='1'){localStorage.setItem(STREAM,'1');localStorage.removeItem('jfm_auth_requested_streaming');clearPKCE()}try{setConnected(true)}catch{enable(true);setStatus(true,'gekoppeld')}message('Spotify gekoppeld · speler wordt voorbereid…');await initPlayer()}catch(e){rememberDevice('');setStatus(false,'offline');enable(false);if($('connect'))$('connect').disabled=false;message(e.message||String(e),true)}}
   ownConnectButton();setTimeout(reconcile,350);window.addEventListener('pageshow',()=>{ownConnectButton();setTimeout(reconcile,250)});
-  window.JFMSpotifySDK={version:'sdk-core-v4-end-signal-no-mediasession',init:initPlayer,transfer,playUris,get player(){return player},get deviceId(){return deviceId}};
+  window.JFMSpotifySDK={version:'sdk-core-v5-device-refresh',init:initPlayer,reconnect,isAvailable,ensureDevice,transfer,playUris,get player(){return player},get deviceId(){return deviceId}};
 })();
