@@ -1,13 +1,13 @@
 {
   "name": "josh-fm",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
     "test": "npm run predeploy",
     "predeploy:static": "node scripts/predeploy-check.mjs",
-    "smoke": "node scripts/app-smoke-check.mjs",
+    "smoke": "node scripts/app-smoke-check-v362.mjs",
     "channel-tap": "node scripts/channel-tap-check.mjs",
     "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap"
   }
