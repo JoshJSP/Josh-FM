@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vercel dev"
+    "dev": "vercel dev",
+    "test": "npm run predeploy",
+    "predeploy": "node scripts/predeploy-check.mjs"
   }
 }
