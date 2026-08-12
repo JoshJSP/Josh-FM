@@ -30,6 +30,7 @@ ok('single Spotify.Player',spotifyPlayers.length===1&&spotifyPlayers[0]?.[0]==='
 ok('legacy spotify-core removed',!exists('spotify-core.js'));
 ok('duplicate web playback controller removed',!exists('playback-web-sdk.js'));
 ok('primary playback controller exists',exists('playback-primary.js'));
+ok('DJ handoff v34 exists',exists('dj-handoff-v34.js'));
 
 if(exists('stability-core.js')){
   const s=read('stability-core.js');
@@ -44,6 +45,17 @@ if(exists('playback-primary.js')){
   ok('transport verification',p.includes('verify(')&&p.includes('Spotify bevestigde'));
   ok('normal device transfer preserves state',p.includes('preserve&&!!s?.is_playing'));
   ok('station start silences transfer before jingle',p.includes('transfer(id,false)')&&p.indexOf('transfer(id,false)')<p.indexOf('Josh FM-jingle'));
+  ok('station context preserved on explicit play',p.includes('stationContext')&&p.includes('playContextDirect'));
+  ok('skip has station-neighbor fallback',p.includes('stationNeighbor')&&p.includes('primary-next-fallback'));
+}
+
+if(exists('dj-handoff-v34.js')){
+  const d=read('dj-handoff-v34.js');
+  ok('DJ handoff resumes without URI body',d.includes("api(pathWithDevice('/me/player/play'),{method:'PUT'})")&&!d.includes('position_ms:0'));
+  ok('DJ handoff never seeks to zero',!d.includes('seek(0)')&&!d.includes('position_ms=0'));
+  ok('DJ handoff preserves expected URI',d.includes('resumePreservingContext(expectedUri)'));
+  ok('DJ handoff validates device id',d.includes('const DEVICE=')&&d.includes('validDevice'));
+  ok('DJ handoff owns manual button by replacement',d.includes("dataset.jfmHandoffOwner='v34'")&&d.includes('cloneNode(true)'));
 }
 
 if(exists('spotify-recovery.js')){
@@ -62,7 +74,8 @@ if(exists('personal-top40.js')){
 
 if(exists('spotify-test-config.js')){
   const s=read('spotify-test-config.js');
-  ok('primary loader wired',s.includes('playback-primary.js?v=33'));
+  ok('primary loader wired',s.includes('playback-primary.js?v=34'));
+  ok('DJ handoff loader wired',s.includes('dj-handoff-v34.js?v=34')&&s.includes('loadDJHandoff'));
   ok('old web SDK loader absent',!s.includes('playback-web-sdk.js'));
 }
 
@@ -83,7 +96,8 @@ if(exists('radio-suite.js')){
 if(exists('sw.js')){
   const sw=read('sw.js');
   ok('PWA caches primary controller',sw.includes("'./playback-primary.js'"));
-  ok('PWA cache version >= v33',/josh-fm-v(?:3[3-9]|[4-9]\d|\d{3,})/.test(sw));
+  ok('PWA caches DJ handoff',sw.includes("'./dj-handoff-v34.js'"));
+  ok('PWA cache version >= v34',/josh-fm-v(?:3[4-9]|[4-9]\d|\d{3,})/.test(sw));
 }
 
 const temp=files.filter(f=>/(^|\/)(\.noop|\.placeholder|__noop__)$/.test(f));
