@@ -30,6 +30,7 @@ ok('legacy spotify-core removed',!exists('spotify-core.js'));
 ok('duplicate web playback controller removed',!exists('playback-web-sdk.js'));
 ok('primary playback controller exists',exists('playback-primary.js'));
 ok('central DJ handoff exists',exists('dj-handoff-v34.js'));
+ok('Spotify API budget exists',exists('spotify-api-budget.js'));
 
 if(exists('stability-core.js')){
   const s=read('stability-core.js');
@@ -57,6 +58,12 @@ if(exists('playback-primary.js')){
   ok('station start silences transfer before jingle',p.includes('transfer(id,false)')&&p.indexOf('transfer(id,false)')<p.indexOf('Josh FM-jingle'));
   ok('station context preserved on explicit play',p.includes('stationContext')&&p.includes('playContextDirect'));
   ok('skip has station-neighbor fallback',p.includes('stationNeighbor')&&p.includes('primary-next-fallback'));
+}
+
+if(exists('spotify-api-budget.js')){
+  const b=read('spotify-api-budget.js');
+  ok('API watchdog >= 15 seconds',b.includes('POLL_MS=15000'));
+  ok('API budget is event-driven',b.includes("jfm:trackchange")&&b.includes('api-budget-v1-event-driven'));
 }
 
 if(exists('dj-handoff-v34.js')){
@@ -95,10 +102,19 @@ if(exists('spotify-test-config.js')){
   const s=read('spotify-test-config.js');
   ok('primary loader wired v35',s.includes('playback-primary.js?v=35'));
   ok('DJ handoff loader wired v35',s.includes('dj-handoff-v34.js?v=35')&&s.includes('loadDJHandoff'));
+  ok('API budget loader wired',s.includes('spotify-api-budget.js?v=35')&&s.includes('loadApiBudget'));
   ok('Spotify device validation',s.includes('isDevice')&&s.includes('device_ids'));
   ok('Spotify search cache >= 5 minutes',s.includes('300000'));
   ok('Spotify search pacing >= 1500ms',s.includes('1500-(Date.now()-lastSearchAt)'));
   ok('old web SDK loader absent',!s.includes('playback-web-sdk.js'));
+}
+
+if(exists('integration-guards.js')){
+  const g=read('integration-guards.js');
+  ok('memory clear owns its button',g.includes("dataset.jfmDataOwner='v35'")&&g.includes('clearPersonalMemory'));
+  ok('memory clear covers requests and preferences',g.includes("'jfm_requests_v1'")&&g.includes("'jfm_director_memory'")&&g.includes("'jfm_dj_feedback'"));
+  ok('logout owns its button',g.includes("dataset.jfmLogoutOwner='v35'")&&g.includes('disconnectSpotify'));
+  ok('logout clears device and PKCE',g.includes("'jfm_spotify_device_id'")&&g.includes("'jfm_pkce_verifier_v2'"));
 }
 
 if(exists('personal-top40.js')){
@@ -107,6 +123,8 @@ if(exists('personal-top40.js')){
   ok('Top 40 clear API',t.includes('clearTop40')&&t.includes('Wis Top 40'));
   ok('Top 40 clear scope is isolated',t.includes('localStorage.removeItem(KEY)')&&t.includes('localStorage.removeItem(SNAP)'));
 }
+
+for(const f of ['api/fact.js','api/discover.js','api/dj.js'])if(exists(f))ok(`${f} has external timeout`,read(f).includes('AbortController')&&read(f).includes('timedFetch'));
 
 if(exists('index.html')){
   const html=read('index.html');
@@ -125,6 +143,7 @@ if(exists('radio-suite.js')){
 if(exists('sw.js')){
   const sw=read('sw.js');
   ok('PWA caches primary controller',sw.includes("'./playback-primary.js'"));
+  ok('PWA caches API budget',sw.includes("'./spotify-api-budget.js'"));
   ok('PWA caches DJ handoff',sw.includes("'./dj-handoff-v34.js'"));
   ok('PWA cache version >= v35',/josh-fm-v(?:3[5-9]|[4-9]\d|\d{3,})/.test(sw));
 }
