@@ -1,6 +1,6 @@
 // Josh FM Radio Suite — memory, stats, hour markers, DJ feedback learning and controller boot.
 (()=>{
- const $=id=>document.getElementById(id),K='jfm_radio_suite',DK='jfm_dj_feedback',BUILD='audit-2026-08-12-v2';
+ const $=id=>document.getElementById(id),K='jfm_radio_suite',DK='jfm_dj_feedback',BUILD=String(window.JFM_ASSET_VERSION||'39');
  const load=()=>{try{return JSON.parse(localStorage.getItem(K)||'{}')}catch{return{}}},save=s=>{try{localStorage.setItem(K,JSON.stringify(s))}catch{}};
  const loadDj=()=>{try{return JSON.parse(localStorage.getItem(DK)||'{"up":0,"down":0,"liked":[],"disliked":[]}')}catch{return{up:0,down:0,liked:[],disliked:[]}}},saveDj=d=>{try{localStorage.setItem(DK,JSON.stringify(d))}catch{}};
  let s={minutes:0,tracks:0,discoveries:0,requests:0,likes:0,dislikes:0,lastIds:[],lastArtists:[],startedAt:0,...load()};
@@ -19,7 +19,7 @@
  function authGuard(){const text=($('queueInfo')?.textContent||'').toLowerCase();if(text.includes('opnieuw gekoppeld')||text.includes('niet gekoppeld')||text.includes('spotify-login')){$('setup')?.classList.remove('hidden');if($('connect'))$('connect').disabled=false}}
  setInterval(authGuard,4000);window.addEventListener('pageshow',authGuard);window.addEventListener('online',authGuard);setTimeout(authGuard,800);
  window.JFMRadioSuite={state:()=>s,save,autoMode,renderShow,djFeedback:loadDj,build:BUILD,boot:null};
- const versioned=src=>{try{const u=new URL(src,location.href);u.searchParams.set('build',BUILD);return u.href}catch{return src+(src.includes('?')?'&':'?')+'build='+encodeURIComponent(BUILD)}};
+ const versioned=src=>{try{const u=new URL(src,location.href);u.searchParams.set('v',BUILD);return u.href}catch{return src+(src.includes('?')?'&':'?')+'v='+encodeURIComponent(BUILD)}};
  const loadScript=(src,id)=>new Promise((resolve,reject)=>{if(document.getElementById(id))return resolve({src,loaded:true,existing:true});const x=document.createElement('script');x.id=id;x.src=versioned(src);x.async=false;x.onload=()=>resolve({src,loaded:true});x.onerror=()=>reject(new Error(`Kon ${src} niet laden`));document.body.appendChild(x)});
  const modules=[
    ['./station-clock.js','jfm-station-clock'],['./station-clock-bridge.js','jfm-station-clock-bridge'],['./rotation-engine.js','jfm-rotation-engine'],['./dj-context.js','jfm-dj-context'],['./dj-audio-guard.js','jfm-dj-audio-guard'],['./request-manager.js','jfm-request-manager'],['./playback-state.js','jfm-playback-state'],['./spotify-recovery.js','jfm-spotify-recovery'],['./station-queue.js','jfm-station-queue'],['./runtime-modes.js','jfm-runtime-modes'],['./personal-top40.js','jfm-personal-top40'],['./live-ui.js','jfm-live-ui'],['./pwa-platform.js','jfm-pwa-platform'],['./integration-guards.js','jfm-integration-guards'],['./station-health.js','jfm-station-health']
