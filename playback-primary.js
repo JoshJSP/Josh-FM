@@ -19,6 +19,16 @@
   async function withBusy(fn){if(busy)return false;setBusy(true);try{return await fn()}finally{setBusy(false)}}
   function ingest(s,source='primary'){if(!s)return;try{playback=s;renderPlayback(s)}catch{};try{truth()?.ingest?.(s,source)}catch{}}
   function rememberError(e,prefix){lastError=String(e?.message||e);failures++;info(prefix+lastError,true);return false}
+  function stationQueue(){try{return Array.isArray(queue)?queue.filter(t=>t?.uri):[]}catch{return[]}}
+  function stationIndex(stateOrUri){const q=stationQueue(),uri=typeof stateOrUri==='string'?stateOrUri:stateOrUri?.item?.uri,id=typeof stateOrUri==='string'?'':stateOrUri?.item?.id;let i=uri?q.findIndex(t=>t?.uri===uri):-1;if(i<0&&id)i=q.findIndex(t=>t?.id===id);return i}
+  function stationContext(uri,max=30){const q=stationQueue(),i=stationIndex(uri);if(i<0)return uri?[uri]:[];return [...new Set(q.slice(i,i+max).map(t=>t?.uri).filter(Boolean))]}
+  function stationNeighbor(state,delta){const q=stationQueue(),i=stationIndex(state);if(i<0)return'';return q[i+delta]?.uri||''}
+  async function playContextDirect(uri,id,source='primary-uri'){
+    const uris=stationContext(uri);if(!uris.length)throw Error('De track staat niet meer in de Josh FM-radioset.');
+    await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
+    const s=await verify(x=>x.device?.id===id&&x.is_playing&&x.item?.uri===uri,10);if(!s)throw Error('Spotify bevestigde de track niet.');
+    ingest(s,source);truth()?.setExpectedLive?.(true,'play-track');return s
+  }
 
   async function start(){
     activateNow();return withBusy(async()=>{
@@ -56,9 +66,12 @@
     activateNow();return withBusy(async()=>{
       try{
         const{id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');if(delta>0)try{recordSkip(before)}catch{};
-        const route=delta>0?'next':'previous';await api('/me/player/'+route+'?device_id='+encodeURIComponent(id),{method:'POST'});
-        let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,10);
-        if(!s){const p=player();if(delta>0)await p?.nextTrack?.();else await p?.previousTrack?.();s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,7)}
+        const fallbackUri=stationNeighbor(state,delta),route=delta>0?'next':'previous';
+        await api('/me/player/'+route+'?device_id='+encodeURIComponent(id),{method:'POST'});
+        let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,8);
+        if(!s){const p=player();if(delta>0)await p?.nextTrack?.();else await p?.previousTrack?.();s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,5)}
+        // If Spotify lost the queue context (for example after a DJ handoff), rebuild it from Josh FM's own station queue.
+        if(!s&&fallbackUri)s=await playContextDirect(fallbackUri,id,delta>0?'primary-next-fallback':'primary-prev-fallback');
         if(!s)throw Error(`Spotify bevestigde ${delta>0?'volgende':'vorige'} niet.`);
         if(!s.is_playing){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,6)||s}
         ingest(s,delta>0?'primary-next':'primary-prev');truth()?.setExpectedLive?.(true,delta>0?'next':'previous');info('Josh FM speelt.');return true
@@ -68,7 +81,7 @@
 
   async function playUri(uri){
     activateNow();if(!uri)return resume();return withBusy(async()=>{
-      try{const{id}=await ensureActive();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris:[uri],position_ms:0}});const s=await verify(x=>x.device?.id===id&&x.is_playing&&x.item?.uri===uri,9);if(!s)throw Error('Spotify bevestigde de track niet.');ingest(s,'primary-uri');truth()?.setExpectedLive?.(true,'play-track');return true}catch(e){return rememberError(e,'Track starten mislukt: ')}
+      try{const{id}=await ensureActive();await playContextDirect(uri,id,'primary-uri');return true}catch(e){return rememberError(e,'Track starten mislukt: ')}
     })
   }
   async function recover(reason='watchdog'){
@@ -90,6 +103,6 @@
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
   window.addEventListener('pageshow',()=>setTimeout(()=>{bound=false;tries=0;boot();recover('pageshow')},250));window.addEventListener('online',()=>setTimeout(()=>recover('online'),350));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),300)});setInterval(()=>recover('watchdog'),12000);
 
-  window.JFMPlayback={primary:true,version:'primary-v2-single-owner-audited',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,playUri,recover,ensureDevice:async()=>{const x=await ensureActive();return x.id},get state(){return truth()?.get?.()||null},get health(){return{failures,recoveries,lastError,busy,deviceId:deviceId(),bound}}};
+  window.JFMPlayback={primary:true,version:'primary-v3-station-context',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,playUri,recover,ensureDevice:async()=>{const x=await ensureActive();return x.id},stationContext,get state(){return truth()?.get?.()||null},get health(){return{failures,recoveries,lastError,busy,deviceId:deviceId(),bound}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
 })();
