@@ -22,7 +22,6 @@ const files=walk();
 const js=files.filter(f=>f.endsWith('.js')||f.endsWith('.mjs'));
 for(const f of js){try{execFileSync(process.execPath,['--check',path.join(root,f)],{stdio:'pipe'});pass.push(`syntax ${f}`)}catch(e){fail.push(`syntax ${f} — ${String(e.stderr||e.message).trim()}`)}}
 
-// Test/gate source contains regression strings on purpose; never treat it as browser runtime.
 const runtimeJs=js.filter(f=>!f.startsWith('scripts/')&&!f.startsWith('tests/')&&!f.startsWith('.github/'));
 const allJs=runtimeJs.map(f=>[f,read(f)]);
 const spotifyPlayers=allJs.filter(([,s])=>s.includes('new Spotify.Player'));
@@ -30,11 +29,22 @@ ok('single Spotify.Player',spotifyPlayers.length===1&&spotifyPlayers[0]?.[0]==='
 ok('legacy spotify-core removed',!exists('spotify-core.js'));
 ok('duplicate web playback controller removed',!exists('playback-web-sdk.js'));
 ok('primary playback controller exists',exists('playback-primary.js'));
-ok('DJ handoff v34 exists',exists('dj-handoff-v34.js'));
+ok('central DJ handoff exists',exists('dj-handoff-v34.js'));
 
 if(exists('stability-core.js')){
   const s=read('stability-core.js');
-  ok('SDK core has no transport button ownership',s.includes('sdk-core-v2-no-transport-owner')&&!/(?:ownButton|own|replace)\(['"](?:start|play|next|prev)['"]/.test(s));
+  ok('SDK core auth-device only',s.includes('sdk-core-v3-auth-device-only'));
+  ok('SDK core has no transport button ownership',!/(?:ownButton|own|replace)\(['"](?:start|play|next|prev)['"]/.test(s));
+  ok('SDK core has no DJ ownership',!s.includes('window.djBreak=')&&!s.includes('stableDJBreak'));
+  ok('SDK clears stale device on not_ready',s.includes("player.addListener('not_ready'")&&s.includes("rememberDevice('')"));
+  ok('SDK clears stale device on auth failure',s.includes("authentication_error")&&s.includes("rememberDevice('')"));
+  ok('SDK emits empty playback state',s.includes("item:null")&&s.includes("sdk-empty"));
+}
+
+if(exists('playback-state.js')){
+  const p=read('playback-state.js');
+  ok('playback truth clears explicit empty state',p.includes('explicitlyEmpty')&&p.includes("truth-v2-empty-state-safe"));
+  ok('trackchange includes previous track id',p.includes('previousTrackId'));
 }
 
 if(exists('playback-primary.js')){
@@ -58,6 +68,16 @@ if(exists('dj-handoff-v34.js')){
   ok('DJ handoff owns manual button by replacement',d.includes("dataset.jfmHandoffOwner='v34'")&&d.includes('cloneNode(true)'));
 }
 
+if(exists('dj-now-queue.js')){
+  const d=read('dj-now-queue.js');
+  ok('legacy DJ engine disabled',d.includes('legacy-disabled-v35')&&!d.includes('/me/player/pause')&&!d.includes('seek(0)'));
+}
+
+if(exists('dj-resume.js')){
+  const d=read('dj-resume.js');
+  ok('DJ resume points to central owner',d.includes("owner:'dj-handoff-v34.js'"));
+}
+
 if(exists('spotify-recovery.js')){
   const r=read('spotify-recovery.js');
   ok('recovery is delegated',r.includes('recovery-v6-delegated'));
@@ -65,18 +85,27 @@ if(exists('spotify-recovery.js')){
   ok('recovery does not create player',!r.includes('new Spotify.Player'));
 }
 
+if(exists('discovery.js')){
+  const d=read('discovery.js');
+  ok('discovery API budget <= 5',/MAX_SEARCHES=([0-5])\b/.test(d));
+  ok('discovery honors shared cooldown',d.includes('sharedCooldown')&&d.includes('JFMSpotifyGuard'));
+}
+
+if(exists('spotify-test-config.js')){
+  const s=read('spotify-test-config.js');
+  ok('primary loader wired v35',s.includes('playback-primary.js?v=35'));
+  ok('DJ handoff loader wired v35',s.includes('dj-handoff-v34.js?v=35')&&s.includes('loadDJHandoff'));
+  ok('Spotify device validation',s.includes('isDevice')&&s.includes('device_ids'));
+  ok('Spotify search cache >= 5 minutes',s.includes('300000'));
+  ok('Spotify search pacing >= 1500ms',s.includes('1500-(Date.now()-lastSearchAt)'));
+  ok('old web SDK loader absent',!s.includes('playback-web-sdk.js'));
+}
+
 if(exists('personal-top40.js')){
   const t=read('personal-top40.js');
   ok('Top 40 canonical dedupe',t.includes('canonicalKey')&&t.includes('mergeEntries'));
   ok('Top 40 clear API',t.includes('clearTop40')&&t.includes('Wis Top 40'));
   ok('Top 40 clear scope is isolated',t.includes('localStorage.removeItem(KEY)')&&t.includes('localStorage.removeItem(SNAP)'));
-}
-
-if(exists('spotify-test-config.js')){
-  const s=read('spotify-test-config.js');
-  ok('primary loader wired',s.includes('playback-primary.js?v=34'));
-  ok('DJ handoff loader wired',s.includes('dj-handoff-v34.js?v=34')&&s.includes('loadDJHandoff'));
-  ok('old web SDK loader absent',!s.includes('playback-web-sdk.js'));
 }
 
 if(exists('index.html')){
@@ -97,7 +126,7 @@ if(exists('sw.js')){
   const sw=read('sw.js');
   ok('PWA caches primary controller',sw.includes("'./playback-primary.js'"));
   ok('PWA caches DJ handoff',sw.includes("'./dj-handoff-v34.js'"));
-  ok('PWA cache version >= v34',/josh-fm-v(?:3[4-9]|[4-9]\d|\d{3,})/.test(sw));
+  ok('PWA cache version >= v35',/josh-fm-v(?:3[5-9]|[4-9]\d|\d{3,})/.test(sw));
 }
 
 const temp=files.filter(f=>/(^|\/)(\.noop|\.placeholder|__noop__)$/.test(f));
