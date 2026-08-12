@@ -1,0 +1,13 @@
+// Josh FM channel tap guard — resilient event delegation for iOS/PWA lifecycle rebuilds.
+(()=>{
+  let switching=false,lastTap=0;
+  const choice=()=>window.JFMMusicChoice;
+  const status=(text,bad=false)=>{const q=document.getElementById('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}};
+  function buttons(){return [...document.querySelectorAll('[data-jfm-channel]')]}
+  function paint(target,loading=false){buttons().forEach(b=>{const active=b.dataset.jfmChannel===target;b.classList.toggle('active',active);b.classList.toggle('loading',active&&loading);b.setAttribute('aria-pressed',active?'true':'false');b.disabled=!!loading&&!active});const d=document.getElementById('channelDescription'),c=choice()?.channels?.[target];if(d&&c)d.textContent=loading?`${c.label} wordt geladen…`:c.desc}
+  async function select(id){const api=choice(),c=api?.channels?.[id];if(!api||!c||switching)return false;if(api.channel===id){paint(id,false);return true}switching=true;paint(id,true);status(`Josh FM ${c.label} wordt gemaakt…`);try{const ok=await api.chooseChannel(id);if(ok===false)throw Error(`${c.label} kon niet worden geladen.`);paint(id,false);return true}catch(e){paint(api.channel,false);status('Kanaal wisselen mislukt: '+String(e?.message||e),true);return false}finally{switching=false;buttons().forEach(b=>b.disabled=false)}}
+  function delegated(e){const b=e.target?.closest?.('[data-jfm-channel]');if(!b)return;e.preventDefault();e.stopPropagation();const now=Date.now();if(now-lastTap<250)return;lastTap=now;select(b.dataset.jfmChannel).catch(()=>{})}
+  function harden(){buttons().forEach(b=>{b.type='button';b.style.touchAction='manipulation';b.setAttribute('role','button');b.setAttribute('aria-pressed',b.dataset.jfmChannel===choice()?.channel?'true':'false')});const pane=document.getElementById('tab-choose');if(pane&&!pane.dataset.jfmDelegated){pane.dataset.jfmDelegated='1';pane.addEventListener('click',delegated,true);pane.addEventListener('touchend',e=>{const b=e.target?.closest?.('[data-jfm-channel]');if(!b)return;e.preventDefault();delegated(e)}, {capture:true,passive:false})}}
+  const boot=()=>{harden();setTimeout(harden,250);setTimeout(harden,900)};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.addEventListener('pageshow',boot);window.addEventListener('jfm:release-status',boot);setInterval(harden,4000);
+  window.JFMChannelTapGuard={version:'v1-ios-delegated',select,harden,get switching(){return switching}};
+})();
