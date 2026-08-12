@@ -55,12 +55,29 @@
   function activateFromGesture(){try{player?.activateElement?.()}catch{}}
   ['start','play','next','prev','djNow'].forEach(id=>document.addEventListener('click',e=>{if(e.target?.closest?.('#'+id))activateFromGesture()},true));
   async function transfer(play=false){await init();if(!deviceId)throw Error('Josh FM-afspeelapparaat is nog niet klaar.');await api('/me/player',{method:'PUT',body:{device_ids:[deviceId],play:!!play}});return deviceId}
+  async function currentRemote(){try{return await api('/me/player')}catch{return null}}
+  async function ensureActiveDevice(){
+    await init();if(!deviceId)throw Error('Josh FM-afspeelapparaat is nog niet klaar.');
+    const remote=await currentRemote();
+    if(remote?.device?.id!==deviceId){await transfer(!!remote?.is_playing);await wait(180)}
+    return remote
+  }
   async function verifiedState(tries=8){for(let i=0;i<tries;i++){await wait(180+i*60);try{const s=await api('/me/player');if(s?.device?.id===deviceId)return s}catch{}}return null}
+  async function verifyTransport(kind,before){
+    for(let i=0;i<8;i++){
+      await wait(140+i*55);const s=await currentRemote();if(!s||s.device?.id!==deviceId)continue;
+      if(kind==='play'&&!!s.is_playing!==!!before?.is_playing)return s;
+      if(kind==='next'&&s.item?.id&&s.item.id!==before?.item?.id)return s;
+      if(kind==='prev'&&s.item?.id&&s.item.id!==before?.item?.id)return s;
+    }
+    return null
+  }
   const legacyStart=typeof startRadio==='function'?startRadio:null;
   async function startWebRadio(){
+    activateFromGesture();
     if(controlsBusy)return;setControlsBusy(true);status('Josh FM-player wordt gestart…');
     try{
-      await init();activateFromGesture();
+      await init();
       if(!queue?.length)await buildSet();if(!queue?.length)throw Error('Ik kon geen tracks voor de radioset vinden.');
       if($('jingles')?.checked&&typeof speakText==='function'){status('Josh FM-jingle…');await speakText('Josh FM. Your music, your radio show.',true).catch(()=>{})}
       await transfer(false);const uris=queue.slice(0,30).map(x=>x.uri).filter(Boolean);if(!uris.length)throw Error('De radioset bevat geen afspeelbare Spotify-tracks.');
@@ -70,20 +87,43 @@
     }catch(e){lastError=String(e?.message||e);status('Starten lukte niet: '+lastError,true);throw e}finally{setControlsBusy(false)}
   }
   async function transport(kind){
+    // IMPORTANT on iOS: activateElement must run synchronously inside the user's tap,
+    // before any await. The capture listener above does this too; this is a second guard.
+    activateFromGesture();
     if(controlsBusy)return;setControlsBusy(true);
     try{
-      await init();activateFromGesture();await transfer(false);
-      if(kind==='next'){if(playback?.item?.id)try{recordSkip(playback.item.id)}catch{};await player.nextTrack()}
-      else if(kind==='prev')await player.previousTrack();
-      else if(kind==='play')await player.togglePlay();
-      await wait(220);await refresh();
+      await init();
+      const before=await ensureActiveDevice();
+      status(kind==='play'?(before?.is_playing?'Pauzeren…':'Afspelen…'):(kind==='next'?'Volgende nummer…':'Vorige nummer…'));
+      if(kind==='next'){
+        if(before?.item?.id)try{recordSkip(before.item.id)}catch{};
+        await api('/me/player/next?device_id='+encodeURIComponent(deviceId),{method:'POST'});
+      }else if(kind==='prev'){
+        await api('/me/player/previous?device_id='+encodeURIComponent(deviceId),{method:'POST'});
+      }else if(kind==='play'){
+        if(before?.is_playing)await api('/me/player/pause?device_id='+encodeURIComponent(deviceId),{method:'PUT'});
+        else await api('/me/player/play?device_id='+encodeURIComponent(deviceId),{method:'PUT'});
+      }
+      let confirmed=await verifyTransport(kind,before);
+      if(!confirmed&&kind==='play'){
+        // SDK fallback for browsers where the Web API command is accepted but state lags.
+        if(before?.is_playing)await player.pause();else await player.resume();
+        confirmed=await verifyTransport(kind,before)
+      }
+      if(!confirmed)throw Error('Spotify bevestigde de bediening niet.');
+      ingestSdkState(await player.getCurrentState().catch(()=>null));
+      await refresh().catch(()=>{});
+      status(confirmed.is_playing?'Josh FM speelt.':'Josh FM staat gepauzeerd.')
     }catch(e){lastError=String(e?.message||e);status('Bediening mislukt: '+lastError,true);throw e}finally{setControlsBusy(false)}
   }
   try{startRadio=startWebRadio}catch{}
   try{control=transport}catch{}
-  window.JFMWebPlayer={version:'web-sdk-v1',init,transfer,activate:activateFromGesture,start:startWebRadio,next:()=>transport('next'),previous:()=>transport('prev'),toggle:()=>transport('play'),getCurrentState:()=>player?.getCurrentState?.(),setVolume:v=>player?.setVolume?.(v),seek:ms=>player?.seek?.(ms),pause:()=>player?.pause?.(),resume:()=>player?.resume?.(),get player(){return player},get deviceId(){return deviceId},get state(){return sdkState()}};
+  window.JFMWebPlayer={version:'web-sdk-v2-ios-controls',init,transfer,activate:activateFromGesture,start:startWebRadio,next:()=>transport('next'),previous:()=>transport('prev'),toggle:()=>transport('play'),getCurrentState:()=>player?.getCurrentState?.(),setVolume:v=>player?.setVolume?.(v),seek:ms=>player?.seek?.(ms),pause:()=>player?.pause?.(),resume:()=>player?.resume?.(),get player(){return player},get deviceId(){return deviceId},get state(){return sdkState()}};
   window.jfmSpotifyPlayer=window.JFMWebPlayer;
   window.addEventListener('pageshow',()=>{navigator.serviceWorker?.getRegistration?.().then(r=>r?.update?.()).catch(()=>{});if(localStorage.getItem('jfm_token'))init().catch(()=>{})});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&localStorage.getItem('jfm_token'))init().catch(()=>{})});
-  setTimeout(()=>{if(localStorage.getItem('jfm_token'))init().catch(()=>{})},500);
+  // Warm the SDK/player before the first user tap so iOS can synchronously activate it.
+  const warm=()=>{if(localStorage.getItem('jfm_token'))init().catch(()=>{})};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(warm,120));else setTimeout(warm,120);
+  setTimeout(warm,700);
 })();
