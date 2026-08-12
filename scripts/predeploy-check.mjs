@@ -22,14 +22,19 @@ const files=walk();
 const js=files.filter(f=>f.endsWith('.js')||f.endsWith('.mjs'));
 for(const f of js){try{execFileSync(process.execPath,['--check',path.join(root,f)],{stdio:'pipe'});pass.push(`syntax ${f}`)}catch(e){fail.push(`syntax ${f} — ${String(e.stderr||e.message).trim()}`)}}
 
-// Never scan this gate's own rule strings as runtime code.
-const runtimeJs=js.filter(f=>f!=='scripts/predeploy-check.mjs');
+// Test/gate source contains regression strings on purpose; never treat it as browser runtime.
+const runtimeJs=js.filter(f=>!f.startsWith('scripts/')&&!f.startsWith('tests/')&&!f.startsWith('.github/'));
 const allJs=runtimeJs.map(f=>[f,read(f)]);
 const spotifyPlayers=allJs.filter(([,s])=>s.includes('new Spotify.Player'));
-ok('single Spotify.Player',spotifyPlayers.length===1,spotifyPlayers.map(([f])=>f).join(', ')||'none');
+ok('single Spotify.Player',spotifyPlayers.length===1&&spotifyPlayers[0]?.[0]==='stability-core.js',spotifyPlayers.map(([f])=>f).join(', ')||'none');
 ok('legacy spotify-core removed',!exists('spotify-core.js'));
 ok('duplicate web playback controller removed',!exists('playback-web-sdk.js'));
 ok('primary playback controller exists',exists('playback-primary.js'));
+
+if(exists('stability-core.js')){
+  const s=read('stability-core.js');
+  ok('SDK core has no transport button ownership',s.includes('sdk-core-v2-no-transport-owner')&&!/(?:ownButton|own|replace)\(['"](?:start|play|next|prev)['"]/.test(s));
+}
 
 if(exists('playback-primary.js')){
   const p=read('playback-primary.js');
