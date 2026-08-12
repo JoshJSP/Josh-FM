@@ -20,15 +20,18 @@
   }
   function get(){return{...state,operation:state.operation?{...state.operation}:null}}
   function normalize(remote={}){
+    const hasApiItem=Object.prototype.hasOwnProperty.call(remote,'item');
+    const hasSdkWindow=Object.prototype.hasOwnProperty.call(remote,'track_window');
     const item=remote?.item||remote?.track_window?.current_track||null;
+    const explicitlyEmpty=(hasApiItem&&remote.item==null)||(hasSdkWindow&&!remote?.track_window?.current_track);
     const paused=remote?.paused;
-    const playing=typeof remote?.is_playing==='boolean'?remote.is_playing:(typeof paused==='boolean'?!paused:state.isPlaying);
-    const progress=remote?.progress_ms ?? remote?.position ?? state.progressMs;
+    const playing=typeof remote?.is_playing==='boolean'?remote.is_playing:(typeof paused==='boolean'?!paused:(explicitlyEmpty?false:state.isPlaying));
+    const progress=remote?.progress_ms ?? remote?.position ?? (explicitlyEmpty?0:state.progressMs);
     return{
-      trackId:item?.id||state.trackId||'',
-      uri:item?.uri||state.uri||'',
-      progressMs:Number.isFinite(Number(progress))?Math.max(0,Number(progress)):state.progressMs,
-      durationMs:Number(item?.duration_ms||state.durationMs||0),
+      trackId:item?.id||(explicitlyEmpty?'':state.trackId||''),
+      uri:item?.uri||(explicitlyEmpty?'':state.uri||''),
+      progressMs:Number.isFinite(Number(progress))?Math.max(0,Number(progress)):(explicitlyEmpty?0:state.progressMs),
+      durationMs:item?Number(item?.duration_ms||0):(explicitlyEmpty?0:state.durationMs),
       isPlaying:!!playing,
       deviceId:remote?.device?.id||state.deviceId||'',
       deviceName:remote?.device?.name||state.deviceName||''
@@ -36,19 +39,19 @@
   }
   function ingest(remote,source='spotify'){
     if(!remote)return get();
+    const previousTrack=state.trackId;
     const next=normalize(remote);
-    const changedTrack=!!next.trackId&&next.trackId!==state.trackId;
+    const changedTrack=next.trackId!==previousTrack&&(!!next.trackId||!!previousTrack);
     state={...state,...next,source,updatedAt:now(),revision:state.revision+1,lastError:''};
     if(next.isPlaying)state.lastGoodAt=now();
     if(changedTrack)state.lastTransitionAt=now();
-    // A verified track change completes next/previous/explicit play operations.
     if(state.operation&&['next','previous','play-track','start'].includes(state.operation.type)){
       const expected=state.operation.expectedTrackId||'';
       if((expected&&next.trackId===expected)||(!expected&&changedTrack))state.operation=null;
     }
     try{playback=remote}catch{}
     persist();emit(changedTrack?'track-change':'state');
-    if(changedTrack)try{window.dispatchEvent(new CustomEvent('jfm:trackchange',{detail:{trackId:next.trackId,source}}))}catch{}
+    if(changedTrack)try{window.dispatchEvent(new CustomEvent('jfm:trackchange',{detail:{trackId:next.trackId,previousTrackId:previousTrack,source}}))}catch{}
     return get()
   }
   function patch(values={},reason='patch'){
@@ -85,6 +88,6 @@
   function reset(){state=empty();persist();emit('reset')}
 
   window.JFMPlaybackState={
-    version:'truth-v1',get,ingest,patch,setExpectedLive,begin,end,activeOperation,blocksRecovery,shouldRecover,error,subscribe,reset
+    version:'truth-v2-empty-state-safe',get,ingest,patch,setExpectedLive,begin,end,activeOperation,blocksRecovery,shouldRecover,error,subscribe,reset
   };
 })();
