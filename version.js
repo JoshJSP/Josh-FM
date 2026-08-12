@@ -1,5 +1,5 @@
 // Josh FM release identity. Version must stay in sync with package.json.
-window.JFM_RELEASE={version:'2.2.0',build:'unknown',asset:'39',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
+window.JFM_RELEASE={version:'2.2.1',build:'unknown',asset:'39',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
 window.JFM_ASSET_VERSION='39';
 (()=>{
   const render=()=>{
