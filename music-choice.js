@@ -1,0 +1,56 @@
+// Josh FM music channels + Hit Battle v1
+(()=>{
+  const $=id=>document.getElementById(id),CHANNEL_KEY='jfm_music_channel_v1',BATTLE_KEY='jfm_hit_battle_v1',SEARCH_KEY='jfm_channel_search_cache_v1';
+  const CHANNELS={
+    mix:{label:'Mijn Mix',icon:'🎧',desc:'Alles wat Josh FM van jouw smaak weet.'},
+    hits:{label:'Hits',icon:'🔥',desc:'Je populairste bekende tracks.'},
+    top40:{label:'Top 40',icon:'🏆',desc:'De 40 sterkste tracks uit jouw actuele muziekmix.'},
+    new:{label:'Nieuw',icon:'✨',desc:'Recente releases en nieuwe muziek.'},
+    throwback:{label:'Throwback',icon:'📻',desc:'Favorieten van vóór 2017.'},
+    '00s':{label:'00s',icon:'💿',desc:'Muziek uit 2000–2009.'},
+    '10s':{label:'10s',icon:'📱',desc:'Muziek uit 2010–2019.'},
+    nl:{label:'Nederlandstalig',icon:'🇳🇱',desc:'Nederlandstalige muziek.'},
+    party:{label:'Party',icon:'🎉',desc:'Dansbaar en energiek.'},
+    chill:{label:'Chill',icon:'🌙',desc:'Rustiger en ontspannen.'},
+    summer:{label:'Summer',icon:'☀️',desc:'Zomerse tracks en feelgood.'}
+  };
+  let current=localStorage.getItem(CHANNEL_KEY)||'mix',pair=[],busy=false,baseBuild=null;
+  if(!CHANNELS[current])current='mix';
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const year=t=>Number(String(t?.release||'').slice(0,4))||0;
+  const artist=t=>String(t?.artists?.[0]||'').toLowerCase().trim();
+  const trackFromSpotify=t=>({id:t.id,uri:t.uri,name:t.name,artists:(t.artists||[]).map(a=>a.name),album:t.album?.name||'',release:t.album?.release_date||'',image:t.album?.images?.[1]?.url||t.album?.images?.[0]?.url||'',url:t.external_urls?.spotify||'',duration:t.duration_ms||0,popularity:Number(t.popularity||0)});
+  function loadBattle(){try{return JSON.parse(localStorage.getItem(BATTLE_KEY)||'{"votes":0,"tracks":{},"artists":{}}')}catch{return{votes:0,tracks:{},artists:{}}}}
+  function saveBattle(s){try{localStorage.setItem(BATTLE_KEY,JSON.stringify(s))}catch{}}
+  function battleScore(t){const s=loadBattle(),x=s.tracks?.[t.id]||{},a=s.artists?.[artist(t)]||0;return Number(x.score||0)+Number(a||0)*.35}
+  function sortWithTaste(list,extra=()=>0){return [...list].sort((a,b)=>(extra(b)+battleScore(b))-(extra(a)+battleScore(a))+(Math.random()-.5)*.4)}
+  async function popularityMap(list){const ids=list.map(t=>t.id).filter(Boolean).slice(0,50);if(!ids.length)return{};try{const d=await api('/tracks?ids='+encodeURIComponent(ids.join(','))),out={};for(const t of d?.tracks||[])if(t?.id)out[t.id]=Number(t.popularity||0);return out}catch{return{}}}
+  function searchCache(){try{return JSON.parse(localStorage.getItem(SEARCH_KEY)||'{}')}catch{return{}}}
+  function saveSearchCache(c){try{localStorage.setItem(SEARCH_KEY,JSON.stringify(c))}catch{}}
+  async function channelSearch(id){const q={nl:'genre:dutch',party:'genre:dance',chill:'genre:chill',summer:'summer hits'}[id];if(!q)return[];const cache=searchCache(),hit=cache[id];if(hit?.at&&Date.now()-hit.at<30*60*1000&&Array.isArray(hit.items))return hit.items;try{const d=await api('/search?type=track&limit=50&q='+encodeURIComponent(q));const items=(d?.tracks?.items||[]).filter(t=>t?.id&&t?.uri).map(trackFromSpotify);cache[id]={at:Date.now(),items};saveSearchCache(cache);return items}catch{return[]}}
+  async function applyChannel(input){
+    let list=(Array.isArray(input)?input:[]).filter(t=>t?.id&&t?.uri),id=current,now=new Date().getFullYear();
+    if(['nl','party','chill','summer'].includes(id)){const found=await channelSearch(id);if(found.length>=8)list=found}
+    if(id==='new'){let x=list.filter(t=>year(t)>=now-1);if(x.length>=8)list=x}
+    if(id==='throwback'){let x=list.filter(t=>year(t)&&year(t)<=2016);if(x.length>=8)list=x}
+    if(id==='00s'){let x=list.filter(t=>year(t)>=2000&&year(t)<=2009);if(x.length>=8)list=x}
+    if(id==='10s'){let x=list.filter(t=>year(t)>=2010&&year(t)<=2019);if(x.length>=8)list=x}
+    if(id==='hits'||id==='top40'){const pop=await popularityMap(list);list=sortWithTaste(list,t=>Number(pop[t.id]||t.popularity||0)/8);if(id==='top40')list=list.slice(0,40)}else list=sortWithTaste(list);
+    const seen=new Set();list=list.filter(t=>!seen.has(t.id)&&(seen.add(t.id),true));
+    return list.slice(0,50)
+  }
+  async function rebuildAndMaybeSwitch(){if(busy)return;busy=true;try{const wasPlaying=!!playback?.is_playing;const q=$('queueInfo');if(q)q.textContent=`Josh FM ${CHANNELS[current].label} wordt gemaakt…`;if(typeof baseBuild==='function')await baseBuild();queue=await applyChannel(queue);try{window.__jfmStationQueueSig=''}catch{};window.jfmRenderNext?.();window.JFMProgramDirector?.render?.();renderBattle();renderChannel();if(q)q.textContent=`${queue.length} tracks klaar · ${CHANNELS[current].label}.`;if(wasPlaying&&queue[0]?.uri&&window.JFMPlayback?.playUri)await window.JFMPlayback.playUri(queue[0].uri)}catch(e){const q=$('queueInfo');if(q){q.textContent='Kanaal wisselen mislukt: '+String(e?.message||e);q.style.color='#ffb4b4'}}finally{busy=false}}
+  function chooseChannel(id){if(!CHANNELS[id]||id===current)return;current=id;localStorage.setItem(CHANNEL_KEY,id);renderChannel();rebuildAndMaybeSwitch()}
+  function nextPair(){const list=(Array.isArray(queue)?queue:[]).filter(t=>t?.id&&t?.uri);if(list.length<2){pair=[];return}let a=list[Math.floor(Math.random()*list.length)],candidates=list.filter(t=>t.id!==a.id&&artist(t)!==artist(a));if(!candidates.length)candidates=list.filter(t=>t.id!==a.id);let b=candidates[Math.floor(Math.random()*candidates.length)];pair=[a,b]}
+  function vote(winner,loser){if(!winner||!loser)return;const s=loadBattle();s.votes=Number(s.votes||0)+1;s.tracks=s.tracks||{};s.artists=s.artists||{};for(const [t,delta,field] of [[winner,2,'wins'],[loser,-1,'losses']]){const x=s.tracks[t.id]||{score:0,wins:0,losses:0,name:t.name,artist:t.artists?.join(', ')||''};x.score=Number(x.score||0)+delta;x[field]=Number(x[field]||0)+1;x.name=t.name;x.artist=t.artists?.join(', ')||'';s.tracks[t.id]=x;const a=artist(t);if(a)s.artists[a]=Number(s.artists[a]||0)+(delta>0?1:-.35)}saveBattle(s);nextPair();renderBattle()}
+  function battleCard(t,n){if(!t)return'<div class="battle-empty">Nog geen track beschikbaar.</div>';return `<button class="battle-card" data-battle="${n}">${t.image?`<img src="${esc(t.image)}" alt="">`:'<div class="battle-art">JFM</div>'}<b>${esc(t.name)}</b><span>${esc((t.artists||[]).join(', '))}</span><em>Kies deze</em></button>`}
+  function renderBattle(){const host=$('jfmBattle');if(!host)return;if(pair.length<2)nextPair();const s=loadBattle();host.innerHTML=`<div class="battle-head"><div><div class="kicker">HIT BATTLE</div><h3>Welke wil jij vaker horen?</h3></div><strong>${Number(s.votes||0)} keuzes</strong></div><div class="battle-grid">${battleCard(pair[0],0)}<div class="battle-vs">VS</div>${battleCard(pair[1],1)}</div><p class="muted">Je keuze telt mee in toekomstige Josh FM-radiosets.</p>`;host.querySelectorAll('[data-battle]').forEach(b=>b.addEventListener('click',()=>{const n=Number(b.dataset.battle),w=pair[n],l=pair[n?0:1];vote(w,l)}))}
+  function renderChannel(){document.querySelectorAll('[data-jfm-channel]').forEach(b=>b.classList.toggle('active',b.dataset.jfmChannel===current));const d=$('channelDescription');if(d)d.textContent=CHANNELS[current].desc;const mini=$('channelMini');if(mini)mini.textContent=CHANNELS[current].label;document.body.dataset.musicChannel=current}
+  function inject(){if($('tab-choose'))return;const nav=document.querySelector('.tabs'),settingsTab=nav?.querySelector('[data-tab="settings"]');if(!nav)return;const b=document.createElement('button');b.className='tab';b.dataset.tab='choose';b.textContent='Kiezen';nav.insertBefore(b,settingsTab||null);const pane=document.createElement('section');pane.id='tab-choose';pane.className='tabpane';pane.innerHTML=`<article class="card"><div class="kicker">JOSH FM KANALEN</div><h3>Kies wat je wilt horen</h3><p id="channelDescription" class="muted"></p><div class="channel-grid">${Object.entries(CHANNELS).map(([id,c])=>`<button class="channel-card" data-jfm-channel="${id}"><span>${c.icon}</span><b>${c.label}</b></button>`).join('')}</div></article><article id="jfmBattle" class="card"></article>`;const settings=$('tab-settings');settings?.parentNode?.insertBefore(pane,settings);b.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.tabpane').forEach(x=>x.classList.toggle('active',x===pane));renderBattle();renderChannel()});pane.querySelectorAll('[data-jfm-channel]').forEach(x=>x.addEventListener('click',()=>chooseChannel(x.dataset.jfmChannel)));
+    const live=document.querySelector('.live');if(live&&!$('channelMini')){const x=document.createElement('span');x.id='channelMini';x.className='channel-mini';live.appendChild(x)}
+    if(!$('jfm-choice-style')){const s=document.createElement('style');s.id='jfm-choice-style';s.textContent='.channel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.channel-card{min-height:82px;border:1px solid #292f38;background:#15181e;color:#eef1f5;border-radius:15px;padding:12px;text-align:left}.channel-card span{font-size:22px;display:block;margin-bottom:7px}.channel-card b{font-size:13px}.channel-card.active{outline:2px solid #68e894;border-color:#68e894}.battle-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.battle-head strong{font-size:11px;color:#68e894}.battle-grid{display:grid;grid-template-columns:1fr 34px 1fr;gap:8px;align-items:center;margin-top:14px}.battle-card{border:1px solid #292f38;background:#15181e;color:#fff;border-radius:16px;padding:10px;min-width:0;text-align:left}.battle-card img,.battle-art{width:100%;aspect-ratio:1;border-radius:11px;object-fit:cover;background:#20242b;display:grid;place-items:center;font-weight:900}.battle-card b,.battle-card span,.battle-card em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.battle-card b{font-size:13px;margin-top:9px}.battle-card span{font-size:11px;color:#929ba8;margin-top:3px}.battle-card em{font-style:normal;color:#68e894;font-size:10px;margin-top:9px}.battle-vs{text-align:center;font-size:10px;font-weight:900;color:#798390}.channel-mini{font-size:10px;font-weight:800;opacity:.8}@media(max-width:420px){.battle-grid{grid-template-columns:1fr 28px 1fr}.channel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}';document.head.appendChild(s)}renderChannel();renderBattle()}
+  function wrapBuild(){if(baseBuild||typeof window.buildSet!=='function')return false;baseBuild=window.buildSet;window.buildSet=async(...args)=>{const r=await baseBuild(...args);queue=await applyChannel(Array.isArray(queue)?queue:r);renderBattle();renderChannel();return queue};return true}
+  let tries=0;const boot=()=>{inject();if(!wrapBuild()&&++tries<50)setTimeout(boot,120)};boot();
+  window.addEventListener('jfm:trackchange',()=>renderBattle());window.addEventListener('pageshow',()=>{inject();renderChannel();renderBattle()});
+  window.JFMMusicChoice={version:'channels-hitbattle-v1',channels:CHANNELS,get channel(){return current},chooseChannel,applyChannel,rebuild:rebuildAndMaybeSwitch,battle:()=>loadBattle(),renderBattle};
+})();
