@@ -1,4 +1,4 @@
-// Josh FM — editable Spotify Client ID override for preview/test URLs.
+// Josh FM — editable Spotify Client ID + shared Spotify API guard.
 (()=>{
   const TEST_KEY='jfm_test_spotify_client_id';
   const CLIENT_KEY='jfm_client_id';
@@ -29,7 +29,6 @@
   input.addEventListener('input',()=>{const id=String(input.value||'').trim();if(id)persist(id)});
   input.addEventListener('change',()=>{const id=String(input.value||'').trim();if(id)persist(id)});
 
-  // Before processing Spotify's callback, force the locally selected test ID back in place.
   try{
     if(typeof callback==='function'){
       const originalCallback=callback;
@@ -37,7 +36,6 @@
     }
   }catch{}
 
-  // Always prefer what is visibly typed in the field when the user taps Koppel Spotify.
   try{
     connect=async function(){
       const id=persist(selected());
@@ -52,12 +50,62 @@
     }
   }catch{}
 
-  // No MutationObserver here: changing input attributes from inside the observer can loop on Safari/iOS.
+  // Shared Spotify guard: stop discovery/search from hammering Spotify and only send valid track URIs.
+  try{
+    if(typeof api==='function'){
+      const rawApi=api;
+      const searchCache=new Map();
+      let searchChain=Promise.resolve(),lastSearchAt=0,cooldownUntil=0,lastRateLimitAt=0;
+      const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+      const isTrackUri=v=>/^spotify:track:[A-Za-z0-9]{22}$/.test(String(v||''));
+      function sanitize(opt={}){
+        if(!opt?.body||typeof opt.body==='string')return opt;
+        const body={...opt.body};
+        if(Array.isArray(body.uris)){
+          const before=body.uris.length;
+          body.uris=[...new Set(body.uris.filter(isTrackUri))].slice(0,100);
+          if(before&&!body.uris.length)throw new Error('Spotify track-URI was ongeldig; afspelen is veilig gestopt.');
+        }
+        return{...opt,body}
+      }
+      async function guarded(path,opt={}){
+        path=String(path||'');
+        if(!path.startsWith('/'))throw new Error('Ongeldige Spotify API-route.');
+        const now=Date.now();
+        if(now<cooldownUntil)throw new Error(`Spotify rate limit actief. Probeer over ${Math.max(1,Math.ceil((cooldownUntil-now)/1000))} sec opnieuw.`);
+        const isSearch=path.startsWith('/search?');
+        const key=isSearch?path:'';
+        if(isSearch){
+          const cached=searchCache.get(key);
+          if(cached&&Date.now()-cached.at<60000)return cached.data;
+          const run=async()=>{
+            const wait=Math.max(0,700-(Date.now()-lastSearchAt));if(wait)await sleep(wait);lastSearchAt=Date.now();
+            try{const out=await rawApi(path,sanitize(opt));searchCache.set(key,{at:Date.now(),data:out});return out}
+            catch(e){
+              const msg=String(e?.message||e);
+              if(/rustiger|rate limit|429/i.test(msg)){lastRateLimitAt=Date.now();cooldownUntil=Date.now()+30000;throw new Error('Spotify rate limit actief. Josh FM wacht 30 seconden voordat er opnieuw gezocht wordt.')}
+              throw e
+            }
+          };
+          const p=searchChain.then(run,run);searchChain=p.catch(()=>{});return p
+        }
+        try{return await rawApi(path,sanitize(opt))}
+        catch(e){
+          const msg=String(e?.message||e);
+          if(/rustiger|rate limit|429/i.test(msg)){lastRateLimitAt=Date.now();cooldownUntil=Date.now()+30000}
+          throw e
+        }
+      }
+      api=window.api=guarded;
+      window.JFMSpotifyGuard={version:'spotify-guard-v1',get state(){return{cooldownUntil,lastRateLimitAt,searchCache:searchCache.size,lastSearchAt}},isTrackUri};
+    }
+  }catch(e){console.warn('Spotify guard kon niet laden',e)}
+
   sync();
   setTimeout(sync,250);
   setTimeout(sync,1200);
   window.addEventListener('pageshow',sync);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});
 
-  window.JFMSpotifyTestConfig={version:'spotify-test-v4-safari-safe',defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
+  window.JFMSpotifyTestConfig={version:'spotify-test-v5-api-guard',defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
 })();
