@@ -3,79 +3,16 @@
 const $=id=>document.getElementById(id),MEM='jfm_long_radio_memory',FB='jfm_dj_feedback';
 function load(k,fallback){try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(fallback))}catch{return fallback}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
-function memory(){return load(MEM,[])}
-function feedback(){return load(FB,{up:0,down:0,items:[],avoid:[]})}
-window.JFMRadioUpgrades={memory,feedback};
-
-// Keep a lightweight internal memory for repetition control and personalisation.
-// This is not exposed as a Gemist/history product surface.
-let seen='';setInterval(()=>{try{const item=playback?.item;if(!item?.id||item.id===seen)return;seen=item.id;const t=trackObj(item),m=memory();m.unshift({id:t.id,name:t.name,artists:t.artists,release:t.release,at:Date.now()});const unique=[];for(const x of m){if(!unique.some(y=>y.id===x.id))unique.push(x);if(unique.length>=80)break}save(MEM,unique)}catch{}},4000);
-
-// Make long uninterrupted music stretches happen sometimes instead of forcing a DJ break on a rigid rhythm.
-try{const oldSchedule=window.scheduleTalk||scheduleTalk;if(typeof oldSchedule==='function'){window.scheduleTalk=scheduleTalk=function(){oldSchedule();const level=Number(document.getElementById('talk')?.value||1);const quietChance=[.48,.32,.20,.10][level]??.25;if(Math.random()<quietChance){const extra=2+Math.floor(Math.random()*3);nextTalkAt+=extra;window.jfmMusicRun=true}else window.jfmMusicRun=false}}}catch{}
-
-// At a new hour, make the next natural track boundary an hour-opener instead of waiting many songs.
-let lastHour=new Date().getHours();setInterval(()=>{const h=new Date().getHours();if(h===lastHour)return;lastHour=h;window.jfmHourMarker=true;try{if(playback?.is_playing){tracksSinceTalk=Math.max(tracksSinceTalk,nextTalkAt-1)}}catch{}},12000);
-
-// Add simple feedback directly to the latest DJ moment. This trains style locally without accounts or paid storage.
+function memory(){return load(MEM,[])}function feedback(){return load(FB,{up:0,down:0,items:[],avoid:[]})}window.JFMRadioUpgrades={memory,feedback,version:'radio-upgrades-v4-english-facts'};
+let seen='';setInterval(()=>{try{const item=playback?.item;if(!item?.id||item.id===seen)return;seen=item.id;const t=trackObj(item),m=memory();m.unshift({id:t.id,name:t.name,artists:t.artists,release:t.release,at:Date.now()});const unique=[];for(const x of m){if(!unique.some(y=>y.id===x.id))unique.push(x);if(unique.length>=80)break}save(MEM,unique)}catch{}},6000);
+try{const oldSchedule=window.scheduleTalk||scheduleTalk;if(typeof oldSchedule==='function'){window.scheduleTalk=scheduleTalk=function(){oldSchedule();const level=Number(document.getElementById('talk')?.value||1),quietChance=[.48,.32,.20,.10][level]??.25;if(Math.random()<quietChance){nextTalkAt+=2+Math.floor(Math.random()*3);window.jfmMusicRun=true}else window.jfmMusicRun=false}}}catch{}
+let lastHour=new Date().getHours();setInterval(()=>{const h=new Date().getHours();if(h===lastHour)return;lastHour=h;window.jfmHourMarker=true;try{if(playback?.is_playing)tracksSinceTalk=Math.max(tracksSinceTalk,nextTalkAt-1)}catch{}},30000);
 function installFeedback(){const text=$('djText');if(!text||$('djFeedback'))return;const card=text.closest('.card');if(!card)return;const row=document.createElement('div');row.id='djFeedback';row.className='dj-feedback';row.innerHTML='<span>Hoe was deze break?</span><div><button type="button" data-v="up">👍 Goed</button><button type="button" data-v="down">👎 Minder</button></div>';card.appendChild(row);row.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const f=feedback(),v=b.dataset.v,last=String(window.jfmLastDJText||text.textContent||'').trim();if(v==='up')f.up=(f.up||0)+1;else{f.down=(f.down||0)+1;if(last){f.avoid=f.avoid||[];f.avoid.unshift(last);f.avoid=f.avoid.slice(0,10)}}f.items=f.items||[];f.items.unshift({v,text:last,at:Date.now()});f.items=f.items.slice(0,30);save(FB,f);row.querySelectorAll('button').forEach(x=>x.classList.toggle('selected',x===b));const span=row.querySelector('span');if(span)span.textContent=v==='up'?'Onthouden — meer in deze stijl':'Onthouden — deze stijl minder'})}
-
-// Fish Audio is the only allowed DJ voice. Never silently fall back to a device/Samantha voice.
-function enforceFishOnly(){
-  try{
-    const select=$('voiceMode');
-    if(select){
-      [...select.options].forEach(o=>{if(o.value!=='fish')o.remove()});
-      if(![...select.options].some(o=>o.value==='fish'))select.add(new Option('Fish Audio — English AI DJ','fish'));
-      select.value='fish';select.disabled=true;
-    }
-    settings.voiceMode='fish';localStorage.setItem('jfm_voice_mode','fish');
-    const info=$('voiceInfo');if(info)info.textContent='Fish Audio is de enige DJ-stem. Bij een Fish-storing wordt de DJ-break overgeslagen en blijft de muziek leidend.';
-  }catch(e){console.warn('Fish voice policy',e)}
-}
-
-// The selected Josh FM voice is the source of truth for spoken language.
-try{
-  const oldMake=window.makeDJScript||makeDJScript;
-  if(typeof oldMake==='function'){
-    window.makeDJScript=makeDJScript=async function(track,fact,weather,manual){
-      window.JFMDJLanguage='en';localStorage.setItem('jfm_dj_language','en');
-      // Existing fact providers can return Dutch copy; omit that copy for the English presenter.
-      return oldMake(track,null,weather,manual);
-    };
-  }
-}catch(e){console.warn('DJ language sync',e)}
-
+function enforceFishOnly(){try{const select=$('voiceMode');if(select){[...select.options].forEach(o=>{if(o.value!=='fish')o.remove()});if(![...select.options].some(o=>o.value==='fish'))select.add(new Option('Fish Audio — English AI DJ','fish'));select.value='fish';select.disabled=true}settings.voiceMode='fish';localStorage.setItem('jfm_voice_mode','fish');const info=$('voiceInfo');if(info)info.textContent='Fish Audio is de enige DJ-stem. Bij een Fish-storing wordt de DJ-break overgeslagen en blijft de muziek leidend.'}catch(e){console.warn('Fish voice policy',e)}}
+function englishFact(track,fact){if(!fact?.text)return fact;const text=String(fact.text).trim();if(/^Het nummer staat op /i.test(text)){const year=String(track?.release||'').slice(0,4);return{...fact,text:`${track?.name||'This track'} appears on the album ${track?.album||'its album'}${/^\d{4}$/.test(year)?`, released in ${year}`:''}.`,source:'Spotify metadata'}}if(/^Voor deze plaat is als releasedatum /i.test(text)){const year=String(track?.release||'').slice(0,4);return{...fact,text:`${track?.name||'This track'} was released${/^\d{4}$/.test(year)?` in ${year}`:''}.`,source:'Spotify metadata'}}return fact}
+try{const oldMake=window.makeDJScript||makeDJScript;if(typeof oldMake==='function'){window.makeDJScript=makeDJScript=async function(track,fact,weather,manual){window.JFMDJLanguage='en';localStorage.setItem('jfm_dj_language','en');return oldMake(track,englishFact(track,fact),weather,manual)}}}catch(e){console.warn('DJ language sync',e)}
 function badge(status,label,detail){return `<div class="row between" style="gap:10px;padding:8px 0;border-bottom:1px solid #20242b"><span>${label}</span><span style="text-align:right"><b>${status}</b>${detail?`<small style="display:block;color:#858e9b">${detail}</small>`:''}</span></div>`}
-async function runSelfTest(){
-  const out=$('selfTestResults'),btn=$('selfTest');if(!out||!btn)return;
-  btn.disabled=true;btn.textContent='Test bezig…';out.innerHTML='<p class="muted">Josh FM controleert de belangrijkste onderdelen zonder playback te wijzigen.</p>';
-  const results=[];
-  const add=(level,label,detail='')=>results.push({level,label,detail});
-  add(navigator.onLine?'PASS':'FAIL','Internet',navigator.onLine?'Browser is online':'Geen netwerkverbinding');
-  try{const t=await ensure();add(t?'PASS':'FAIL','Spotify-auth',t?'Token beschikbaar':'Opnieuw koppelen nodig')}catch(e){add('FAIL','Spotify-auth',String(e?.message||e))}
-  try{const d=await api('/me/player/devices');const usable=(d?.devices||[]).filter(x=>!x.is_restricted);add(usable.length?'PASS':'WARN','Spotify-device',usable.length?`${usable.length} bruikbaar apparaat${usable.length===1?'':'en'}`:'Open Spotify kort om een device actief te maken')}catch(e){add('WARN','Spotify-device',String(e?.message||e))}
-  try{const s=await api('/me/player');add(s?.device?.id?'PASS':'WARN','Playback API',s?.item?`${s.is_playing?'Speelt':'Gepauzeerd'} · ${s.item.name}`:'Geen actieve track')}catch(e){add('WARN','Playback API',String(e?.message||e))}
-  add(typeof window.buildSet==='function'&&Array.isArray(window.queue||queue)?'PASS':'FAIL','Programmering','Queue-builder beschikbaar');
-  add(typeof window.djBreak==='function'&&typeof window.makeDJScript==='function'?'PASS':'FAIL','AI-DJ','DJ-engine geladen');
-  try{const r=await fetch('/api/config',{cache:'no-store'});add(r.ok?'PASS':'WARN','Backend/config',r.ok?'Endpoint bereikbaar':`HTTP ${r.status}`)}catch(e){add('WARN','Backend/config','Endpoint niet bereikbaar')}
-  try{const r=await fetch('/api/tts',{method:'GET',cache:'no-store'});add(r.ok||[400,405,422].includes(r.status)?'PASS':'WARN','Fish/TTS route',r.ok?'Route bereikbaar':'Route bereikbaar; geen audio gegenereerd')}catch(e){add('WARN','Fish/TTS route','Route niet bereikbaar')}
-  add('serviceWorker'in navigator?'PASS':'WARN','PWA/service worker','serviceWorker'in navigator?(navigator.serviceWorker.controller?'Actief':'Ondersteund, nog niet controlerend'):'Niet ondersteund');
-  add('mediaSession'in navigator?'PASS':'WARN','Media Session','mediaSession'in navigator?'Ondersteund':'Niet ondersteund door deze browser');
-  add(window.JFMPlayback||window.jfmSpotifyPlayer?'PASS':'WARN','Playback controller',window.JFMPlayback?'Centrale playback API aanwezig':window.jfmSpotifyPlayer?'Spotify-player actief':'Nog niet geïnitialiseerd');
-  const rank={FAIL:0,WARN:1,PASS:2};results.sort((a,b)=>rank[a.level]-rank[b.level]);
-  out.innerHTML=results.map(x=>badge(x.level==='PASS'?'✓ PASS':x.level==='WARN'?'⚠ WARN':'✕ FAIL',x.label,x.detail)).join('');
-  btn.disabled=false;btn.textContent='Test Josh FM opnieuw';
-}
-function installSelfTest(){
-  if($('selfTest'))return;
-  const setup=$('setup'),pane=$('tab-settings');if(!pane)return;
-  const card=document.createElement('article');card.className='card';card.innerHTML='<div class="kicker">STATION HEALTH</div><h3>Self Test</h3><p class="muted">Controleert Spotify, playback, DJ, backend en PWA zonder expres je muziek te stoppen.</p><button id="selfTest" class="secondary">Test Josh FM</button><div id="selfTestResults" style="margin-top:10px"></div>';
-  if(setup)setup.insertAdjacentElement('beforebegin',card);else pane.appendChild(card);
-  $('selfTest').addEventListener('click',runSelfTest);
-  window.JFMSelfTest={run:runSelfTest};
-}
-
-function install(){installFeedback();enforceFishOnly();installSelfTest()}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
+async function runSelfTest(){const out=$('selfTestResults'),btn=$('selfTest');if(!out||!btn)return;btn.disabled=true;btn.textContent='Test bezig…';out.innerHTML='<p class="muted">Josh FM controleert de belangrijkste onderdelen zonder playback te wijzigen.</p>';const results=[],add=(level,label,detail='')=>results.push({level,label,detail});add(navigator.onLine?'PASS':'FAIL','Internet',navigator.onLine?'Browser is online':'Geen netwerkverbinding');try{const t=await ensure();add(t?'PASS':'FAIL','Spotify-auth',t?'Token beschikbaar':'Opnieuw koppelen nodig')}catch(e){add('FAIL','Spotify-auth',String(e?.message||e))}try{const d=await api('/me/player/devices');const usable=(d?.devices||[]).filter(x=>!x.is_restricted);add(usable.length?'PASS':'WARN','Spotify-device',usable.length?`${usable.length} bruikbaar apparaat${usable.length===1?'':'en'}`:'Open Spotify kort om een device actief te maken')}catch(e){add('WARN','Spotify-device',String(e?.message||e))}try{const s=await api('/me/player');add(s?.device?.id?'PASS':'WARN','Playback API',s?.item?`${s.is_playing?'Speelt':'Gepauzeerd'} · ${s.item.name}`:'Geen actieve track')}catch(e){add('WARN','Playback API',String(e?.message||e))}add(typeof window.buildSet==='function'&&Array.isArray(queue)?'PASS':'FAIL','Programmering','Queue-builder beschikbaar');add(typeof window.djBreak==='function'&&typeof window.makeDJScript==='function'?'PASS':'FAIL','AI-DJ','DJ-engine geladen');try{const r=await fetch('/api/config',{cache:'no-store'});add(r.ok?'PASS':'WARN','Backend/config',r.ok?'Endpoint bereikbaar':`HTTP ${r.status}`)}catch{add('WARN','Backend/config','Endpoint niet bereikbaar')}try{const r=await fetch('/api/tts',{method:'GET',cache:'no-store'});add(r.ok||[400,405,422].includes(r.status)?'PASS':'WARN','Fish/TTS route',r.ok?'Route bereikbaar':'Route bereikbaar; geen audio gegenereerd')}catch{add('WARN','Fish/TTS route','Route niet bereikbaar')}add('serviceWorker'in navigator?'PASS':'WARN','PWA/service worker','serviceWorker'in navigator?(navigator.serviceWorker.controller?'Actief':'Ondersteund, nog niet controlerend'):'Niet ondersteund');add('mediaSession'in navigator?'PASS':'WARN','Media Session','mediaSession'in navigator?'Ondersteund':'Niet ondersteund door deze browser');add(window.JFMPlayback||window.jfmSpotifyPlayer?'PASS':'WARN','Playback controller',window.JFMPlayback?'Centrale playback API aanwezig':window.jfmSpotifyPlayer?'Spotify-player actief':'Nog niet geïnitialiseerd');const rank={FAIL:0,WARN:1,PASS:2};results.sort((a,b)=>rank[a.level]-rank[b.level]);out.innerHTML=results.map(x=>badge(x.level==='PASS'?'✓ PASS':x.level==='WARN'?'⚠ WARN':'✕ FAIL',x.label,x.detail)).join('');btn.disabled=false;btn.textContent='Test Josh FM opnieuw'}
+function installSelfTest(){if($('selfTest'))return;const setup=$('setup'),pane=$('tab-settings');if(!pane)return;const card=document.createElement('article');card.className='card';card.innerHTML='<div class="kicker">STATION HEALTH</div><h3>Self Test</h3><p class="muted">Controleert Spotify, playback, DJ, backend en PWA zonder expres je muziek te stoppen.</p><button id="selfTest" class="secondary">Test Josh FM</button><div id="selfTestResults" style="margin-top:10px"></div>';if(setup)setup.insertAdjacentElement('beforebegin',card);else pane.appendChild(card);$('selfTest').addEventListener('click',runSelfTest);window.JFMSelfTest={run:runSelfTest}}
+function install(){installFeedback();enforceFishOnly();installSelfTest()}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
