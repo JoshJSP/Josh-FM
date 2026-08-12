@@ -1,7 +1,7 @@
 // Josh FM DJ handoff v36 — next track stays active: mute -> DJ -> rewind -> unmute.
 (()=>{
   const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
-  const TRACK_URI=/^spotify:track:[A-Za-z0-9]{22}$/,DEVICE=/^[A-Za-z0-9_-]{8,128}$/;
+  const TRACK_URI=/^spotify:track:[A-Za-z0-9]{22}$/,DEVICE=/^[A-Za-z0-9_-]{8,128}$/,LAST_BREAK_KEY='jfm_last_dj_break_at';
   let busy=false,armed=null,polling=false;
   const status=(text,bad=false)=>{const q=$('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}};
   const truth=()=>window.JFMPlaybackState||null,player=()=>window.jfmSpotifyPlayer||null;
@@ -9,6 +9,8 @@
   const validDevice=()=>{const raw=String(truth()?.get?.()?.deviceId||localStorage.getItem('jfm_spotify_device_id')||'').trim();return DEVICE.test(raw)?raw:''};
   const pathWithDevice=base=>{const id=validDevice();return id?base+(base.includes('?')?'&':'?')+'device_id='+encodeURIComponent(id):base};
   const sharedBusy=()=>{try{return !!djBusy}catch{return false}},setSharedBusy=v=>{try{djBusy=!!v}catch{}};
+  function renderBreakTime(ts=Number(localStorage.getItem(LAST_BREAK_KEY)||0)){const el=$('djBreakTime');if(!el)return;if(!ts){el.textContent='nog niet';return}const d=new Date(ts);el.textContent=d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
+  function recordBreakTime(){const ts=Date.now();try{localStorage.setItem(LAST_BREAK_KEY,String(ts))}catch{}renderBreakTime(ts)}
   async function setVolume(v){const p=player();if(!p||typeof p.setVolume!=='function')throw Error('Josh FM-volumecontroller is niet klaar.');await p.setVolume(Math.max(0,Math.min(1,v)))}
   async function buildSpeech(track,manual){const[fact,weather]=await Promise.all([getFact(track),getWeather()]);const text=await makeDJScript(track,fact,weather,manual);if(!text)return null;try{if(typeof window.prepareSpeech==='function'){const ok=await window.prepareSpeech(text,false);if(ok===false)return null}}catch{}return{text,fact,weather}}
   async function speak(pack,manual){if(!pack?.text)return false;if($('djText'))$('djText').textContent=pack.text;if($('factSource'))$('factSource').classList.add('hidden');if($('jingles')?.checked&&!manual&&Math.random()<.2)try{await speakText('Josh FM.',true)}catch{}try{return(await speakText(pack.text,false))!==false}catch{return false}}
@@ -18,12 +20,11 @@
     try{
       const live=await currentState();expectedUri=TRACK_URI.test(live?.item?.uri||'')?live.item.uri:'';
       if(!live?.is_playing||!expectedUri)throw Error('Het volgende nummer is nog niet actief.');
-      // Exact radio flow: next song is already playing, then mute immediately.
       await setVolume(0);muted=true;try{truth()?.patch?.({expectedLive:true,intent:'dj-handoff'},'dj-handoff-v36-muted')}catch{};
       const target=track||(live?.item?trackObj(live.item):null);status('DJ live · nieuw nummer staat tijdelijk stil in de mix.');
       const pack=await buildSpeech(target,manual);let spoken=false;if(pack)spoken=await speak(pack,manual);
       const same=await currentState();if(same?.item?.uri===expectedUri){const rewound=await rewindExpected(expectedUri);if(!rewound)throw Error('Het nieuwe nummer kon niet veilig naar het begin worden gezet.');}
-      await setVolume(1);muted=false;try{truth()?.patch?.({expectedLive:true,intent:'radio-live',progressMs:0},'dj-handoff-v36-complete')}catch{};
+      await setVolume(1);muted=false;if(spoken)recordBreakTime();try{truth()?.patch?.({expectedLive:true,intent:'radio-live',progressMs:0},'dj-handoff-v36-complete')}catch{};
       try{scheduleTalk()}catch{};status(spoken?'DJ klaar · nummer start vanaf het begin.':'DJ overgeslagen · nummer start vanaf het begin.');setTimeout(()=>refresh().catch(()=>{}),250);return spoken
     }catch(e){status('DJ-fout · '+String(e?.message||e),true);return false}
     finally{if(muted)try{await setVolume(1)}catch{};setSharedBusy(false);busy=false}
@@ -33,6 +34,6 @@
   setInterval(async()=>{if(polling||busy||!armed||document.visibilityState!=='visible')return;polling=true;try{const s=await currentState();if(s?.item?.id&&s.item.id!==armed.id){const a=armed;armed=null;setArmedUi(false);await runBreak(a.track,true)}}finally{polling=false}},900);
   window.djBreak=runBreak;
   window.JFMDJTransition={version:'handoff-v36-mute-rewind',transition:({track,manual=false}={})=>runBreak(track,manual),get busy(){return busy}};
-  const boot=()=>{ownManualButton();if(!$('djNow'))setTimeout(boot,150)};boot();window.addEventListener('pageshow',()=>setTimeout(ownManualButton,200));
-  window.JFMDJHandoff={version:'v36-mute-rewind',runBreak,get busy(){return busy},get armed(){return armed?.id||''}};
+  const boot=()=>{renderBreakTime();ownManualButton();if(!$('djNow'))setTimeout(boot,150)};boot();window.addEventListener('pageshow',()=>{renderBreakTime();setTimeout(ownManualButton,200)});
+  window.JFMDJHandoff={version:'v36-mute-rewind',runBreak,get busy(){return busy},get armed(){return armed?.id||''},get lastBreakAt(){return Number(localStorage.getItem(LAST_BREAK_KEY)||0)}};
 })();
