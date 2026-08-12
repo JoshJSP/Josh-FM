@@ -10,6 +10,8 @@
   const currentState=async()=>{try{return await api('/me/player')}catch{return null}};
   const validDevice=()=>{const raw=String(truth()?.get?.()?.deviceId||localStorage.getItem('jfm_spotify_device_id')||'').trim();return DEVICE.test(raw)?raw:''};
   const pathWithDevice=base=>{const id=validDevice();return id?base+'?device_id='+encodeURIComponent(id):base};
+  const sharedBusy=()=>{try{return !!djBusy}catch{return false}};
+  const setSharedBusy=value=>{try{djBusy=!!value}catch{}};
   async function setVolume(v){try{if(typeof player()?.setVolume==='function')await player().setVolume(v)}catch{}}
   async function verifyPlaying(uri='',tries=9){for(let i=0;i<tries;i++){await wait(160+i*55);const s=await currentState();if(s?.is_playing&&(!uri||s.item?.uri===uri)){try{truth()?.ingest?.(s,'dj-handoff-v34')}catch{};return s}}return null}
   async function pausePreservingPosition(){
@@ -46,7 +48,7 @@
     try{return(await speakText(pack.text,false))!==false}catch{return false}
   }
   async function runBreak(track=null,manual=false){
-    if(busy||window.djBusy)return false;busy=true;window.djBusy=true;
+    if(busy||sharedBusy())return false;busy=true;setSharedBusy(true);
     let paused=false,resumed=false,before=null;
     try{
       before=await currentState();
@@ -67,7 +69,7 @@
       status('DJ-fout · '+String(e?.message||e),true);
       if(paused&&!resumed){try{await api(pathWithDevice('/me/player/play'),{method:'PUT'});resumed=!!(await verifyPlaying('',5))}catch{}}
       return false
-    }finally{await setVolume(1);window.djBusy=false;busy=false}
+    }finally{await setVolume(1);setSharedBusy(false);busy=false}
   }
   function setArmedUi(on){const b=$('djNow');if(!b)return;b.dataset.queued=on?'1':'0';const strong=b.querySelector('b'),small=b.querySelector('span');if(strong)strong.textContent=on?'🎙️ DJ staat klaar':'🎙️ DJ nu';if(small)small.textContent=on?'Praat na dit nummer':'Laat hem iets vertellen'}
   function ownManualButton(){
@@ -81,7 +83,7 @@
   },1200);
   // Replace automatic DJ break entry point. The old dj-now-queue transition object may still prefetch speech,
   // but it no longer owns the actual pause/resume handoff or the manual button.
-  window.djBreak=window.djBreak=runBreak;
+  window.djBreak=runBreak;
   window.JFMDJTransition={version:'handoff-v34-preserve-context',transition:({track,manual=false}={})=>runBreak(track,manual),get busy(){return busy}};
   const boot=()=>{ownManualButton();if(!$('djNow'))setTimeout(boot,150)};boot();
   window.addEventListener('pageshow',()=>setTimeout(ownManualButton,200));
