@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vercel dev",
     "test": "npm run predeploy",
-    "predeploy": "node scripts/predeploy-check.mjs"
+    "predeploy:static": "node scripts/predeploy-check.mjs",
+    "smoke": "node scripts/app-smoke-check.mjs",
+    "predeploy": "npm run predeploy:static && npm run smoke"
   }
 }
