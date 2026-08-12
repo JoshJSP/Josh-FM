@@ -15,6 +15,7 @@ const sdk=read('stability-core.js');
 const top40=read('personal-top40.js');
 const health=read('station-health.js');
 const spotifyConfig=read('spotify-test-config.js');
+const djHandoff=read('dj-handoff-v34.js');
 
 // 1. Whole UI contract: all primary screens and controls must exist.
 const criticalIds=['status','tab-radio','tab-requests','tab-settings','prev','play','next','start','djNow','skipTalk','searchInput','searchBtn','source','rebuild','queueInfo','autoProgram','discovery','talk','facts','timeMention','weatherMention','jingles','voiceMode','testVoice','setup','clientId','connect','clearHistory','logout'];
@@ -32,6 +33,8 @@ const modules=[...suite.matchAll(/\['\.\/(.+?\.js)'\s*,\s*'[^']+'\]/g)].map(m=>m
 check('radio-suite discovers modules',modules.length>=10,`${modules.length} modules`);
 for(const f of modules){check(`module exists ${f}`,exists(f));check(`service worker caches ${f}`,sw.includes(`'./${f}'`));}
 for(const f of localScripts)check(`service worker caches entry script ${f}`,sw.includes(`'./${f}'`)||f==='app.js'&&sw.includes("'./app.js'"));
+check('dynamic DJ handoff exists',exists('dj-handoff-v34.js'));
+check('dynamic DJ handoff cached',sw.includes("'./dj-handoff-v34.js'"));
 
 // 4. Local API route contract: every fetch('/api/x') must have api/x.js.
 const runtimeFiles=fs.readdirSync(root).filter(f=>f.endsWith('.js'));
@@ -50,6 +53,8 @@ check('no competing transport owner',competingOwners.length===0,competingOwners.
 check('iPhone gesture unlock before transport',primary.includes('activateElement')&&primary.includes("document.addEventListener('click'"));
 check('Spotify commands are verified',primary.includes('async function verify')&&primary.includes('Spotify bevestigde'));
 check('recovery delegates to primary',exists('spotify-recovery.js')&&read('spotify-recovery.js').includes('recovery-v6-delegated'));
+check('explicit track play keeps station context',primary.includes('stationContext')&&primary.includes('playContextDirect'));
+check('skip has queue rebuild fallback',primary.includes('stationNeighbor')&&primary.includes('primary-next-fallback'));
 
 // 6. Top 40 feature contract and settings management.
 check('Top 40 canonical dedupe',top40.includes('canonicalKey')&&top40.includes('mergeEntries'));
@@ -62,20 +67,26 @@ check('Fish/TTS route used',runtimeFiles.some(f=>read(f).includes("'/api/tts")||
 check('station health tests Fish',health.includes('Fish/TTS route')&&health.includes('Fish Audio guard'));
 check('music-first safe mode',health.includes('jfmMusicRun=true')&&health.includes('skipNextTalk=true'));
 check('station health tests playback controller',health.includes("'Playback controller'")&&health.includes('JFMPlayback'));
+check('DJ handoff preserves queue context',djHandoff.includes('resumePreservingContext')&&djHandoff.includes("api(pathWithDevice('/me/player/play'),{method:'PUT'})"));
+check('DJ handoff does not restart at zero',!djHandoff.includes('position_ms:0')&&!djHandoff.includes('seek(0)')&&!djHandoff.includes('position_ms=0'));
+check('DJ handoff validates Spotify device',djHandoff.includes('const DEVICE=')&&djHandoff.includes('validDevice'));
+check('DJ manual control migrated to handoff',djHandoff.includes("dataset.jfmHandoffOwner='v34'")&&djHandoff.includes('cloneNode(true)'));
 
 // 8. Spotify request safety/discovery rate-limit protection.
 check('Spotify API guard installed',spotifyConfig.includes('JFMSpotifyGuard'));
 check('discovery rate limit cooldown',spotifyConfig.includes('cooldownUntil')&&spotifyConfig.includes('429'));
 check('track URI validation',spotifyConfig.includes('isTrackUri')&&spotifyConfig.includes('spotify:track:'));
+check('DJ handoff loader configured',spotifyConfig.includes('dj-handoff-v34.js?v=34')&&spotifyConfig.includes('loadDJHandoff'));
 
 // 9. PWA/update contract.
-check('service worker cache version >= 33',/josh-fm-v(?:3[3-9]|[4-9]\d|\d{3,})/.test(sw));
+check('service worker cache version >= 34',/josh-fm-v(?:3[4-9]|[4-9]\d|\d{3,})/.test(sw));
 check('primary controller cached',sw.includes("'./playback-primary.js'"));
+check('DJ handoff cached',sw.includes("'./dj-handoff-v34.js'"));
 check('old playback-web-sdk not cached',!sw.includes('playback-web-sdk.js'));
-check('primary loader configured',spotifyConfig.includes('playback-primary.js?v=33'));
+check('primary loader configured',spotifyConfig.includes('playback-primary.js?v=34'));
 
 // 10. No old controller files or temporary deployment artifacts.
-for(const f of ['playback-web-sdk.js','spotify-core.js'])check(`legacy controller removed ${f}`,!exists(f));
+for(const f of ['playback-web-sdk.js','spotify-core.js','stable-playback.js'])check(`legacy controller removed ${f}`,!exists(f));
 for(const f of ['.noop','.placeholder','__noop__'])check(`temporary file absent ${f}`,!exists(f));
 
 console.log(`Josh FM whole-app smoke: ${pass.length} PASS, ${fail.length} FAIL`);
