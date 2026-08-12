@@ -43,6 +43,10 @@
     }
   }catch(e){console.warn('Spotify guard kon niet laden',e)}
 
-  sync();setTimeout(sync,250);setTimeout(sync,1200);window.addEventListener('pageshow',sync);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});
-  window.JFMSpotifyTestConfig={version:'spotify-test-v6-route-safe',defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
+  function loadPlaybackController(){
+    if(document.querySelector('script[data-jfm-playback-web-sdk]'))return;
+    const s=document.createElement('script');s.src='./playback-web-sdk.js?v=31';s.async=false;s.dataset.jfmPlaybackWebSdk='1';s.onerror=()=>{const q=document.getElementById('queueInfo');if(q)q.textContent='Josh FM-player kon niet worden geladen. Vernieuw de app.'};document.body.appendChild(s)
+  }
+  sync();loadPlaybackController();setTimeout(sync,250);setTimeout(sync,1200);window.addEventListener('pageshow',()=>{sync();loadPlaybackController()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadPlaybackController()}});
+  window.JFMSpotifyTestConfig={version:'spotify-test-v7-web-playback',defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
 })();
