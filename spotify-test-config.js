@@ -9,44 +9,19 @@
   input.addEventListener('input',()=>{const id=String(input.value||'').trim();if(id)persist(id)});input.addEventListener('change',()=>{const id=String(input.value||'').trim();if(id)persist(id)});
   try{if(typeof callback==='function'){const originalCallback=callback;callback=async function(...args){persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);return originalCallback.apply(this,args)}}}catch{}
   try{connect=async function(){const id=persist(selected());if(!id)return alert('Vul eerst je Spotify Client ID in.');const verifier=rand(),state=rand(20);sessionStorage.setItem('jfm_verifier',verifier);sessionStorage.setItem('jfm_state',state);try{localStorage.setItem('jfm_pkce_verifier_v2',verifier);localStorage.setItem('jfm_pkce_state_v2',state)}catch{}const challenge=b64url(await sha256(verifier));const p=new URLSearchParams({response_type:'code',client_id:id,scope:SCOPES,redirect_uri:redirectUri(),state,code_challenge_method:'S256',code_challenge:challenge});location.href='https://accounts.spotify.com/authorize?'+p}}catch{}
-
   try{
     if(typeof api==='function'){
       const rawApi=api,searchCache=new Map();let searchChain=Promise.resolve(),lastSearchAt=0,cooldownUntil=0,lastRateLimitAt=0;
       const sleep=ms=>new Promise(r=>setTimeout(r,ms)),isTrackUri=v=>/^spotify:track:[A-Za-z0-9]{22}$/.test(String(v||''));
       function sanitizeBody(opt={}){if(!opt?.body||typeof opt.body==='string')return opt;const body={...opt.body};if(Array.isArray(body.uris)){const before=body.uris.length;body.uris=[...new Set(body.uris.filter(isTrackUri))].slice(0,100);if(before&&!body.uris.length)throw new Error('Spotify track-URI was ongeldig; afspelen is veilig gestopt.')}return{...opt,body}}
-      function validatePath(path){
-        if(!path.startsWith('/'))throw new Error('Ongeldige Spotify API-route.');
-        let u;try{u=new URL(path,'https://api.spotify.com')}catch{throw new Error('Ongeldige Spotify API-route.')}
-        if(u.pathname==='/me/player/queue'){
-          const uri=u.searchParams.get('uri');if(uri&&!isTrackUri(uri))throw new Error('Spotify request bevatte een ongeldige track-URI en is niet verstuurd.');
-        }
-        if(u.pathname.startsWith('/tracks/')){const id=decodeURIComponent(u.pathname.slice('/tracks/'.length));if(!/^[A-Za-z0-9]{22}$/.test(id))throw new Error('Ongeldig Spotify track-ID.')}
-        return path
-      }
+      function validatePath(path){if(!path.startsWith('/'))throw new Error('Ongeldige Spotify API-route.');let u;try{u=new URL(path,'https://api.spotify.com')}catch{throw new Error('Ongeldige Spotify API-route.')}if(u.pathname==='/me/player/queue'){const uri=u.searchParams.get('uri');if(uri&&!isTrackUri(uri))throw new Error('Spotify request bevatte een ongeldige track-URI en is niet verstuurd.')}if(u.pathname.startsWith('/tracks/')){const id=decodeURIComponent(u.pathname.slice('/tracks/'.length));if(!/^[A-Za-z0-9]{22}$/.test(id))throw new Error('Ongeldig Spotify track-ID.')}return path}
       function rateLimitError(e){return/rustiger|rate limit|429|wacht .*sec/i.test(String(e?.message||e))}
       function enterCooldown(){lastRateLimitAt=Date.now();cooldownUntil=Math.max(cooldownUntil,Date.now()+30000)}
-      async function guarded(path,opt={}){
-        path=validatePath(String(path||''));const now=Date.now();
-        const isSearch=path.startsWith('/search?');
-        if(now<cooldownUntil&&isSearch)throw new Error(`Spotify discovery wacht nog ${Math.max(1,Math.ceil((cooldownUntil-now)/1000))} sec.`);
-        const cleanOpt=sanitizeBody(opt),key=isSearch?path:'';
-        if(isSearch){
-          const cached=searchCache.get(key);if(cached&&Date.now()-cached.at<60000)return cached.data;
-          const run=async()=>{const wait=Math.max(0,800-(Date.now()-lastSearchAt));if(wait)await sleep(wait);lastSearchAt=Date.now();try{const out=await rawApi(path,cleanOpt);searchCache.set(key,{at:Date.now(),data:out});if(searchCache.size>80){const oldest=[...searchCache.entries()].sort((a,b)=>a[1].at-b[1].at).slice(0,20);oldest.forEach(([k])=>searchCache.delete(k))}return out}catch(e){if(rateLimitError(e)){enterCooldown();throw new Error('Spotify rate limit actief. Discovery wacht 30 seconden; gewone playback blijft beschikbaar.')}throw e}};
-          const p=searchChain.then(run,run);searchChain=p.catch(()=>{});return p
-        }
-        try{return await rawApi(path,cleanOpt)}catch(e){if(rateLimitError(e))enterCooldown();throw e}
-      }
-      api=window.api=guarded;
-      window.JFMSpotifyGuard={version:'spotify-guard-v2-route-safe',get state(){return{cooldownUntil,lastRateLimitAt,searchCache:searchCache.size,lastSearchAt}},isTrackUri,validatePath};
+      async function guarded(path,opt={}){path=validatePath(String(path||''));const now=Date.now(),isSearch=path.startsWith('/search?');if(now<cooldownUntil&&isSearch)throw new Error(`Spotify discovery wacht nog ${Math.max(1,Math.ceil((cooldownUntil-now)/1000))} sec.`);const cleanOpt=sanitizeBody(opt),key=isSearch?path:'';if(isSearch){const cached=searchCache.get(key);if(cached&&Date.now()-cached.at<60000)return cached.data;const run=async()=>{const wait=Math.max(0,800-(Date.now()-lastSearchAt));if(wait)await sleep(wait);lastSearchAt=Date.now();try{const out=await rawApi(path,cleanOpt);searchCache.set(key,{at:Date.now(),data:out});if(searchCache.size>80){const oldest=[...searchCache.entries()].sort((a,b)=>a[1].at-b[1].at).slice(0,20);oldest.forEach(([k])=>searchCache.delete(k))}return out}catch(e){if(rateLimitError(e)){enterCooldown();throw new Error('Spotify rate limit actief. Discovery wacht 30 seconden; gewone playback blijft beschikbaar.')}throw e}};const p=searchChain.then(run,run);searchChain=p.catch(()=>{});return p}try{return await rawApi(path,cleanOpt)}catch(e){if(rateLimitError(e))enterCooldown();throw e}}
+      api=window.api=guarded;window.JFMSpotifyGuard={version:'spotify-guard-v3-single-playback',get state(){return{cooldownUntil,lastRateLimitAt,searchCache:searchCache.size,lastSearchAt}},isTrackUri,validatePath};
     }
   }catch(e){console.warn('Spotify guard kon niet laden',e)}
-
-  function loadPlaybackController(){
-    if(document.querySelector('script[data-jfm-playback-web-sdk]'))return;
-    const s=document.createElement('script');s.src='./playback-web-sdk.js?v=31';s.async=false;s.dataset.jfmPlaybackWebSdk='1';s.onerror=()=>{const q=document.getElementById('queueInfo');if(q)q.textContent='Josh FM-player kon niet worden geladen. Vernieuw de app.'};document.body.appendChild(s)
-  }
-  sync();loadPlaybackController();setTimeout(sync,250);setTimeout(sync,1200);window.addEventListener('pageshow',()=>{sync();loadPlaybackController()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadPlaybackController()}});
-  window.JFMSpotifyTestConfig={version:'spotify-test-v7-web-playback',defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
+  function loadPrimaryController(){if(document.querySelector('script[data-jfm-playback-primary]'))return;const s=document.createElement('script');s.src='./playback-primary.js?v=33';s.async=false;s.dataset.jfmPlaybackPrimary='1';s.onerror=()=>{const q=document.getElementById('queueInfo');if(q)q.textContent='Centrale Josh FM-player kon niet worden geladen. Vernieuw de app.'};document.body.appendChild(s)}
+  sync();loadPrimaryController();setTimeout(sync,250);setTimeout(sync,1200);window.addEventListener('pageshow',()=>{sync();loadPrimaryController()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadPrimaryController()}});
+  window.JFMSpotifyTestConfig={version:'spotify-test-v8-single-playback',defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
 })();
