@@ -12,10 +12,13 @@ const suite=read('radio-suite.js');
 const sw=read('sw.js');
 const primary=read('playback-primary.js');
 const sdk=read('stability-core.js');
+const truth=read('playback-state.js');
 const top40=read('personal-top40.js');
 const health=read('station-health.js');
 const spotifyConfig=read('spotify-test-config.js');
+const discovery=read('discovery.js');
 const djHandoff=read('dj-handoff-v34.js');
+const legacyDj=read('dj-now-queue.js');
 
 // 1. Whole UI contract: all primary screens and controls must exist.
 const criticalIds=['status','tab-radio','tab-requests','tab-settings','prev','play','next','start','djNow','skipTalk','searchInput','searchBtn','source','rebuild','queueInfo','autoProgram','discovery','talk','facts','timeMention','weatherMention','jingles','voiceMode','testVoice','setup','clientId','connect','clearHistory','logout'];
@@ -42,11 +45,14 @@ const apiRefs=new Set();
 for(const f of runtimeFiles){const s=read(f);for(const m of s.matchAll(/fetch\(\s*[`"']\/api\/([a-zA-Z0-9_-]+)/g))apiRefs.add(m[1]);}
 for(const name of apiRefs)check(`API route /api/${name}`,exists(`api/${name}.js`));
 
-// 5. Playback architecture: one SDK owner, one transport owner, delegated recovery.
+// 5. Playback architecture: one SDK owner, one transport owner, one DJ owner.
 const runtimeJs=runtimeFiles.filter(f=>!f.startsWith('scripts/'));
 const playerCreators=runtimeJs.filter(f=>read(f).includes('new Spotify.Player'));
 check('one Spotify SDK player owner',playerCreators.length===1&&playerCreators[0]==='stability-core.js',playerCreators.join(', ')||'none');
-check('SDK core declares no transport ownership',sdk.includes('sdk-core-v2-no-transport-owner')&&!/ownButton\(['"](?:start|play|next|prev)/.test(sdk));
+check('SDK core auth-device only',sdk.includes('sdk-core-v3-auth-device-only'));
+check('SDK core no transport ownership',!/ownButton\(['"](?:start|play|next|prev)/.test(sdk));
+check('SDK core no DJ ownership',!sdk.includes('window.djBreak=')&&!sdk.includes('stableDJBreak'));
+check('SDK stale device is cleared',sdk.includes("not_ready")&&sdk.includes("rememberDevice('')"));
 check('primary controller owns transport',primary.includes("JFMPlaybackPrimary='playback-primary'")&&primary.includes("own('start'")&&primary.includes("own('play'")&&primary.includes("own('next'")&&primary.includes("own('prev'"));
 const competingOwners=runtimeJs.filter(f=>f!=='playback-primary.js'&&/(?:ownButton|own|replace)\(['"](?:start|play|next|prev)['"]/.test(read(f)));
 check('no competing transport owner',competingOwners.length===0,competingOwners.join(', '));
@@ -55,6 +61,7 @@ check('Spotify commands are verified',primary.includes('async function verify')&
 check('recovery delegates to primary',exists('spotify-recovery.js')&&read('spotify-recovery.js').includes('recovery-v6-delegated'));
 check('explicit track play keeps station context',primary.includes('stationContext')&&primary.includes('playContextDirect'));
 check('skip has queue rebuild fallback',primary.includes('stationNeighbor')&&primary.includes('primary-next-fallback'));
+check('playback truth clears empty sessions',truth.includes('explicitlyEmpty')&&truth.includes('truth-v2-empty-state-safe'));
 
 // 6. Top 40 feature contract and settings management.
 check('Top 40 canonical dedupe',top40.includes('canonicalKey')&&top40.includes('mergeEntries'));
@@ -71,19 +78,26 @@ check('DJ handoff preserves queue context',djHandoff.includes('resumePreservingC
 check('DJ handoff does not restart at zero',!djHandoff.includes('position_ms:0')&&!djHandoff.includes('seek(0)')&&!djHandoff.includes('position_ms=0'));
 check('DJ handoff validates Spotify device',djHandoff.includes('const DEVICE=')&&djHandoff.includes('validDevice'));
 check('DJ manual control migrated to handoff',djHandoff.includes("dataset.jfmHandoffOwner='v34'")&&djHandoff.includes('cloneNode(true)'));
+check('legacy DJ transition engine disabled',legacyDj.includes('legacy-disabled-v35')&&!legacyDj.includes('/me/player/pause')&&!legacyDj.includes('seek(0)'));
+check('DJ resume shim names central owner',read('dj-resume.js').includes("owner:'dj-handoff-v34.js'"));
 
 // 8. Spotify request safety/discovery rate-limit protection.
 check('Spotify API guard installed',spotifyConfig.includes('JFMSpotifyGuard'));
 check('discovery rate limit cooldown',spotifyConfig.includes('cooldownUntil')&&spotifyConfig.includes('429'));
 check('track URI validation',spotifyConfig.includes('isTrackUri')&&spotifyConfig.includes('spotify:track:'));
-check('DJ handoff loader configured',spotifyConfig.includes('dj-handoff-v34.js?v=34')&&spotifyConfig.includes('loadDJHandoff'));
+check('device ID validation',spotifyConfig.includes('isDevice')&&spotifyConfig.includes('device_ids'));
+check('search cache five minutes',spotifyConfig.includes('300000'));
+check('search pacing 1500ms',spotifyConfig.includes('1500-(Date.now()-lastSearchAt)'));
+check('discovery budget <= 5 calls',/MAX_SEARCHES=([0-5])\b/.test(discovery));
+check('discovery obeys shared cooldown',discovery.includes('sharedCooldown')&&discovery.includes('JFMSpotifyGuard'));
+check('DJ handoff loader configured',spotifyConfig.includes('dj-handoff-v34.js?v=35')&&spotifyConfig.includes('loadDJHandoff'));
 
 // 9. PWA/update contract.
-check('service worker cache version >= 34',/josh-fm-v(?:3[4-9]|[4-9]\d|\d{3,})/.test(sw));
+check('service worker cache version >= 35',/josh-fm-v(?:3[5-9]|[4-9]\d|\d{3,})/.test(sw));
 check('primary controller cached',sw.includes("'./playback-primary.js'"));
 check('DJ handoff cached',sw.includes("'./dj-handoff-v34.js'"));
 check('old playback-web-sdk not cached',!sw.includes('playback-web-sdk.js'));
-check('primary loader configured',spotifyConfig.includes('playback-primary.js?v=34'));
+check('primary loader configured',spotifyConfig.includes('playback-primary.js?v=35'));
 
 // 10. No old controller files or temporary deployment artifacts.
 for(const f of ['playback-web-sdk.js','spotify-core.js','stable-playback.js'])check(`legacy controller removed ${f}`,!exists(f));
