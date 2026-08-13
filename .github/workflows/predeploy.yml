@@ -31,3 +31,6 @@ jobs:
       - name: Build 3 music intelligence checks
         if: startsWith(github.head_ref, 'build/product-beta-03-')
         run: node scripts/build3-check.mjs
+      - name: Build 4 personal learning checks
+        if: startsWith(github.head_ref, 'build/product-beta-04-')
+        run: node -e "const fs=require('fs');const p=fs.readFileSync('personal-learning-v4.js','utf8'),m=fs.readFileSync('music-intelligence-v3.js','utf8'),v=fs.readFileSync('version.js','utf8');new Function(p);if(!p.includes('JFMTasteModel')||!m.includes('JFMTasteModel?.score')||!m.includes('rerank')||!v.includes('personal-learning-v4.js'))process.exit(1);console.log('PASS Build 4')"
