@@ -1,35 +1,11 @@
 (()=>{
  const $=id=>document.getElementById(id);
- const tabMap={radio:'radio',stations:'requests',settings:'settings'};
- function setBrandText(){
-   document.title='MAIR';
-   const h=document.querySelector('.brandwrap h1');if(h)h.textContent='MAIR';
-   const k=document.querySelector('.brandwrap .kicker');if(k)k.textContent='YOUR MUSIC. YOUR RADIO.';
-   const logo=document.querySelector('.brandlogo');if(logo){logo.src='./mair-logo.svg';logo.alt='MAIR logo'}
-   const fallback=$('artFallback');if(fallback)fallback.textContent='MAIR';
-   const start=$('start');if(start&&/Josh FM/i.test(start.textContent))start.textContent='Start MAIR';
-   const version=$('appVersion');if(version&&/Josh FM/i.test(version.textContent))version.textContent=version.textContent.replace(/Josh FM/gi,'MAIR');
-   document.querySelectorAll('h3,p,span,b,button,option').forEach(el=>{if(el.children.length)return;const t=el.textContent;if(/Josh FM/.test(t))el.textContent=t.replace(/Josh FM/g,'MAIR FM')});
- }
- function ensureForYou(){
-   if($('tab-for-you'))return;
-   const section=document.createElement('section');section.id='tab-for-you';section.className='tabpane mair-for-you';section.innerHTML='<div class="mair-hero"><div class="eyebrow">MADE FOR YOU</div><h2>Voor jou</h2><p class="muted">Build 1 legt de nieuwe MAIR-structuur klaar. Persoonlijke mixes worden in een latere build gekoppeld aan je luistergedrag.</p></div><div class="mair-mix-grid"><div class="mair-mix"><b>Morning Energy</b><span>Een frisse start op basis van je smaak.</span></div><div class="mair-mix"><b>Heavy Rotation</b><span>De tracks waar je steeds naar terugkomt.</span></div><div class="mair-mix"><b>New for You</b><span>Nieuwe muziek met een hoge match.</span></div><div class="mair-mix"><b>Late Night</b><span>Rustiger geselecteerd voor later op de avond.</span></div></div><p style="margin:18px 4px"><span class="mair-build-pill">MAIR BUILD 1 · FOUNDATION</span></p>';
-   document.querySelector('.shell')?.appendChild(section);
- }
- function activate(target){
-   document.querySelectorAll('.tabpane').forEach(p=>p.classList.remove('active'));
-   if(target==='for-you')$('tab-for-you')?.classList.add('active');else $('tab-'+tabMap[target])?.classList.add('active');
-   document.querySelectorAll('.mair-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.mairTab===target));
-   window.scrollTo({top:0,behavior:'smooth'});
- }
- function ensureNav(){
-   if(document.querySelector('.mair-bottom-nav'))return;
-   const nav=document.createElement('nav');nav.className='mair-bottom-nav';nav.setAttribute('aria-label','MAIR navigatie');
-   nav.innerHTML='<button class="mair-nav-btn active" data-mair-tab="radio"><span class="ico">◉</span><span>Radio</span></button><button class="mair-nav-btn" data-mair-tab="stations"><span class="ico">▦</span><span>Stations</span></button><button class="mair-nav-btn" data-mair-tab="for-you"><span class="ico">✦</span><span>Voor jou</span></button><button class="mair-nav-btn" data-mair-tab="settings"><span class="ico">⚙</span><span>Instellingen</span></button>';
-   nav.addEventListener('click',e=>{const b=e.target.closest('.mair-nav-btn');if(b)activate(b.dataset.mairTab)});
-   document.body.appendChild(nav);
- }
+ const tabMap={radio:'radio',stations:'stations-mair',settings:'settings'};
+ function setBrandText(){document.title='MAIR';const h=document.querySelector('.brandwrap h1');if(h)h.textContent='MAIR';const k=document.querySelector('.brandwrap .kicker');if(k)k.textContent='YOUR MUSIC. YOUR RADIO.';const logo=document.querySelector('.brandlogo');if(logo){logo.src='./mair-logo.svg';logo.alt='MAIR logo'}const fallback=$('artFallback');if(fallback)fallback.textContent='MAIR';const start=$('start');if(start&&/Josh FM/i.test(start.textContent))start.textContent='Start MAIR';const version=$('appVersion');if(version&&/Josh FM/i.test(version.textContent))version.textContent=version.textContent.replace(/Josh FM/gi,'MAIR');document.querySelectorAll('h3,p,span,b,button,option').forEach(el=>{if(el.children.length)return;const t=el.textContent;if(/Josh FM/.test(t))el.textContent=t.replace(/Josh FM/g,'MAIR FM')})}
+ function ensureForYou(){if($('tab-for-you'))return;const section=document.createElement('section');section.id='tab-for-you';section.className='tabpane mair-for-you';section.innerHTML='<div class="mair-hero"><div class="eyebrow">MADE FOR YOU</div><h2>Voor jou</h2><p class="muted">Persoonlijke mixes worden later gekoppeld aan je luistergedrag.</p></div><div class="mair-mix-grid"><div class="mair-mix"><b>Morning Energy</b><span>Een frisse start op basis van je smaak.</span></div><div class="mair-mix"><b>Heavy Rotation</b><span>De tracks waar je steeds naar terugkomt.</span></div><div class="mair-mix"><b>New for You</b><span>Nieuwe muziek met een hoge match.</span></div><div class="mair-mix"><b>Late Night</b><span>Rustiger geselecteerd voor later op de avond.</span></div></div>';document.querySelector('.shell')?.appendChild(section)}
+ function activate(target){document.querySelectorAll('.tabpane').forEach(p=>p.classList.remove('active'));if(target==='for-you')$('tab-for-you')?.classList.add('active');else{const id=tabMap[target],pane=$('tab-'+id)||$('tab-requests');pane?.classList.add('active')}document.querySelectorAll('.mair-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.mairTab===target));window.scrollTo({top:0,behavior:'smooth'})}
+ function ensureNav(){if(document.querySelector('.mair-bottom-nav'))return;const nav=document.createElement('nav');nav.className='mair-bottom-nav';nav.setAttribute('aria-label','MAIR navigatie');nav.innerHTML='<button class="mair-nav-btn active" data-mair-tab="radio"><span class="ico">◉</span><span>Radio</span></button><button class="mair-nav-btn" data-mair-tab="stations"><span class="ico">▦</span><span>Stations</span></button><button class="mair-nav-btn" data-mair-tab="for-you"><span class="ico">✦</span><span>Voor jou</span></button><button class="mair-nav-btn" data-mair-tab="settings"><span class="ico">⚙</span><span>Instellingen</span></button>';nav.addEventListener('click',e=>{const b=e.target.closest('.mair-nav-btn');if(b)activate(b.dataset.mairTab)});document.body.appendChild(nav)}
  function migrate(){try{if(!localStorage.getItem('mair_migrated_v1'))localStorage.setItem('mair_migrated_v1',JSON.stringify({at:Date.now(),keptLegacyKeys:true}))}catch{}}
- function install(){migrate();ensureForYou();ensureNav();setBrandText();window.addEventListener('jfm:brand',setBrandText);window.MAIRFoundation={version:'mair-foundation-v1',activate,build:1}}
+ function install(){migrate();ensureForYou();ensureNav();setBrandText();window.addEventListener('jfm:brand',setBrandText);window.MAIRFoundation={version:'mair-foundation-v1.1',activate,build:1}}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
