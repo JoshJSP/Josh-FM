@@ -2,7 +2,7 @@ name: Josh FM predeploy
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, release/product-beta]
   push:
     branches:
       - main
@@ -18,3 +18,6 @@ jobs:
         with:
           node-version: '22'
       - run: npm run predeploy
+      - name: Build 1 radio-core checks
+        if: startsWith(github.head_ref, 'build/product-beta-01-')
+        run: node scripts/build1-radio-core-check-v2.mjs
