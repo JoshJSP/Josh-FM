@@ -1,7 +1,7 @@
 // Josh FM discovery layer — playback-first Spotify budget, cache-friendly and cooldown retry safe.
 (()=>{
 const slider=document.getElementById('discovery'),label=document.getElementById('discoveryValue');if(!slider||!label)return;
-const stored=Number(localStorage.getItem('jfm_discovery'));slider.value=Number.isFinite(stored)?Math.max(0,Math.min(100,stored)):30;const paint=()=>label.textContent=`${slider.value}%`;paint();slider.addEventListener('input',()=>{paint();localStorage.setItem('jfm_discovery',slider.value)});slider.addEventListener('change',()=>{localStorage.setItem('jfm_discovery',slider.value);if(typeof queue!=='undefined')queue=[]});
+const stored=Number(localStorage.getItem('jfm_discovery'));slider.value=Number.isFinite(stored)?Math.max(0,Math.min(100,stored)):30;const paint=()=>label.textContent=`${slider.value}%`;paint();slider.addEventListener('input',()=>{paint();localStorage.setItem('jfm_discovery',slider.value)});slider.addEventListener('change',()=>{localStorage.setItem('jfm_discovery',slider.value);const live=!!window.JFMPlaybackState?.get?.()?.expectedLive;if(typeof queue!=='undefined'&&!live)queue=[]});
 const originalBuild=window.buildSet||buildSet,DIAG='jfm_discovery_diag_v5',MAX_SEARCHES=5,wait=ms=>new Promise(r=>setTimeout(r,ms));
 function mem(){try{return JSON.parse(localStorage.getItem('jfm_director_memory')||'{"plays":{},"likes":{},"requests":{}}')}catch{return{plays:{},likes:{},requests:{}}}}
 function skips(){try{return typeof skipMap==='function'?skipMap():JSON.parse(localStorage.getItem('jfm_skips')||'{}')}catch{return{}}}
