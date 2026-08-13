@@ -1,0 +1,1 @@
+Health monitor should ignore background/offline periods and use a grace window after returning to foreground before counting stalls.
