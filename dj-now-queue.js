@@ -8,6 +8,7 @@
   async function boot(){
     await load('./progress-clock-v226.js','jfm-progress-v226');
     await load('./dj-authoritative-v226.js','jfm-dj-v226');
+    setTimeout(()=>load('./beta-status.js','jfm-beta-status-v8'),2600);
     if(typeof window.refresh==='function')ownedRefresh=window.refresh;
   }
   boot();
