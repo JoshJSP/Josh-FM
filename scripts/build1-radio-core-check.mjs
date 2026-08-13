@@ -10,6 +10,8 @@ const checks=[
  ['start jingle fully awaited',playback.includes("await speakText('Josh FM. Your music, your radio show.',true).catch(()=>false)")&&!playback.includes('Promise.race([speakText')],
  ['errors reach playback truth',playback.includes('truth()?.error?.(lastError)')],
  ['recovery uses central shouldRecover',playback.includes('truth()?.shouldRecover')],
+ ['resume restart stays inside lock',playback.includes('return startDirect()')&&!playback.includes('setBusy(false);return start()')],
+ ['confirmed device is synchronized',playback.includes("localStorage.setItem(DEVICE_KEY,confirmed)")],
  ['long session health monitor exists',health.includes('playback-stall')&&health.includes('deviceFlaps')&&health.includes('rapidTransitions')],
  ['health monitor is loaded',version.includes('radio-core-health-v1.js')]
 ];
