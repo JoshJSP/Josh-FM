@@ -23,8 +23,9 @@
     const recentStalls=recentEvents.filter(e=>e?.type==='playback-stall'&&now-Number(e?.at||0)<RECENT_WINDOW_MS).length;
     const currentError=String(truth.lastError||'').trim();
     const telemetry={failureBudget:failures<5,stallBudget:stalls<2};
-    const ready=missing.length===0&&!currentError&&recentStalls<2;
-    return{version:'build8.1-recoverable-health',ready,modules,missing,failures,stalls,recentStalls,currentError,telemetry,recoveries:Number(playback.recoveries||0),at:now};
+    const moduleGate={ready:missing.length===0};
+    const ready=moduleGate.ready&&!currentError&&recentStalls<2;
+    return{version:'build8.1-recoverable-health',ready,modules,missing,failures,stalls,recentStalls,currentError,moduleGate,telemetry,recoveries:Number(playback.recoveries||0),at:now};
   }
   window.JFMBetaStatus={version:'build8.1-recoverable-health',snapshot,get status(){return snapshot()}};
 })();
