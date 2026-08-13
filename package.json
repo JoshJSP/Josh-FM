@@ -7,7 +7,7 @@
     "dev": "vercel dev",
     "test": "npm run predeploy",
     "predeploy:static": "node scripts/predeploy-check-v40.mjs",
-    "smoke": "node scripts/app-smoke-check-v362.mjs",
+    "smoke": "node scripts/smoke-stabilization.mjs",
     "channel-tap": "node scripts/channel-tap-check.mjs",
     "hotfix-check": "node scripts/hotfix-release-check.mjs",
     "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check"
