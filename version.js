@@ -1,6 +1,7 @@
 // Josh FM release identity. Internal package version uses valid semver; displayVersion is the public beta label.
 window.JFM_RELEASE={version:'2.0.0-beta.2',displayVersion:'2b.0.2',build:'unknown',asset:'44',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
 window.JFM_ASSET_VERSION='44';
+// production redeploy marker: v2b.0.2-r1
 (()=>{
   function sanitizeSleepState(){try{const key='jfm_sleep_timer_v1',raw=localStorage.getItem(key);if(!raw)return;const x=JSON.parse(raw),expired=x?.mode==='time'&&Number(x?.at||0)<=Date.now(),unsafe=x?.mode==='after-track';if(expired||unsafe)localStorage.setItem(key,'null')}catch{try{localStorage.setItem('jfm_sleep_timer_v1','null')}catch{}}}
   sanitizeSleepState();
