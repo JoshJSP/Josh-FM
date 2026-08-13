@@ -9,6 +9,8 @@ const oldCache='josh-fm-v39-v22-hardening';
 const newCache='josh-fm-v42-product-beta-hardening';
 if(!source.includes(oldCache))throw new Error('Predeploy cache baseline changed.');
 for(const asset of ['./dj-authoritative-v226.js','./progress-clock-v226.js','./radio-core-health-v1.js','./dj-quality-v2.js','./dj-context-v2.js','./music-intelligence-v3.js','./personal-learning-v4.js','./product-model-v6.js','./product-ux-v5.js'])if(!sw.includes(`'${asset}'`))throw new Error(`PWA core cache mist ${asset}.`);
+const betaPath=new URL('../beta-status.js',import.meta.url),bootstrap=fs.readFileSync(new URL('../dj-now-queue.js',import.meta.url),'utf8');
+if(fs.existsSync(betaPath)){if(!sw.includes("'./beta-status.js'"))throw new Error('PWA core cache mist beta-status.js.');if(!bootstrap.includes("load('./beta-status.js','jfm-beta-status-v8')"))throw new Error('Build 8 beta status is not wired at runtime.');const beta=fs.readFileSync(betaPath,'utf8');if(!beta.includes('JFMBetaStatus')||!beta.includes('ready:missing.length===0'))throw new Error('Build 8 beta readiness gate is incomplete.');}
 let patched=source.replaceAll(oldCache,newCache);
 const oldPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&primary.includes('primary-v5-device-heal'));";
 const newPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&(primary.includes('primary-v5-device-heal')||primary.includes('primary-v8-recovery-backoff')));";
