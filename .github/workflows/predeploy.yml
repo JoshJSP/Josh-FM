@@ -31,3 +31,6 @@ jobs:
       - name: Build 3 music intelligence checks
         if: startsWith(github.head_ref, 'build/product-beta-03-')
         run: node scripts/build3-check.mjs
+      - name: Build 4 personal learning checks
+        if: startsWith(github.head_ref, 'build/product-beta-04-')
+        run: node scripts/build4-check.mjs
