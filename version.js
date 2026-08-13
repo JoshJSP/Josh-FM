@@ -13,6 +13,7 @@ window.JFM_ASSET_VERSION='40';
   function loadBuild1Health(){loadScript('jfm-radio-core-health-v1','./radio-core-health-v1.js')}
   function loadMusicIntelligence(){loadScript('jfm-music-intelligence-v3','./music-intelligence-v3.js')}
   function loadPersonalLearning(){loadScript('jfm-personal-learning-v4','./personal-learning-v4.js')}
+  function loadProductModel(){loadScript('jfm-product-model-v6','./product-model-v6.js')}
   function loadProductUX(){loadScript('jfm-product-ux-v5','./product-ux-v5.js')}
   async function resolveBuild(){
     render();
@@ -24,6 +25,6 @@ window.JFM_ASSET_VERSION='40';
   }
   navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.type!=='CACHE_VERSION')return;window.JFM_RELEASE.localCache=String(e.data.cache||'unknown');window.JFM_RELEASE.updateAvailable=!!(window.JFM_RELEASE.serverCache&&window.JFM_RELEASE.serverCache!=='unknown'&&window.JFM_RELEASE.localCache!==window.JFM_RELEASE.serverCache);emit()});
   window.addEventListener('jfm:diagnostics-refresh',resolveBuild);
-  loadBuild1Health();setTimeout(loadMusicIntelligence,1200);setTimeout(loadPersonalLearning,1500);setTimeout(loadProductUX,1800);
+  loadBuild1Health();setTimeout(loadMusicIntelligence,1200);setTimeout(loadPersonalLearning,1500);setTimeout(loadProductModel,1700);setTimeout(loadProductUX,2000);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',resolveBuild,{once:true});else resolveBuild();
 })();
