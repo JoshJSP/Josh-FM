@@ -15,7 +15,7 @@ if(!bootstrap.includes("load('./brand-config.js','jfm-brand-config-v9')")||!boot
 const brand=fs.readFileSync(new URL('../brand-config.js',import.meta.url),'utf8'),brandRuntime=fs.readFileSync(new URL('../brand-runtime-v9.js',import.meta.url),'utf8');if(!brand.includes('JFMBrand')||!brand.includes("productName:'Josh FM'")||!brandRuntime.includes('JFMBrandRuntime'))throw new Error('Build 9 brand configuration is incomplete.');
 let patched=source.replaceAll(oldCache,newCache);
 const oldPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&primary.includes('primary-v5-device-heal'));";
-const newPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&(primary.includes('primary-v5-device-heal')||primary.includes('primary-v8-recovery-backoff')));";
+const newPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&(primary.includes('primary-v5-device-heal')||primary.includes('primary-v8-recovery-backoff')||primary.includes('primary-v8.1-start-responsive')));";
 if(!patched.includes(oldPrimary))throw new Error('Primary playback baseline changed.');
 patched=patched.replace(oldPrimary,newPrimary);
 const oldDj="ok('DJ flow stays playing',!dj.includes('/me/player/pause')&&!dj.includes('player()?.pause'));";

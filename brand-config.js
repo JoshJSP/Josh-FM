@@ -1,30 +1,12 @@
-// Josh FM Product Beta Build 9 — central brand configuration. Visible defaults intentionally remain Josh FM.
+// MAIR Build 1 — central brand configuration with non-destructive Josh FM migration.
 (()=>{
-  const DEFAULTS={
-    productName:'Josh FM',
-    stationName:'Josh FM',
-    shortName:'Josh FM',
-    tagline:'Persoonlijke AI-radio',
-    djName:'Josh FM DJ',
-    logo:'logo.svg',
-    themeColor:'#08090b',
-    language:'nl',
-    supportName:'Josh FM'
-  };
-  const read=()=>{try{return JSON.parse(localStorage.getItem('jfm_brand_config_v1')||'{}')}catch{return{}}};
+  const DEFAULTS={productName:'MAIR',stationName:'MAIR FM',shortName:'MAIR',tagline:'Your music. Your radio.',djName:'MAIR DJ',logo:'mair-logo.svg',themeColor:'#ff5a00',language:'nl',supportName:'MAIR'};
+  const read=()=>{try{const raw=JSON.parse(localStorage.getItem('jfm_brand_config_v1')||'{}');const legacy=!raw.productName||/^Josh FM$/i.test(String(raw.productName));return legacy?{}:raw}catch{return{}}};
   const cfg={...DEFAULTS,...read()};
+  function loadAssets(){if(!document.getElementById('mair-foundation-css')){const l=document.createElement('link');l.id='mair-foundation-css';l.rel='stylesheet';l.href='./mair-foundation.css';document.head.appendChild(l)}if(!document.getElementById('mair-foundation-js')){const s=document.createElement('script');s.id='mair-foundation-js';s.src='./mair-foundation.js';s.defer=true;document.head.appendChild(s)}}
   const save=patch=>{Object.assign(cfg,patch||{});try{localStorage.setItem('jfm_brand_config_v1',JSON.stringify(cfg))}catch{};apply();return{...cfg}};
   function text(sel,value){document.querySelectorAll(sel).forEach(el=>{if(el.dataset.brandStatic==='1')return;el.textContent=value})}
-  function apply(){
-    document.title=cfg.productName;
-    text('[data-brand="product"]',cfg.productName);
-    text('[data-brand="station"]',cfg.stationName);
-    text('[data-brand="tagline"]',cfg.tagline);
-    text('[data-brand="dj"]',cfg.djName);
-    document.querySelectorAll('[data-brand-logo]').forEach(img=>{img.src=cfg.logo;img.alt=`${cfg.productName} logo`});
-    const theme=document.querySelector('meta[name="theme-color"]');if(theme)theme.setAttribute('content',cfg.themeColor);
-    try{window.dispatchEvent(new CustomEvent('jfm:brand',{detail:{...cfg}}))}catch{}
-  }
-  window.JFMBrand={version:'brand-config-v1',defaults:{...DEFAULTS},get config(){return{...cfg}},apply,set:save,reset(){Object.assign(cfg,DEFAULTS);try{localStorage.removeItem('jfm_brand_config_v1')}catch{};apply();return{...cfg}}};
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
+  function apply(){document.title=cfg.productName;text('[data-brand="product"]',cfg.productName);text('[data-brand="station"]',cfg.stationName);text('[data-brand="tagline"]',cfg.tagline);text('[data-brand="dj"]',cfg.djName);document.querySelectorAll('[data-brand-logo]').forEach(img=>{img.src=cfg.logo;img.alt=`${cfg.productName} logo`});const theme=document.querySelector('meta[name="theme-color"]');if(theme)theme.setAttribute('content',cfg.themeColor);try{localStorage.setItem('jfm_brand_config_v1',JSON.stringify(cfg))}catch{};try{window.dispatchEvent(new CustomEvent('jfm:brand',{detail:{...cfg}}))}catch{}}
+  window.JFMBrand={version:'brand-config-v2-mair-build1',defaults:{...DEFAULTS},get config(){return{...cfg}},apply,set:save,reset(){Object.assign(cfg,DEFAULTS);try{localStorage.setItem('jfm_brand_config_v1',JSON.stringify(cfg))}catch{};apply();return{...cfg}}};
+  loadAssets();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
 })();
