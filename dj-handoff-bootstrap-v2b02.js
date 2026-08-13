@@ -1,0 +1,1 @@
+(()=>{if(window.JFMDJHandoff||document.getElementById('jfm-dj-handoff-bootstrap'))return;const s=document.createElement('script');s.id='jfm-dj-handoff-bootstrap';s.src='./dj-handoff-v34.js?v='+(window.JFM_ASSET_VERSION||'40');s.async=false;s.onload=()=>window.dispatchEvent(new Event('jfm:dj-handoff-ready'));document.body.appendChild(s)})();
