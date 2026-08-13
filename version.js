@@ -1,12 +1,11 @@
-// MAIR rebrand preview keeps the tested Product Beta release identity while loading Build 1 UI assets.
+// MAIR rebrand preview keeps the tested Product Beta release identity while loading rebrand UI assets.
 window.JFM_RELEASE={version:'2.0.0-beta.2',displayVersion:'2b.0.2',build:'unknown',asset:'44',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
 window.JFM_ASSET_VERSION='44';
 (()=>{
-  function loadMairFoundation(){
-    if(!document.getElementById('mair-foundation-css')){const l=document.createElement('link');l.id='mair-foundation-css';l.rel='stylesheet';l.href='./mair-foundation.css';document.head.appendChild(l)}
-    if(!document.getElementById('mair-foundation-js')){const s=document.createElement('script');s.id='mair-foundation-js';s.src='./mair-foundation.js';s.async=false;document.head.appendChild(s)}
-  }
-  loadMairFoundation();
+  function addStyle(id,src){if(document.getElementById(id))return;const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=src;document.head.appendChild(l)}
+  function addSyncScript(id,src){if(document.getElementById(id))return;const s=document.createElement('script');s.id=id;s.src=src;s.async=false;document.head.appendChild(s)}
+  function loadMairUI(){addStyle('mair-foundation-css','./mair-foundation.css');addStyle('mair-radio-home-css','./mair-radio-home.css');addSyncScript('mair-foundation-js','./mair-foundation.js');addSyncScript('mair-radio-home-js','./mair-radio-home.js')}
+  loadMairUI();
   function sanitizeSleepState(){try{const key='jfm_sleep_timer_v1',raw=localStorage.getItem(key);if(!raw)return;const x=JSON.parse(raw),expired=x?.mode==='time'&&Number(x?.at||0)<=Date.now(),unsafe=x?.mode==='after-track';if(expired||unsafe)localStorage.setItem(key,'null')}catch{try{localStorage.setItem('jfm_sleep_timer_v1','null')}catch{}}}
   sanitizeSleepState();
   const render=()=>{const version=document.getElementById('appVersion'),build=document.getElementById('appBuild');if(version)version.textContent='MAIR · v'+(window.JFM_RELEASE.displayVersion||window.JFM_RELEASE.version);if(build)build.textContent='Build '+window.JFM_RELEASE.build};
