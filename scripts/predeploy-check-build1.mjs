@@ -6,9 +6,13 @@ import {execFileSync} from 'node:child_process';
 const source=fs.readFileSync(new URL('./predeploy-check.mjs',import.meta.url),'utf8');
 const sw=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');
 const oldCache='josh-fm-v39-v22-hardening';
-const newCache='josh-fm-v41-v226-dj-progress';
+const newCache='josh-fm-v43-rebrand-ready';
 if(!source.includes(oldCache))throw new Error('Predeploy cache baseline changed.');
-if(!sw.includes("'./dj-authoritative-v226.js'")||!sw.includes("'./progress-clock-v226.js'"))throw new Error('PWA core cache mist v2.2.6 DJ/progress runtime assets.');
+for(const asset of ['./dj-authoritative-v226.js','./progress-clock-v226.js','./radio-core-health-v1.js','./dj-quality-v2.js','./dj-context-v2.js','./music-intelligence-v3.js','./personal-learning-v4.js','./product-model-v6.js','./product-ux-v5.js','./brand-config.js','./brand-runtime-v9.js'])if(!sw.includes(`'${asset}'`))throw new Error(`PWA core cache mist ${asset}.`);
+const betaPath=new URL('../beta-status.js',import.meta.url),bootstrap=fs.readFileSync(new URL('../dj-now-queue.js',import.meta.url),'utf8');
+if(fs.existsSync(betaPath)){if(!sw.includes("'./beta-status.js'"))throw new Error('PWA core cache mist beta-status.js.');if(!bootstrap.includes("load('./beta-status.js','jfm-beta-status-v8')"))throw new Error('Build 8 beta status is not wired at runtime.');const beta=fs.readFileSync(betaPath,'utf8');if(!beta.includes('JFMBetaStatus')||!beta.includes('ready:missing.length===0'))throw new Error('Build 8 beta readiness gate is incomplete.');}
+if(!bootstrap.includes("load('./brand-config.js','jfm-brand-config-v9')")||!bootstrap.includes("load('./brand-runtime-v9.js','jfm-brand-runtime-v9')"))throw new Error('Build 9 brand runtime is not wired.');
+const brand=fs.readFileSync(new URL('../brand-config.js',import.meta.url),'utf8'),brandRuntime=fs.readFileSync(new URL('../brand-runtime-v9.js',import.meta.url),'utf8');if(!brand.includes('JFMBrand')||!brand.includes("productName:'Josh FM'")||!brandRuntime.includes('JFMBrandRuntime'))throw new Error('Build 9 brand configuration is incomplete.');
 let patched=source.replaceAll(oldCache,newCache);
 const oldPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&primary.includes('primary-v5-device-heal'));";
 const newPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&(primary.includes('primary-v5-device-heal')||primary.includes('primary-v8-recovery-backoff')));";

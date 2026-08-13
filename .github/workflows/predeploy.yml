@@ -11,20 +11,11 @@ on:
 jobs:
   predeploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Static predeploy
-        run: node scripts/predeploy-check-build1.mjs
-      - run: npm run smoke
-      - run: npm run channel-tap
-      - run: npm run hotfix-check
-      - name: Build 1 radio-core checks
-        if: startsWith(github.head_ref, 'build/product-beta-01-')
-        run: node scripts/build1-radio-core-check-v2.mjs
-      - name: Build 2 DJ quality checks
-        if: startsWith(github.head_ref, 'build/product-beta-02-')
-        run: node scripts/build2-check.mjs
+      - name: Full Product Beta release gate
+        run: npm run predeploy
