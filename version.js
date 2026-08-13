@@ -2,6 +2,8 @@
 window.JFM_RELEASE={version:'2.2.5',build:'unknown',asset:'40',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
 window.JFM_ASSET_VERSION='40';
 (()=>{
+  function sanitizeSleepState(){try{const key='jfm_sleep_timer_v1',raw=localStorage.getItem(key);if(!raw)return;const x=JSON.parse(raw),expired=x?.mode==='time'&&Number(x?.at||0)<=Date.now(),unsafe=x?.mode==='after-track';if(expired||unsafe)localStorage.setItem(key,'null')}catch{try{localStorage.setItem('jfm_sleep_timer_v1','null')}catch{}}}
+  sanitizeSleepState();
   const render=()=>{const version=document.getElementById('appVersion'),build=document.getElementById('appBuild');if(version)version.textContent='Josh FM · v'+window.JFM_RELEASE.version;if(build)build.textContent='Build '+window.JFM_RELEASE.build};
   function emit(){try{window.dispatchEvent(new CustomEvent('jfm:release-status',{detail:{...window.JFM_RELEASE}}))}catch{}}
   function requestCacheVersion(){try{navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'})}catch{}}
