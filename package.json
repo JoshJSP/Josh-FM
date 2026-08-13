@@ -1,6 +1,6 @@
 {
   "name": "josh-fm",
-  "version": "2.2.2",
+  "version": "2.2.5",
   "private": true,
   "type": "module",
   "scripts": {
