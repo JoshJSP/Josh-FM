@@ -14,10 +14,10 @@ const checks=[
  ['popular-category-pools',/buildPool/.test(channels)&&/popularity/.test(channels)],
  ['dutch-filter',/nlArtists/.test(channels)&&/nlOk/.test(channels)],
  ['v226-bootstrap',bootstrap.includes('progress-clock-v226.js')&&bootstrap.includes('dj-authoritative-v226.js')],
- ['dj-pauses-before-speech',dj.indexOf('pauseExpected(expectedUri)')<dj.indexOf('speak(pack,manual)')],
- ['dj-rewind-resume',dj.includes('rewindExpected(expectedUri)')&&dj.includes('resumeExpected(expectedUri)')],
- ['dj-auto-scheduler',dj.includes('tracksSinceTalk>=nextTalkAt')&&dj.includes('runBreak(ended,false)')],
- ['dj-manual-next',dj.includes('consumeArmedIfChanged')&&dj.includes('runBreak(null,true)')],
+ ['dj-pauses-before-speech',dj.indexOf('await pause(uri)')<dj.indexOf('window.speakText')],
+ ['dj-rewind-resume',dj.includes('await rewind(uri)')&&dj.includes('await resume(uri)')],
+ ['dj-auto-scheduler',dj.includes('autoCount>=nextAuto')&&dj.includes('run(false)')],
+ ['dj-manual-next',dj.includes('armedFrom')&&dj.includes('run(true)')],
  ['progress-local-clock',progress.includes('performance.now()')&&progress.includes('setInterval(tick,250)')&&progress.includes("$('elapsed')")],
  ['radio-copy',/music-radio presenter/.test(apiDj)&&/REAL RADIO STRUCTURE/.test(apiDj)&&/live radio link/.test(apiDj)]
 ];
