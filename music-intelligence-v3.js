@@ -17,7 +17,7 @@
   function history(){return load(HISTORY,[])}
   function remember(t){if(!t?.id)return;const h=history().filter(x=>x.id!==t.id);h.unshift({id:t.id,artist:artist(t),at:Date.now()});save(HISTORY,h.slice(0,80))}
   function recentPenalty(t){const h=history(),a=artist(t);let p=0;h.slice(0,18).forEach((x,i)=>{if(x.id===t.id)p+=80-Math.min(60,i*4);if(a&&x.artist===a)p+=24-Math.min(18,i)});return p}
-  function baseScore(t){const pop=Number(t?.popularity||0),fresh=year(t)>=new Date().getFullYear()-1?4:0;return pop*.12+fresh-recentPenalty(t)}
+  function baseScore(t){const pop=Number(t?.popularity||0),fresh=year(t)>=new Date().getFullYear()-1?4:0,taste=Number(window.JFMTasteModel?.score?.(t)||0);return pop*.12+fresh+taste-recentPenalty(t)}
   function optimize(input,id=channel()){
     const seenId=new Set(),seenSig=new Set(),valid=[];
     for(const t of Array.isArray(input)?input:[]){const s=sig(t);if(!pure(t,id)||seenId.has(t?.id)||seenSig.has(s))continue;seenId.add(t.id);seenSig.add(s);valid.push(t)}
@@ -29,7 +29,8 @@
   }
   let lastSig='',applying=false;
   function reconcile(){if(applying||!Array.isArray(window.queue)||window.queue.length<2)return;const id=channel(),s=id+'|'+window.queue.map(t=>t?.id).join(',');if(s===lastSig)return;lastSig=s;const next=optimize(window.queue,id);if(next.length<Math.min(5,window.queue.length))return;const changed=next.map(t=>t.id).join(',')!==window.queue.map(t=>t?.id).join(',');if(!changed)return;applying=true;window.queue=next;try{window.__jfmStationQueueSig='';window.jfmRenderNext?.();window.JFMProgramDirector?.invalidateUpcoming?.('music-intelligence-v3');window.JFMProgramDirector?.render?.()}finally{applying=false}}
+  function rerank(){lastSig='';reconcile()}
   window.addEventListener('jfm:trackchange',e=>{const id=e?.detail?.trackId;const t=(window.queue||[]).find(x=>x?.id===id);if(t)remember(t);setTimeout(reconcile,100)});
   setInterval(reconcile,900);setTimeout(reconcile,800);
-  window.JFMMusicIntelligence={version:'music-intelligence-v3',optimize,pure,score:baseScore,recent:history,reconcile};
+  window.JFMMusicIntelligence={version:'music-intelligence-v3',optimize,pure,score:baseScore,recent:history,reconcile,rerank};
 })();
