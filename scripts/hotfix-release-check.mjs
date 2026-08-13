@@ -12,6 +12,6 @@ const checks=[
  ['popular-category-pools',/buildPool/.test(channels)&&/popularity/.test(channels)],
  ['dutch-filter',/nlArtists/.test(channels)&&/nlOk/.test(channels)],
  ['dj-skip-bridge',/consumeAfterSkip/.test(dj)&&/consumeArmedIfChanged/.test(dj)],
- ['radio-copy',/modern music-radio presenter/.test(apiDj)&&/microphone is live/.test(apiDj)]
+ ['radio-copy',/music-radio presenter/.test(apiDj)&&/REAL RADIO STRUCTURE/.test(apiDj)&&/live radio link/.test(apiDj)]
 ];
 let fail=0;for(const [name,ok] of checks){console.log(`${ok?'PASS':'FAIL'} ${name}`);if(!ok)fail++}if(fail)process.exit(1);console.log(`Hotfix release checks: ${checks.length} PASS / 0 FAIL`);
