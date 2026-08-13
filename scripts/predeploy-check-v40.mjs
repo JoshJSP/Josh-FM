@@ -7,7 +7,10 @@ const source=fs.readFileSync(new URL('./predeploy-check.mjs',import.meta.url),'u
 const old='josh-fm-v39-v22-hardening';
 const next='josh-fm-v40-v221-hotfix';
 if(!source.includes(old))throw new Error('Predeploy cache baseline changed; update the v40 adapter.');
-const patched=source.replaceAll(old,next);
+let patched=source.replaceAll(old,next);
+const oldDj="ok('DJ flow stays playing',!dj.includes('/me/player/pause')&&!dj.includes('player()?.pause'));";
+const newDj="ok('DJ flow stays playing or safely pauses on iOS',(!dj.includes('/me/player/pause')&&!dj.includes('player()?.pause'))||(dj.includes('pauseExpected(expectedUri)')&&dj.includes('resumeExpected(expectedUri)')&&dj.includes(\"iosFallback:'pause-speak-rewind-resume'\")));";
+if(patched.includes(oldDj))patched=patched.replace(oldDj,newDj);
 const temp=path.join(os.tmpdir(),`josh-fm-predeploy-${process.pid}.mjs`);
 try{
   fs.writeFileSync(temp,patched,'utf8');
