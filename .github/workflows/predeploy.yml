@@ -25,3 +25,6 @@ jobs:
       - name: Build 1 radio-core checks
         if: startsWith(github.head_ref, 'build/product-beta-01-')
         run: node scripts/build1-radio-core-check-v2.mjs
+      - name: Build 2 DJ quality checks
+        if: startsWith(github.head_ref, 'build/product-beta-02-')
+        run: node scripts/build2-check.mjs
