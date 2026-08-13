@@ -1,0 +1,1 @@
+Hotfix scope: discovery retry, authoritative popular category pools, deterministic DJ-now skip handoff, and radio-style DJ copy.
