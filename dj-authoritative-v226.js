@@ -1,7 +1,7 @@
 // Josh FM v2.2.6 authoritative DJ scheduler.
 (()=>{
   const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
-  let busy=false,armedFrom='',lastSeen='',autoCount=0,nextAuto=3,skipAuto=false;
+  let busy=false,armedFrom='',lastSeen='',autoCount=0,nextAuto=3;
   const state=async()=>{try{return await api('/me/player')}catch{return null}};
   const devicePath=p=>{const id=String(window.JFMPlaybackState?.get?.()?.deviceId||localStorage.getItem('jfm_spotify_device_id')||'').trim();return id?p+(p.includes('?')?'&':'?')+'device_id='+encodeURIComponent(id):p};
   const status=t=>{const e=$('queueInfo');if(e)e.textContent=t};
@@ -23,9 +23,8 @@
     status(spoken?'DJ klaar · nummer start vanaf 0:00.':'DJ overgeslagen · muziek hervat vanaf 0:00.');plan();return spoken
   }finally{busy=false}}
   function arm(){const id=String(playback?.item?.id||'');if(!id)return;armedFrom=armedFrom===id?'':id;const b=$('djNow');if(b){b.dataset.queued=armedFrom?'1':'0';const s=b.querySelector('span');if(s)s.textContent=armedFrom?'Skip naar het volgende nummer':'Laat hem iets vertellen'}status(armedFrom?'DJ staat klaar voor het volgende nummer.':'DJ-opdracht geannuleerd.')}
-  function ownButton(){const old=$('djNow');if(!old||old.dataset.jfmOwner==='v226')return;const b=old.cloneNode(true);old.replaceWith(b);b.dataset.jfmOwner='v226';b.disabled=false;b.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();arm()},true)}
-  async function onTrackChange(s){const id=String(s?.item?.id||'');if(!id||id===lastSeen)return;const previous=lastSeen;lastSeen=id;if(!previous)return;if(armedFrom&&id!==armedFrom){armedFrom='';ownButton();await wait(120);await run(true);return}autoCount++;if(autoCount>=nextAuto){if(skipAuto){skipAuto=false;plan()}else{await wait(120);await run(false)}}}
-  const oldRefresh=window.refresh;
+  function ownButton(){const old=$('djNow');if(!old||old.dataset.jfmOwner==='v226')return;const b=old.cloneNode(true);old.replaceWith(b);b.dataset.jfmOwner='v226';b.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();arm()},true)}
+  async function onTrackChange(s){const id=String(s?.item?.id||'');if(!id||id===lastSeen)return;const previous=lastSeen;lastSeen=id;if(!previous)return;if(armedFrom&&id!==armedFrom){armedFrom='';const b=$('djNow');if(b){b.dataset.queued='0';const x=b.querySelector('span');if(x)x.textContent='Laat hem iets vertellen'}await wait(120);await run(true);return}autoCount++;if(autoCount>=nextAuto){let skip=false;try{skip=!!skipNextTalk;if(skip)skipNextTalk=false}catch{}if(skip)plan();else{await wait(120);await run(false)}}}
   window.refresh=async function(){const d=await api('/me/player');if(!d?.item)return;playback=d;try{window.JFMPlaybackState?.ingest?.(d,'dj-v226-refresh')}catch{};renderPlayback(d);await onTrackChange(d);lastTrackId=d.item.id};
   window.djBreak=()=>run(false);window.JFMDJAuthoritative={version:'v226-pause-speak-rewind-resume',run,plan,get busy(){return busy}};
   plan();ownButton();setInterval(()=>{ownButton();state().then(onTrackChange).catch(()=>{})},1200);window.addEventListener('pageshow',()=>setTimeout(ownButton,120));
