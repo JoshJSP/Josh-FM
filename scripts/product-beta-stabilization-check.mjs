@@ -14,6 +14,7 @@ const checks=[
   ['v43 cache active',sw.includes("josh-fm-v43-rebrand-ready")&&apiVersion.includes("josh-fm-v43-rebrand-ready")],
   ['all Product Beta runtime cached',['radio-core-health-v1.js','dj-quality-v2.js','music-intelligence-v3.js','personal-learning-v4.js','product-model-v6.js','product-ux-v5.js','beta-status.js','brand-config.js','brand-runtime-v9.js'].every(x=>sw.includes(`./${x}`))],
   ['network requests have timeout',sw.includes('AbortController')&&sw.includes('fetchTimed')],
+  ['transient server errors can fall back to cache',sw.includes('response.status<500')&&sw.includes('cache.match(request,{ignoreSearch:true})')],
   ['PWA update checks recover on foreground',pwa.includes("visibilitychange")&&pwa.includes('checkForUpdate')&&pwa.includes('pageshow')],
   ['single MediaSession owner remains',pwa.includes("setActionHandler('play'")||pwa.includes("bind('play'")],
   ['long-session health detects stalls',health.includes('playback-stall')&&health.includes('stalls++')&&health.includes('deviceFlaps')],
