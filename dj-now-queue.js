@@ -1,10 +1,17 @@
-// Josh FM DJ-now skip bridge — guarantees the armed break is consumed after a manual Next.
+// Josh FM v2.2.6 runtime bootstrap for DJ and progress fixes.
 (()=>{
-  const wait=ms=>new Promise(r=>setTimeout(r,ms));
-  if(!window.JFMDJTransition){window.JFMDJTransition={version:'legacy-disabled-v225',disabled:true,transition:opts=>window.JFMDJHandoff?.runBreak?.(opts?.track||null,!!opts?.manual)??Promise.resolve(false),get busy(){return !!window.JFMDJHandoff?.busy}}}
-  async function consumeAfterSkip(fromId){for(let i=0;i<28;i++){await wait(120+i*18);let s=null;try{s=await api('/me/player')}catch{};if(s?.item?.id&&s.item.id!==fromId&&s.is_playing){await wait(120);return window.JFMDJHandoff?.consumeArmedIfChanged?.(s)}}return false}
-  window.addEventListener('click',e=>{if(!e.target?.closest?.('#next'))return;const from=String(window.JFMDJHandoff?.armed||'');if(!from)return;consumeAfterSkip(from).catch(()=>{})},true);
-  function radioManualCopy(){if(typeof window.makeDJScript!=='function'||window.makeDJScript.__radio225)return;const old=window.makeDJScript;const wrapped=async function(track,fact,weather,manual){if(manual&&track){const a=(track.artists||[]).join(' and '),n=track.name||'';if(a&&n)return `On Josh FM, ${a} with ${n}. Let’s take this one from the top.`}return old(track,fact,weather,manual)};wrapped.__radio225=true;window.makeDJScript=makeDJScript=wrapped}
-  radioManualCopy();setTimeout(radioManualCopy,600);setTimeout(radioManualCopy,1600);
-  window.JFMDJNowSkipBridge={version:'v225-deterministic-next-radio',consumeAfterSkip};
+  const load=(src,id)=>new Promise(resolve=>{
+    if(document.getElementById(id))return resolve(true);
+    const s=document.createElement('script');s.id=id;s.src=src;s.onload=()=>resolve(true);s.onerror=()=>resolve(false);document.body.appendChild(s);
+  });
+  let ownedRefresh=null;
+  async function boot(){
+    await load('./progress-clock-v226.js','jfm-progress-v226');
+    await load('./dj-authoritative-v226.js','jfm-dj-v226');
+    if(typeof window.refresh==='function')ownedRefresh=window.refresh;
+  }
+  boot();
+  window.addEventListener('pageshow',()=>setTimeout(()=>{if(ownedRefresh){try{refresh=ownedRefresh;window.refresh=ownedRefresh}catch{}}},700));
+  setInterval(()=>{if(ownedRefresh&&window.JFMDJAuthoritative){try{refresh=ownedRefresh;window.refresh=ownedRefresh}catch{}}},1500);
+  window.JFMV226Bootstrap={version:'v226-dj-progress',get ready(){return !!(window.JFMDJAuthoritative&&window.JFMProgressClock)}};
 })();
