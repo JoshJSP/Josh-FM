@@ -6,7 +6,7 @@
     shortName:'MAIR',
     tagline:'Your music. Your radio.',
     djName:'MAIR DJ',
-    logo:'mair-logo.svg',
+    logo:'logo.svg',
     themeColor:'#ff6a00',
     language:'nl',
     supportName:'MAIR'
