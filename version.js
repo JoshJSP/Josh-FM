@@ -9,9 +9,11 @@ window.JFM_ASSET_VERSION='40';
   };
   function emit(){try{window.dispatchEvent(new CustomEvent('jfm:release-status',{detail:{...window.JFM_RELEASE}}))}catch{}}
   function requestCacheVersion(){try{navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'})}catch{}}
-  function loadBuild1Health(){if(document.getElementById('jfm-radio-core-health-v1'))return;const s=document.createElement('script');s.id='jfm-radio-core-health-v1';s.src='./radio-core-health-v1.js';s.async=true;document.head.appendChild(s)}
-  function loadMusicIntelligence(){if(document.getElementById('jfm-music-intelligence-v3'))return;const s=document.createElement('script');s.id='jfm-music-intelligence-v3';s.src='./music-intelligence-v3.js';s.async=true;document.head.appendChild(s)}
-  function loadPersonalLearning(){if(document.getElementById('jfm-personal-learning-v4'))return;const s=document.createElement('script');s.id='jfm-personal-learning-v4';s.src='./personal-learning-v4.js';s.async=true;document.head.appendChild(s)}
+  function loadScript(id,src){if(document.getElementById(id))return;const s=document.createElement('script');s.id=id;s.src=src;s.async=true;document.head.appendChild(s)}
+  function loadBuild1Health(){loadScript('jfm-radio-core-health-v1','./radio-core-health-v1.js')}
+  function loadMusicIntelligence(){loadScript('jfm-music-intelligence-v3','./music-intelligence-v3.js')}
+  function loadPersonalLearning(){loadScript('jfm-personal-learning-v4','./personal-learning-v4.js')}
+  function loadProductUX(){loadScript('jfm-product-ux-v5','./product-ux-v5.js')}
   async function resolveBuild(){
     render();
     try{
@@ -22,6 +24,6 @@ window.JFM_ASSET_VERSION='40';
   }
   navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.type!=='CACHE_VERSION')return;window.JFM_RELEASE.localCache=String(e.data.cache||'unknown');window.JFM_RELEASE.updateAvailable=!!(window.JFM_RELEASE.serverCache&&window.JFM_RELEASE.serverCache!=='unknown'&&window.JFM_RELEASE.localCache!==window.JFM_RELEASE.serverCache);emit()});
   window.addEventListener('jfm:diagnostics-refresh',resolveBuild);
-  loadBuild1Health();setTimeout(loadMusicIntelligence,1200);setTimeout(loadPersonalLearning,1500);
+  loadBuild1Health();setTimeout(loadMusicIntelligence,1200);setTimeout(loadPersonalLearning,1500);setTimeout(loadProductUX,1800);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',resolveBuild,{once:true});else resolveBuild();
 })();
