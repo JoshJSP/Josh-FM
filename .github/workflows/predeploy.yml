@@ -17,7 +17,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm run predeploy
+      - name: Static predeploy
+        run: node scripts/predeploy-check-build1.mjs
+      - run: npm run smoke
+      - run: npm run channel-tap
+      - run: npm run hotfix-check
       - name: Build 1 radio-core checks
         if: startsWith(github.head_ref, 'build/product-beta-01-')
         run: node scripts/build1-radio-core-check-v2.mjs
