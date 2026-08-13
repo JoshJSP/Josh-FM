@@ -10,7 +10,7 @@ if(!source.includes(oldDj))throw new Error('Whole-app smoke DJ baseline changed;
 let patched=source.replace(oldDj,newDj);
 patched=patched.replace("check('DJ no pause/resume',!dj.includes('/me/player/pause')&&!dj.includes(\"/me/player/play')\"));","check('DJ safe iOS handoff',dj.includes('pauseExpected(expectedUri)')&&dj.includes('resumeExpected(expectedUri)')&&dj.includes(\"iosFallback:'pause-speak-rewind-resume'\"));");
 patched=patched.replace("check('DJ current-track guard',dj.includes(\"same?.item?.uri===expectedUri\"));","check('DJ current-track guard',dj.includes(\"same?.item?.uri!==expectedUri\")&&dj.includes('Track wisselde tijdens de DJ-break')); ");
-patched=patched.replaceAll('josh-fm-v39-v22-hardening','josh-fm-v43-rebrand-ready');
-patched=patched.replace("check('central asset version',versionJs.includes(\"JFM_ASSET_VERSION='39'\")&&cfg.includes(\"window.JFM_ASSET_VERSION||'39'\")&&suite.includes(\"window.JFM_ASSET_VERSION||'39'\"));","check('central asset version',versionJs.includes(\"JFM_ASSET_VERSION='40'\")&&cfg.includes('window.JFM_ASSET_VERSION')&&suite.includes('window.JFM_ASSET_VERSION')); ");
+patched=patched.replaceAll('josh-fm-v39-v22-hardening','josh-fm-v44-v2b02-hotfix');
+patched=patched.replace("check('central asset version',versionJs.includes(\"JFM_ASSET_VERSION='39'\")&&cfg.includes(\"window.JFM_ASSET_VERSION||'39'\")&&suite.includes(\"window.JFM_ASSET_VERSION||'39'\"));","check('central asset version',versionJs.includes(\"JFM_ASSET_VERSION='44'\")&&cfg.includes('window.JFM_ASSET_VERSION')&&suite.includes('window.JFM_ASSET_VERSION')); ");
 const temp=path.join(os.tmpdir(),`josh-fm-smoke-${process.pid}.mjs`);
 try{fs.writeFileSync(temp,patched,'utf8');execFileSync(process.execPath,[temp],{cwd:process.cwd(),stdio:'inherit'})}finally{try{fs.unlinkSync(temp)}catch{}}
