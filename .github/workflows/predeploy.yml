@@ -28,3 +28,6 @@ jobs:
       - name: Build 2 DJ quality checks
         if: startsWith(github.head_ref, 'build/product-beta-02-')
         run: node scripts/build2-check.mjs
+      - name: Build 3 music intelligence checks
+        if: startsWith(github.head_ref, 'build/product-beta-03-')
+        run: node scripts/build3-check.mjs
