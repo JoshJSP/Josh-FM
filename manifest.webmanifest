@@ -1,15 +1,15 @@
 {
-  "name": "Josh FM — AI Radio",
-  "short_name": "Josh FM",
-  "start_url": "./",
-  "scope": "./",
-  "display": "standalone",
-  "background_color": "#05070c",
-  "theme_color": "#05070c",
-  "lang": "nl-NL",
-  "description": "Je persoonlijke AI-radiostation met een Engelstalige Fish Audio DJ bovenop Spotify.",
-  "icons": [
-    {"src":"logo.svg?v=7","sizes":"512x512","type":"image/svg+xml","purpose":"any"},
-    {"src":"logo.svg?v=7","sizes":"512x512","type":"image/svg+xml","purpose":"maskable"}
+  "name":"MAIR",
+  "short_name":"MAIR",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#070707",
+  "theme_color":"#ff5a00",
+  "lang":"nl-NL",
+  "description":"Persoonlijke radio-app.",
+  "icons":[
+    {"src":"mair-logo.svg","sizes":"512x512","type":"image/svg+xml","purpose":"any"},
+    {"src":"mair-logo.svg","sizes":"512x512","type":"image/svg+xml","purpose":"maskable"}
   ]
 }
