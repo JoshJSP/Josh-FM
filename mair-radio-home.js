@@ -28,8 +28,8 @@
   function decorateActions(){
     const grid=$('djNow')?.closest('.grid2');if(!grid)return;
     grid.classList.add('mair-radio-actions-v2');
-    const r=radio(),dj=findCard('djText');if(r&&dj&&grid.previousElementSibling!==dj)r.insertBefore(grid,dj.nextSibling);
-    const dj=$('djNow');if(dj){dj.querySelector('b')&&(dj.querySelector('b').textContent='DJ nu');dj.querySelector('span')&&(dj.querySelector('span').textContent='Laat MAIR iets vertellen')}
+    const r=radio(),djCard=findCard('djText');if(r&&djCard&&grid.previousElementSibling!==djCard)r.insertBefore(grid,djCard.nextSibling);
+    const djButton=$('djNow');if(djButton){djButton.querySelector('b')&&(djButton.querySelector('b').textContent='DJ nu');djButton.querySelector('span')&&(djButton.querySelector('span').textContent='Laat MAIR iets vertellen')}
     const quiet=$('skipTalk');if(quiet){quiet.querySelector('b')&&(quiet.querySelector('b').textContent='Even stil');quiet.querySelector('span')&&(quiet.querySelector('span').textContent='Volgende break overslaan')}
   }
   function hideLegacyRadioCards(){
@@ -39,8 +39,8 @@
     const r=radio();if(!r||$('mair-up-next'))return;
     const card=document.createElement('article');card.id='mair-up-next';card.className='card mair-up-next-v2';
     card.innerHTML='<div class="mair-section-head"><div><div class="kicker">HIERNA</div><h3>Op MAIR</h3></div><span class="mair-queue-live">LIVE</span></div><div id="mair-up-next-list" class="mair-up-next-list"><div class="mair-up-empty">MAIR maakt je volgende tracks klaar zodra de radio draait.</div></div>';
-    const actions=$('djNow')?.closest('.grid2'),dj=findCard('djText');
-    const anchor=actions||dj||document.querySelector('#tab-radio .now');
+    const actions=$('djNow')?.closest('.grid2'),djCard=findCard('djText');
+    const anchor=actions||djCard||document.querySelector('#tab-radio .now');
     if(anchor?.parentNode)anchor.parentNode.insertBefore(card,anchor.nextSibling);else r.appendChild(card);
   }
   function readQueue(){
