@@ -9,6 +9,7 @@ window.JFM_ASSET_VERSION='40';
   };
   function emit(){try{window.dispatchEvent(new CustomEvent('jfm:release-status',{detail:{...window.JFM_RELEASE}}))}catch{}}
   function requestCacheVersion(){try{navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'})}catch{}}
+  function loadBuild1Health(){if(document.getElementById('jfm-radio-core-health-v1'))return;const s=document.createElement('script');s.id='jfm-radio-core-health-v1';s.src='./radio-core-health-v1.js';s.async=true;document.head.appendChild(s)}
   async function resolveBuild(){
     render();
     try{
@@ -19,5 +20,6 @@ window.JFM_ASSET_VERSION='40';
   }
   navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.type!=='CACHE_VERSION')return;window.JFM_RELEASE.localCache=String(e.data.cache||'unknown');window.JFM_RELEASE.updateAvailable=!!(window.JFM_RELEASE.serverCache&&window.JFM_RELEASE.serverCache!=='unknown'&&window.JFM_RELEASE.localCache!==window.JFM_RELEASE.serverCache);emit()});
   window.addEventListener('jfm:diagnostics-refresh',resolveBuild);
+  loadBuild1Health();
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',resolveBuild,{once:true});else resolveBuild();
 })();
