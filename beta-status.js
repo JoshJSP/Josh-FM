@@ -1,4 +1,5 @@
 (()=>{
+  const RECENT_WINDOW_MS=10*60*1000;
   function snapshot(){
     const modules={
       playback:!!window.JFMPlayback,
@@ -15,8 +16,14 @@
     const missing=Object.keys(modules).filter(k=>!modules[k]);
     const playback=window.JFMPlayback?.health||{};
     const radio=window.JFMRadioCoreHealth?.state||{};
+    const truth=window.JFMPlaybackState?.get?.()||{};
     const failures=Number(playback.failures||0),stalls=Number(radio.stalls||0);
-    return{version:'build8',ready:missing.length===0&&failures<5&&stalls<2,modules,missing,failures,stalls,recoveries:Number(playback.recoveries||0),at:Date.now()};
+    const now=Date.now();
+    const recentEvents=window.JFMRadioCoreHealth?.events?.()||[];
+    const recentStalls=recentEvents.filter(e=>e?.type==='playback-stall'&&now-Number(e?.at||0)<RECENT_WINDOW_MS).length;
+    const currentError=String(truth.lastError||'').trim();
+    const ready=missing.length===0&&!currentError&&recentStalls<2;
+    return{version:'build8.1-recoverable-health',ready,modules,missing,failures,stalls,recentStalls,currentError,recoveries:Number(playback.recoveries||0),at:now};
   }
-  window.JFMBetaStatus={version:'build8',snapshot,get status(){return snapshot()}};
+  window.JFMBetaStatus={version:'build8.1-recoverable-health',snapshot,get status(){return snapshot()}};
 })();
