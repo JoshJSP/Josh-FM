@@ -1,0 +1,21 @@
+(()=>{
+ const MODE_KEY='mair_dj_mode_v1',LAST_HOUR='mair_rotation_hour_v1',CTX_KEY='mair_live_context_v1';
+ const ORDER=['josh','maya','max','noah'];
+ const now=()=>Date.now(),hour=()=>new Date().getHours();
+ const getMode=()=>localStorage.getItem(MODE_KEY)||'rotation';
+ const setMode=m=>{if(!['fixed','rotation','station'].includes(m))m='rotation';localStorage.setItem(MODE_KEY,m);render();return m};
+ const selected=()=>window.MAIRDJProfiles?.current?.id||localStorage.getItem('mair_dj_profile_v1')||'josh';
+ function targetDJ(){const mode=getMode();if(mode==='fixed')return selected();if(mode==='station'){const c=window.JFMMusicChoice?.channel||'mix';return({party:'max',chill:'maya',new:'noah',throwback:'noah',hits:'josh',mix:'josh'})[c]||'josh'}return ORDER[hour()%ORDER.length]}
+ function applyRotation(reason='trackchange'){const api=window.MAIRDJProfiles;if(!api?.select)return null;const target=targetDJ(),current=api.current?.id||selected();if(target!==current){api.select(target);window.dispatchEvent(new CustomEvent('mair:djhandover',{detail:{from:current,to:target,reason,at:now()}}))}localStorage.setItem(LAST_HOUR,String(hour()));render();return target}
+ function maybeRotate(){const last=Number(localStorage.getItem(LAST_HOUR)||-1);if(last!==hour())applyRotation('hour-boundary')}
+ function loadCtx(){try{return JSON.parse(localStorage.getItem(CTX_KEY)||'{}')}catch{return{}}}
+ function saveCtx(x){try{localStorage.setItem(CTX_KEY,JSON.stringify(x))}catch{}}
+ function shouldMention(type,minutes){const x=loadCtx(),t=Number(x[type]||0);if(now()-t<minutes*60000)return false;x[type]=now();saveCtx(x);return true}
+ function weatherHint(w){if(!w||!Number.isFinite(Number(w.temperature))||!shouldMention('weather',60))return'';const t=Math.round(Number(w.temperature)),loc=w.location?` in ${w.location}`:'';if(t>=35)return`Het is ${t} graden${loc}. Als je naar buiten gaat: goed insmeren, genoeg drinken en pak af en toe de schaduw.`;if(t>=28)return`Het is ${t} graden${loc}. Lekker weer, maar vergeet water en zonnebrand niet.`;if(t<=3)return`Het is maar ${t} graden${loc}, dus als je naar buiten gaat: jas aan.`;return`Buiten is het ${t} graden${loc}.`}
+ function timeHint(){if(!shouldMention('time',45))return'';return`Het is ${new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}.`}
+ function contextFor(weather){return{weather:weatherHint(weather),time:timeHint(),dj:window.MAIRDJProfiles?.current||null,mode:getMode(),station:window.JFMMusicChoice?.channel||'mix'}}
+ function installUI(){if(document.getElementById('mairRotationCard'))return;const pane=document.getElementById('tab-settings');if(!pane)return;const c=document.createElement('article');c.id='mairRotationCard';c.className='card';c.innerHTML='<div class="kicker">DJ ROTATION</div><h3>Wie presenteert MAIR?</h3><p class="muted">MAIR wisselt alleen bij een natuurlijke trackovergang.</p><select id="mairRotationMode"><option value="rotation">MAIR Rotation · elk uur</option><option value="fixed">Vaste DJ</option><option value="station">Automatisch per station</option></select><p id="mairRotationStatus" class="muted"></p>';pane.insertBefore(c,pane.firstChild);document.getElementById('mairRotationMode').value=getMode();document.getElementById('mairRotationMode').addEventListener('change',e=>{setMode(e.target.value);applyRotation('mode-change')});render()}
+ function render(){const s=document.getElementById('mairRotationStatus');if(s)s.textContent=`Nu: ${window.MAIRDJProfiles?.current?.name||selected()} · modus: ${getMode()}`}
+ function boot(){installUI();applyRotation('boot');window.addEventListener('jfm:trackchange',()=>{maybeRotate();if(getMode()==='station')applyRotation('station-trackchange')});window.addEventListener('mair:djchange',render);setInterval(maybeRotate,60000);window.MAIRLiveContext={version:'mair-live-context-v1',build:5,get mode(){return getMode()},setMode,targetDJ,applyRotation,contextFor,weatherHint,timeHint}}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
