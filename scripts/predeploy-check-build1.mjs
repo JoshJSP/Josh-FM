@@ -17,6 +17,9 @@ const health=fs.readFileSync(new URL('../radio-core-health-v1.js',import.meta.ur
 if(!health.includes('!document.hidden')||!health.includes('navigator.onLine!==false')||!health.includes("stallSince=0;push('offline')"))throw new Error('Stabilization health guard is incomplete.');
 if(!pwa.includes('if(reg?.waiting)showUpdate(reg)')||!pwa.includes('await reg.update();if(reg.waiting)showUpdate(reg)'))throw new Error('Stabilization PWA update reminder is incomplete.');
 let patched=source.replaceAll(oldCache,newCache);
+const oldPwa="ok('PWA sole MediaSession owner',pwa.includes('pwa-v4-single-mediasession-owner')&&pwa.includes('safePositionState'));";
+const newPwa="ok('PWA sole MediaSession owner',(pwa.includes('pwa-v4-single-mediasession-owner')||pwa.includes('pwa-v4.1-update-reminder'))&&pwa.includes('safePositionState'));";
+if(patched.includes(oldPwa))patched=patched.replace(oldPwa,newPwa);
 const oldPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&primary.includes('primary-v5-device-heal'));";
 const newPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&(primary.includes('primary-v5-device-heal')||primary.includes('primary-v8-recovery-backoff')));";
 if(!patched.includes(oldPrimary))throw new Error('Primary playback baseline changed.');
