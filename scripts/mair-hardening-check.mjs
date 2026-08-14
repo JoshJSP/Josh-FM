@@ -9,6 +9,9 @@ for(const id of ['nl','party','chill','summer'])if(!purity.includes(`'${id}'`))t
 if(!purity.includes('confidence')&& !read('api/category-filter.js').includes('confidence>=0.90'))throw Error('Confidence gate ontbreekt');
 if(!guard.includes("channel==='mix'")||!guard.includes("api('/tracks/'"))throw Error('Direct-play category guard ontbreekt');
 if(!orchestrator.includes('startChannel')||!orchestrator.includes('generation'))throw Error('Stale build guard ontbreekt');
+if(orchestrator.includes("if(mine!==generation||window.MAIRCategoryPurity.active()!==startChannel){window.queue=before;return before}"))throw Error('Stale build mag pre-switch queue niet terugzetten');
+if(!orchestrator.includes("currentChannel!=='mix'")||!orchestrator.includes("validate(currentChannel,current,{minimum:1})"))throw Error('Stale build moet huidige strikte categorie opnieuw valideren');
+if(!orchestrator.includes("mair-build-orchestrator-v1.1-stale-fail-closed"))throw Error('Nieuwe stale-build fail-closed versie ontbreekt');
 const hardeningFiles=['mair-category-purity.js','mair-ui-hardening.js','mair-playback-category-guard.js','mair-build-orchestrator.js'];
 for(const file of hardeningFiles){
  if(!pwa.includes(file))throw Error('Hardening script wordt niet geladen: '+file);
