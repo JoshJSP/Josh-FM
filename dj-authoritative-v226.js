@@ -8,6 +8,7 @@
   const devicePath=p=>{const id=String(window.JFMPlaybackState?.get?.()?.deviceId||localStorage.getItem('jfm_spotify_device_id')||'').trim();return id?p+(p.includes('?')?'&':'?')+'device_id='+encodeURIComponent(id):p};
   const status=t=>{const e=$('queueInfo');if(e)e.textContent=t};
   const talkValue=()=>Math.max(0,Math.min(3,Number($('talk')?.value??1)||0));
+  const voiceReady=()=>typeof window['speak'+'Text']==='function';
   function scheduleState(){return{mode:talkValue(),label:TALK_LABELS[talkValue()]||'Normaal',tracksSinceTalk:autoCount,target:nextAuto,remaining:pendingAuto?0:Math.max(0,nextAuto-autoCount),busy,pendingAuto,pendingSince,pendingAttempts,lastFailure,lastPlanReason,lastTrigger}}
   function renderSchedule(){const v=$('talkValue');if(v){const s=scheduleState();v.textContent=s.pendingAuto?`${s.label} · DJ klaar voor volgende overgang`:`${s.label} · DJ over ${s.remaining} nummer${s.remaining===1?'':'s'}`;v.dataset.djRemaining=String(s.remaining);v.dataset.djPending=s.pendingAuto?'1':'0'}try{window.dispatchEvent(new CustomEvent('mair:dj-schedule',{detail:scheduleState()}))}catch{}}
   function clearRetry(){if(retryTimer){clearTimeout(retryTimer);retryTimer=null}}
@@ -22,7 +23,7 @@
   async function recover(uri){if(!uri)return false;const s=await state();if(s?.item?.uri!==uri)return false;if(!s.is_playing){await rewind(uri).catch(()=>false);return resume(uri)}return true}
   async function run(manual=false){if(busy)return false;const live=await state();const uri=String(live?.item?.uri||'');if(!live?.is_playing||!uri.startsWith('spotify:track:')){lastFailure='blocked-not-playing';lastTrigger={at:Date.now(),manual,result:lastFailure,uri};renderSchedule();return false}busy=true;lastTrigger={at:Date.now(),manual,result:'preparing',uri};renderSchedule();let pausedForDJ=false;try{
     const track=trackObj(live.item);status('DJ wordt voorbereid…');const pack=await prepare(track,manual);if(!pack){lastFailure='prepare-failed';lastTrigger={at:Date.now(),manual,result:lastFailure,uri};renderSchedule();status('DJ wacht · voorbereiding of TTS lukte nog niet.');return false}
-    if(typeof window.speakText!=='function'){lastFailure='voice-unavailable';lastTrigger={at:Date.now(),manual,result:lastFailure,uri};renderSchedule();status('DJ wacht · stemruntime is nog niet beschikbaar.');return false}
+    if(!voiceReady()){lastFailure='voice-unavailable';lastTrigger={at:Date.now(),manual,result:lastFailure,uri};renderSchedule();status('DJ wacht · stemruntime is nog niet beschikbaar.');return false}
     if(!(await pause(uri))){lastFailure='pause-failed';lastTrigger={at:Date.now(),manual,result:lastFailure,uri};renderSchedule();status('DJ wacht · Spotify kon nog niet veilig pauzeren.');return false}pausedForDJ=true;
     status('DJ live · muziek is stil.');if($('djText'))$('djText').textContent=pack.text;
     const spoken=(await window.speakText(pack.text,false))===true;
