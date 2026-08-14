@@ -74,13 +74,30 @@ async function speak(text,jingle=false){
   text=cleanSpeech(text);if(!text)return false;const k=cacheKey(text,jingle,profile());try{const pack=speechCache.get(k)||await fetchFish(text,jingle);speechCache.delete(k);return await playBlob(pack.blob)}catch(e){console.warn('MAIR Fish Audio',e);return false}
 }
 function setVoiceInfo(text,state=''){const el=$('voiceInfo');if(el){el.textContent=text;el.dataset.state=state}}
+function localizeHealth(){
+  const card=$('jfmHealthCard');if(!card)return;
+  const title=card.querySelector('h3');if(title)title.textContent='MAIR status';
+  const badge=$('jfmHealthBadge');if(badge){const map={CHECKING:'CONTROLEREN',UNKNOWN:'ONBEKEND',READY:'GEREED',ERROR:'FOUT'};badge.textContent=map[badge.textContent]||badge.textContent}
+  const button=$('jfmHealthRefresh');if(button&&!button.disabled)button.textContent='Controleer Fish Audio';
+  const rows=$('jfmHealthRows');if(rows){
+    const replacements=[
+      ['Primary voice:','Primaire stem:'],['Voice:','Stem:'],['Model:','Model:'],['TTS latency:','TTS-latentie:'],['Audio unlocked:','Audio vrijgegeven:'],['Playback route:','Afspeelroute:'],['Prepared breaks:','Voorbereide breaks:'],['Audible test:','Hoorbare test:'],['Build:','Build:'],['Last error:','Laatste fout:'],['not yet','nog niet'],['not used yet','nog niet gebruikt'],['not run yet','nog niet uitgevoerd'],['passed ','geslaagd ']
+    ];
+    rows.querySelectorAll('div').forEach(div=>{let html=div.innerHTML;for(const[a,b]of replacements)html=html.replaceAll(a,b);if(html!==div.innerHTML)div.innerHTML=html});
+  }
+}
 function repairVoice(){
+  localStorage.setItem('jfm_dj_language','nl');window.JFMDJLanguage='nl';window.JFMSetDJLanguage=()=>{localStorage.setItem('jfm_dj_language','nl');window.JFMDJLanguage='nl';return'nl'};
+  window.JFMJingleText=(type='station')=>{const dict={station:['Dit is MAIR.','Je luistert naar MAIR.'],show:['MAIR. Jouw muziek, jouw radio.'],next:['Blijf luisteren. Straks meer muziek op MAIR.']},a=dict[type]||dict.station;return a[Math.floor(Math.random()*a.length)]};
   const select=$('voiceMode');if(select){select.innerHTML='<option value="fish">Fish Audio — Nederlandse MAIR DJ</option>';select.value='fish';select.disabled=true}
+  const info=$('voiceInfo');if(info&&(/Josh FM/i.test(info.textContent)||/English/i.test(info.textContent)||/enige DJ-stem/i.test(info.textContent)))setVoiceInfo('Fish Audio gebruikt de Nederlandse MAIR DJ-stem. Bij een storing wordt de break overgeslagen en blijft de muziek spelen.');
   window.prepareSpeech=prepare;window.speakText=speak;
   window.MAIRVoiceEngine?.register?.('fish',{prepare,speak,health:()=>window.JFMDJAudio?.status||null});
-  const btn=$('testVoice');if(btn){btn.onclick=async()=>{const old=btn.textContent;btn.disabled=true;btn.textContent='Luistertest bezig…';setVoiceInfo('Fish Audio maakt een Nederlandse MAIR-test klaar…','preparing');try{await window.JFMDJAudio?.unlock?.();const ok=await speak('Dit is MAIR. Als je deze stem hoort, werkt de DJ-audio goed.',false);setVoiceInfo(ok?'✓ Stem hoorbaar getest — Fish Audio werkt.':'Fish test FAILED — audio kon niet worden afgespeeld.',ok?'ready':'error');return ok}catch(e){setVoiceInfo(`Fish test FAILED — ${String(e?.message||e)}.`,'error');return false}finally{btn.disabled=false;btn.textContent=old}}}
+  if(window.JFMDJAudio){try{Object.defineProperty(window.JFMDJAudio,'language',{configurable:true,get:()=> 'nl'})}catch{}}
+  const btn=$('testVoice');if(btn){btn.onclick=async()=>{const old=btn.textContent;btn.disabled=true;btn.textContent='Luistertest bezig…';setVoiceInfo('Fish Audio maakt een Nederlandse MAIR-test klaar…','preparing');try{await window.JFMDJAudio?.unlock?.();const ok=await speak('Dit is MAIR. Als je deze stem hoort, werkt de DJ-audio goed.',false);setVoiceInfo(ok?'✓ Stem hoorbaar getest — Fish Audio werkt.':'Fish Audio-test mislukt — audio kon niet worden afgespeeld.',ok?'ready':'error');return ok}catch(e){setVoiceInfo(`Fish Audio-test mislukt — ${String(e?.message||e)}.`,'error');return false}finally{btn.disabled=false;btn.textContent=old;localizeHealth()}}}
+  localizeHealth();
 }
 
-function install(){installStyle();repairBrandAndRadio();repairVoice();setInterval(()=>{repairBrandAndRadio();repairVoice()},2500);window.MAIRMobileHotfix={version:'mair-mobile-hotfix-v1',repair:repairBrandAndRadio,prepareSpeech:prepare,speakText:speak}}
+function install(){installStyle();repairBrandAndRadio();repairVoice();const target=$('jfmHealthCard');if(target)new MutationObserver(()=>localizeHealth()).observe(target,{subtree:true,childList:true,characterData:true});setInterval(()=>{repairBrandAndRadio();repairVoice();localizeHealth()},2000);window.MAIRMobileHotfix={version:'mair-mobile-hotfix-v1.1-nl',repair:repairBrandAndRadio,prepareSpeech:prepare,speakText:speak,localizeHealth}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
