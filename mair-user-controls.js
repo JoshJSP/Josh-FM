@@ -1,0 +1,25 @@
+// MAIR user controls — only user-facing webapp controls that remain: Car Mode and Sleeptimer.
+(()=>{
+'use strict';
+if(window.MAIRUserControls)return;
+const $=id=>document.getElementById(id),CAR='mair_car_mode_v1',SLEEP='mair_sleep_timer_v1';
+let timer=null,state=readSleep();
+function readSleep(){try{return JSON.parse(localStorage.getItem(SLEEP)||'null')||{mode:'off',deadline:0,trackId:''}}catch{return{mode:'off',deadline:0,trackId:''}}}
+function saveSleep(){try{localStorage.setItem(SLEEP,JSON.stringify(state))}catch{}renderSleep();schedule()}
+function isCar(){return localStorage.getItem(CAR)==='1'}
+function setCar(on){localStorage.setItem(CAR,on?'1':'0');document.body.classList.toggle('mair-car-mode',!!on);const input=$('mairCarMode');if(input)input.checked=!!on}
+async function pauseRadio(){const p=window.MAIRPlayback||window.JFMPlayback;try{if(typeof p?.pause==='function')return await p.pause()}catch{}try{const b=$('play');if(b&&!b.disabled)b.click()}catch{}return false}
+function currentTrackId(){try{return String(window.JFMPlaybackState?.get?.()?.trackId||window.playback?.item?.id||'')}catch{return''}}
+function setSleep(mode){clearTimeout(timer);timer=null;if(mode==='after-track'){state={mode,deadline:0,trackId:currentTrackId()};if(!state.trackId){state={mode:'off',deadline:0,trackId:''};toast('Start eerst muziek voor “Na dit nummer”.')}}else if(Number(mode)>0){state={mode:String(mode),deadline:Date.now()+Number(mode)*60*1000,trackId:''}}else state={mode:'off',deadline:0,trackId:''};saveSleep()}
+function remaining(){if(!state.deadline)return 0;return Math.max(0,state.deadline-Date.now())}
+function label(){if(state.mode==='after-track')return 'Na dit nummer';if(state.mode==='off')return 'Uit';const mins=Math.max(1,Math.ceil(remaining()/60000));return `${mins} min`}
+function renderSleep(){const out=$('mairSleepStatus');if(out)out.textContent=label();document.querySelectorAll('[data-mair-sleep]').forEach(b=>b.classList.toggle('active',b.dataset.mairSleep===state.mode))}
+function schedule(){clearTimeout(timer);timer=null;if(state.mode==='off'||state.mode==='after-track')return;const ms=remaining();if(ms<=0){expire();return}timer=setTimeout(expire,Math.min(ms,2147483647))}
+async function expire(){state={mode:'off',deadline:0,trackId:''};try{localStorage.setItem(SLEEP,JSON.stringify(state))}catch{}renderSleep();await pauseRadio();toast('Sleeptimer · MAIR is gepauzeerd')}
+function consumeAfterTrack(trackId){if(state.mode!=='after-track')return false;const armed=state.trackId;if(armed&&trackId&&armed!==String(trackId))return false;state={mode:'off',deadline:0,trackId:''};try{localStorage.setItem(SLEEP,JSON.stringify(state))}catch{}renderSleep();toast('Sleeptimer · gestopt na dit nummer');return true}
+function naturalEndCapture(e){const id=String(e.detail?.trackId||'');if(!consumeAfterTrack(id))return;e.stopImmediatePropagation();try{window.JFMPlaybackState?.setExpectedLive?.(false,'sleep-after-track')}catch{}setTimeout(()=>pauseRadio(),0)}
+function toast(text){let t=$('mairUserToast');if(!t){t=document.createElement('div');t.id='mairUserToast';t.className='mair-toast';document.body.appendChild(t)}t.textContent=text;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),1800)}
+function inject(){const pane=$('tab-settings');if(!pane||$('mairUserControlsCard'))return;const card=document.createElement('article');card.id='mairUserControlsCard';card.className='card mair-settings-card mair-user-controls';card.innerHTML='<div class="kicker">GEBRUIK</div><h3>Luisteren</h3><label class="switch"><input id="mairCarMode" type="checkbox"><span></span><b>Car Mode</b></label><div class="row between mair-sleep-head"><span>Sleeptimer</span><b id="mairSleepStatus" class="accent">Uit</b></div><div class="chips mair-sleep-options"><button class="chip" data-mair-sleep="15">15 min</button><button class="chip" data-mair-sleep="30">30 min</button><button class="chip" data-mair-sleep="45">45 min</button><button class="chip" data-mair-sleep="60">60 min</button><button class="chip" data-mair-sleep="after-track">Na dit nummer</button><button class="chip" data-mair-sleep="off">Uit</button></div>';const version=pane.querySelector('.versionbox');pane.insertBefore(card,version||pane.lastChild);$('mairCarMode').checked=isCar();$('mairCarMode').addEventListener('change',e=>setCar(e.target.checked));card.addEventListener('click',e=>{const b=e.target.closest('[data-mair-sleep]');if(b)setSleep(b.dataset.mairSleep)});renderSleep()}
+function boot(){setCar(isCar());inject();schedule();window.addEventListener('jfm:natural-track-end',naturalEndCapture,true);window.addEventListener('pageshow',()=>{setCar(isCar());inject();state=readSleep();renderSleep();schedule()});window.MAIRSleepTimer={version:'mair-sleep-v1.1-natural-end',set:setSleep,consumeAfterTrack,get state(){return{...state,remaining:remaining()}}};window.MAIRUserControls={version:'mair-user-controls-v1.1',setCar,setSleep,get carMode(){return isCar()}}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();

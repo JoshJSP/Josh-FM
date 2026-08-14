@@ -14,6 +14,10 @@ if(fs.existsSync(betaPath)){if(!sw.includes("'./beta-status.js'"))throw new Erro
 if(!bootstrap.includes("load('./brand-config.js','jfm-brand-config-v9')")||!bootstrap.includes("load('./brand-runtime-v9.js','jfm-brand-runtime-v9')"))throw new Error('Build 9 brand runtime is not wired.');
 const brand=fs.readFileSync(new URL('../brand-config.js',import.meta.url),'utf8'),brandRuntime=fs.readFileSync(new URL('../brand-runtime-v9.js',import.meta.url),'utf8');if(!brand.includes('JFMBrand')||!(brand.includes("productName:'Josh FM'")||brand.includes("productName:'MAIR'"))||!brandRuntime.includes('JFMBrandRuntime'))throw new Error('Build 9 brand configuration is incomplete.');
 let patched=source.replaceAll(oldCache,newCache);
+const oldBackup="ok('backup policy exists',exists('backups/README.md')&&read('PRE_DEPLOY.md').includes('backup'));ok('at least one production backup exists',exists('backups')&&fs.readdirSync(path.join(root,'backups')).some(x=>x!=='README.md'));";
+const newBackup="ok('Git rollback policy exists',!exists('backups')&&read('PRE_DEPLOY.md').includes('rollbackpunt'));ok('repository backup tree removed',!exists('backups'));";
+if(!patched.includes(oldBackup))throw new Error('Backup policy baseline changed.');
+patched=patched.replace(oldBackup,newBackup);
 const oldPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&primary.includes('primary-v5-device-heal'));";
 const newPrimary="ok('primary prefers live SDK device',primary.includes('sdkDeviceId')&&primary.includes('JFMSpotifySDK?.ensureDevice')&&(primary.includes('primary-v5-device-heal')||primary.includes('primary-v8-recovery-backoff')||primary.includes('primary-v8.1-start-responsive')));";
 if(!patched.includes(oldPrimary))throw new Error('Primary playback baseline changed.');
@@ -33,5 +37,5 @@ if(patched.includes(oldPwaCache))patched=patched.replace(oldPwaCache,newPwaCache
 const oldReleaseCache="ok('release endpoint exposes v39 cache',versionApi.includes(\"cache:'josh-fm-v39-v22-hardening'\")&&versionJs.includes('updateAvailable'));";
 const newReleaseCache="ok('release endpoint exposes MAIR cache',versionApi.includes(\"cache:'mair-v49-hardening-cache-20260814'\")&&versionJs.includes('updateAvailable'));";
 if(patched.includes(oldReleaseCache))patched=patched.replace(oldReleaseCache,newReleaseCache);
-const temp=path.join(os.tmpdir(),`josh-fm-build1-predeploy-${process.pid}.mjs`);
+const temp=path.join(os.tmpdir(),`mair-build1-predeploy-${process.pid}.mjs`);
 try{fs.writeFileSync(temp,patched,'utf8');execFileSync(process.execPath,[temp],{cwd:process.cwd(),stdio:'inherit'})}finally{try{fs.unlinkSync(temp)}catch{}}
