@@ -14,6 +14,7 @@ const foundationCss=read('mair-foundation.css');
 const manifest=read('manifest.webmanifest');
 const logo=read('mair-logo.svg');
 const health=read('station-health.js');
+const dj=read('dj-authoritative-v226.js');
 const sw=read('sw.js');
 
 expect(!live.includes("live.id='jfmLiveMeta'"),'live-ui mag geen tweede live-metablok meer toevoegen');
@@ -41,6 +42,11 @@ expect(manifest.includes('mair-logo.svg?v=12'),'manifest gebruikt niet het verni
 expect(!health.includes('Test Josh FM opnieuw'),'Self Test bevat nog oude Josh FM-knoptekst');
 expect(health.includes("btn.textContent='Test MAIR opnieuw'")&&health.includes("b.textContent='Test MAIR opnieuw'"),'Self Test gebruikt niet overal MAIR');
 expect(health.includes("name:brand(c.show.name)")&&health.includes("esc(brand(s.show?.name||'—'))"),'Self Test scrubt oude programmanaam niet');
+expect(dj.includes('TALK_RANGES=[[6,9],[3,5],[2,4],[1,3]]'),'DJ praatfrequentie-ranges zijn onverwacht gewijzigd');
+expect(dj.includes("talk.addEventListener('input',replanFromSetting)")&&dj.includes("talk.addEventListener('change',replanFromSetting)"),'Praatfrequentie moet de DJ-planning direct opnieuw berekenen');
+expect(dj.includes('DJ over ${s.remaining} nummer'),'UI toont niet hoeveel nummers er nog tot de volgende DJ zijn');
+expect(dj.includes("result:'prepare-failed'")&&dj.includes("result:'pause-failed'")&&dj.includes("result:'tts-failed'"),'DJ scheduler mist diagnose voor overgeslagen breaks');
+expect(dj.includes("version:'v227-frequency-replan-diagnostics'"),'Nieuwe DJ scheduler-versie ontbreekt');
 expect(sw.includes("const CACHE='mair-v46-template-fixes-20260814'"),'service-worker cache is niet verhoogd voor de templatefix');
 expect(sw.includes("k.startsWith('josh-fm-')"),'service worker moet oude Josh FM caches opruimen');
 
