@@ -24,11 +24,11 @@ function sync(){
  const engine=document.getElementById('mairVoiceEngineCard');if(engine&&engine.style.display!=='none')engine.style.display='none';
  const active=localStorage.getItem('jfm_music_channel_v1')||'mix';document.querySelectorAll('[data-mair-station]').forEach(x=>{const on=x.dataset.mairStation===active;x.classList.toggle('active',on);x.setAttribute('aria-pressed',on?'true':'false')});
 }
-document.addEventListener('click',e=>{const b=e.target?.closest?.('[data-mair-station]');if(!b)return;b.classList.add('loading');document.querySelectorAll('[data-mair-station]').forEach(x=>x.classList.toggle('active',x===b));setTimeout(()=>b.classList.remove('loading'),15000)},true);
+document.addEventListener('click',e=>{const b=e.target?.closest?.('[data-mair-station]');if(!b)return;b.classList.add('loading');setTimeout(()=>{b.classList.remove('loading');sync()},4000)},true);
 window.addEventListener('jfm:trackchange',sync);
 window.addEventListener('mair:djchange',sync);
 window.addEventListener('pageshow',()=>setTimeout(sync,100));
 document.addEventListener('DOMContentLoaded',()=>setTimeout(sync,0),{once:true});
 setTimeout(sync,0);setTimeout(sync,400);setTimeout(sync,1500);
-window.MAIRUIHardening={version:'mair-ui-hardening-v1.1-no-observer-loop',sync,stations:stations.map(x=>x[0])};
+window.MAIRUIHardening={version:'mair-ui-hardening-v1.2-click-safe-loading',sync,stations:stations.map(x=>x[0])};
 })();
