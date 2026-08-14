@@ -1,1 +1,1 @@
-Hotfix scope: discovery retry, authoritative popular category pools, deterministic DJ-now skip handoff, and radio-style DJ copy.
+MAIR hardening update: strict fail-closed categories, centralized purity validation, category-safe direct playback, stale queue-build protection, complete Dutch station UI, misleading chevrons removed, and regression coverage for station purity and DJ voice profiles.
