@@ -19,8 +19,8 @@ const checks=[
   ['long-session health detects stalls',health.includes('playback-stall')&&health.includes('stalls++')&&health.includes('deviceFlaps')],
   ['beta readiness observes runtime health',beta.includes('JFMBetaStatus')&&beta.includes('failures<5')&&beta.includes('stalls<2')],
   ['beta readiness loaded at runtime',boot.includes("load('./beta-status.js','jfm-beta-status-v8')")],
-  ['branding is centralized',brand.includes('JFMBrand')&&brand.includes("productName:'Josh FM'")&&brandRuntime.includes('JFMBrand')],
-  ['visible brand remains Josh FM',brand.includes("stationName:'Josh FM'")&&brand.includes("shortName:'Josh FM'")]
+  ['branding is centralized',brand.includes('JFMBrand')&&brand.includes("productName:'MAIR'")&&brandRuntime.includes('JFMBrand')],
+  ['visible brand is MAIR',brand.includes("stationName:'MAIR FM'")&&brand.includes("shortName:'MAIR'")]
 ];
 
 let failures=0;
