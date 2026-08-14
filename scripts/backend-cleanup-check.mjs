@@ -13,10 +13,13 @@ const station=read('channel-click-fix.js'),policy=read('mair-station-policy.js')
 if(station.includes('setInterval(boot,1000)'))fail('Station controller gebruikt nog permanente ownership polling');
 if(!station.includes('window.MAIRStationController'))fail('Station controller heeft geen MAIR eigenaar');
 if(!station.includes('MAIRStationPolicy')&&!station.includes('mair-station-policy.js'))fail('Station controller gebruikt geen centrale policy');
-if(!policy.includes('MAIR NEDERLANDSTALIG')||!policy.includes("language:'nl'"))fail('Nederlandstalig policy is niet expliciet fail-closed');
+if(!policy.includes('MAIR NEDERLANDSTALIG')||!policy.includes("language:'nl'")||!policy.includes('minConfidence:.95'))fail('Nederlandstalig policy is niet expliciet fail-closed op 0.95');
 if(/status\(`Josh FM/.test(station))fail('Station controller bevat nog zichtbare Josh FM statusbranding');
-const voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js'),runtime=read('mair-runtime-core.js');
+const voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js'),runtime=read('mair-runtime-core.js'),controls=read('mair-user-controls.js'),visuals=read('mair-dj-visuals.js'),sw=read('sw.js');
 if(!voice.includes("'mair:dj-speaking'")||!easy.includes("'mair:dj-speaking'"))fail('DJ LIVE is niet gekoppeld aan de echte voice-engine');
 if(!easy.includes("'mair:dj-schedule'"))fail('DJ countdown gebruikt niet de authoritative scheduler event');
 if(!runtime.includes('window.MAIRRuntime')||!runtime.includes("playback:'playback-primary'"))fail('Centrale MAIR runtime facade ontbreekt');
+if(!controls.includes('Car Mode')||!controls.includes('Sleeptimer')||!controls.includes('Na dit nummer'))fail('Car Mode/Sleeptimer controls ontbreken');
+for(const id of ['josh','maya','max','noah']){const asset=`assets/dj-${id}.webp`;if(!exists(asset))fail(`Concept DJ asset ontbreekt: ${asset}`);if(!visuals.includes(`./${asset}`))fail(`DJ visuals verwijst niet naar ${asset}`);if(!sw.includes(`'./${asset}'`))fail(`PWA cache mist ${asset}`)}
+if(!sw.includes("'./mair-dj-visuals.js'"))fail('PWA cache mist mair-dj-visuals.js');
 console.log('MAIR backend cleanup checks: OK');
