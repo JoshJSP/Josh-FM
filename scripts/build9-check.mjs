@@ -7,7 +7,7 @@ const html=fs.readFileSync('index.html','utf8'),b7=fs.readFileSync('build7.js','
 new Function(b7);new Function(ctx);new Function(persona);
 const checks=[
  ['Build7 runtime loaded',html.includes('src="build7.js"')],
- ['MAIR visible brand',html.includes('<h1>MAIR</h1>')&&html.includes('Start MAIR')),
+ ['MAIR visible brand',html.includes('<h1>MAIR</h1>')&&html.includes('Start MAIR')],
  ['DJ mix and four profiles',['mix','josh','maya','max','noah'].every(x=>b7.includes(x))],
  ['Rotation choices',b7.includes('Elke 30 minuten')&&b7.includes('Elk uur')&&b7.includes('Elke 2 uur')],
  ['Natural rotation engine',ctx.includes("window.addEventListener('jfm:trackchange'")&&ctx.includes('maybeRotate')],
