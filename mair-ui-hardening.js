@@ -8,15 +8,27 @@ const art=id=>`<span class="mair-station-art art-${id}" aria-hidden="true"><span
 function sync(){
  document.querySelectorAll('.mair-personal-row>strong,.mair-station-card>strong').forEach(x=>x.remove());
  const grid=document.querySelector('.mair-station-grid');
- if(grid){const existing=new Map([...grid.querySelectorAll('[data-mair-station]')].map(x=>[x.dataset.mairStation,x]));for(const[id,name,tagline]of stations){let b=existing.get(id);if(!b){b=document.createElement('button');b.type='button';b.className='mair-station-card';b.dataset.mairStation=id;grid.appendChild(b)}b.innerHTML=`${art(id)}<span class="mair-station-copy"><b>${name}</b><small>${tagline}</small></span>`}const order=new Map(stations.map((x,i)=>[x[0],i]));[...grid.children].sort((a,b)=>(order.get(a.dataset.mairStation)??99)-(order.get(b.dataset.mairStation)??99)).forEach(x=>grid.appendChild(x))}
- const select=document.getElementById('voiceMode');if(select){const o=select.querySelector('option[value="fish"]');if(o)o.textContent='Automatisch per DJ'}
- const info=document.getElementById('voiceInfo');if(info)info.textContent='MAIR kiest automatisch de juiste stem voor de actieve DJ.';
- const engine=document.getElementById('mairVoiceEngineCard');if(engine)engine.style.display='none';
+ if(grid){
+  const existing=new Map([...grid.querySelectorAll('[data-mair-station]')].map(x=>[x.dataset.mairStation,x]));
+  for(const[id,name,tagline]of stations){
+   let b=existing.get(id);
+   if(!b){b=document.createElement('button');b.type='button';b.className='mair-station-card';b.dataset.mairStation=id;grid.appendChild(b)}
+   const html=`${art(id)}<span class="mair-station-copy"><b>${name}</b><small>${tagline}</small></span>`;
+   if(b.innerHTML!==html)b.innerHTML=html;
+  }
+  const order=new Map(stations.map((x,i)=>[x[0],i]));
+  [...grid.children].sort((a,b)=>(order.get(a.dataset.mairStation)??99)-(order.get(b.dataset.mairStation)??99)).forEach((x,i)=>{if(grid.children[i]!==x)grid.appendChild(x)});
+ }
+ const select=document.getElementById('voiceMode');if(select){const o=select.querySelector('option[value="fish"]');if(o&&o.textContent!=='Automatisch per DJ')o.textContent='Automatisch per DJ'}
+ const info=document.getElementById('voiceInfo');if(info&&info.textContent!=='MAIR kiest automatisch de juiste stem voor de actieve DJ.')info.textContent='MAIR kiest automatisch de juiste stem voor de actieve DJ.';
+ const engine=document.getElementById('mairVoiceEngineCard');if(engine&&engine.style.display!=='none')engine.style.display='none';
  const active=localStorage.getItem('jfm_music_channel_v1')||'mix';document.querySelectorAll('[data-mair-station]').forEach(x=>{const on=x.dataset.mairStation===active;x.classList.toggle('active',on);x.setAttribute('aria-pressed',on?'true':'false')});
 }
 document.addEventListener('click',e=>{const b=e.target?.closest?.('[data-mair-station]');if(!b)return;b.classList.add('loading');document.querySelectorAll('[data-mair-station]').forEach(x=>x.classList.toggle('active',x===b));setTimeout(()=>b.classList.remove('loading'),15000)},true);
-window.addEventListener('jfm:trackchange',sync);window.addEventListener('pageshow',()=>setTimeout(sync,100));
-const obs=new MutationObserver(()=>sync());if(document.documentElement)obs.observe(document.documentElement,{childList:true,subtree:true});
+window.addEventListener('jfm:trackchange',sync);
+window.addEventListener('mair:djchange',sync);
+window.addEventListener('pageshow',()=>setTimeout(sync,100));
+document.addEventListener('DOMContentLoaded',()=>setTimeout(sync,0),{once:true});
 setTimeout(sync,0);setTimeout(sync,400);setTimeout(sync,1500);
-window.MAIRUIHardening={version:'mair-ui-hardening-v1',sync,stations:stations.map(x=>x[0])};
+window.MAIRUIHardening={version:'mair-ui-hardening-v1.1-no-observer-loop',sync,stations:stations.map(x=>x[0])};
 })();
