@@ -67,7 +67,9 @@ expect(dj.includes('DJ over ${s.remaining} nummer'),'UI toont niet hoeveel numme
 expect(dj.includes("result:lastFailure")&&dj.includes("lastFailure='pause-failed'")&&dj.includes("lastFailure='tts-failed'"),'DJ scheduler mist diagnose voor mislukte breaks');
 expect(dj.includes('pendingAuto')&&dj.includes("attemptPending('next-track-retry')")&&dj.includes('schedulePendingRetry'),'Mislukte DJ-break moet pending blijven en automatisch opnieuw proberen');
 expect(dj.includes('DJ klaar voor volgende overgang'),'UI moet tonen dat een break klaarstaat maar nog niet hoorbaar is');
-expect(dj.includes("version:'v228-pending-break-delivery'"),'Nieuwe DJ delivery scheduler-versie ontbreekt');
+expect(dj.includes("typeof window.speakText!=='function'")&&dj.includes("lastFailure='voice-unavailable'"),'DJ mag een ontbrekende voice runtime niet als hoorbare break tellen');
+expect(!dj.includes('window.speakText?.'),'DJ delivery mag optional chaining niet als stil succes behandelen');
+expect(dj.includes("version:'v229-voice-runtime-guard'"),'Nieuwe DJ voice-runtime guard ontbreekt');
 expect(sw.includes("const CACHE='mair-v49-hardening-cache-20260814'"),'service-worker cache is niet verhoogd voor hardening-update');
 expect(sw.includes("'./mair-category-search.js'")&&sw.includes("'./mair-category-search.css'"),'service worker cachet categoriezoeker niet');
 expect(sw.includes("'./mair-category-purity.js'")&&sw.includes("'./mair-ui-hardening.js'")&&sw.includes("'./mair-playback-category-guard.js'")&&sw.includes("'./mair-build-orchestrator.js'"),'service worker cachet de hardening runtime niet volledig');
