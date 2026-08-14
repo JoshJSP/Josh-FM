@@ -11,7 +11,7 @@ const checks=[
  ['discovery-v5',/playback-first-discovery-v5/.test(discovery)],
  ['discovery-retry',/awaitCooldown/.test(discovery)&&/setTimeout\(\(\)=>buildSet\(\)/.test(discovery)],
  ['max-five-searches',/MAX_SEARCHES=5/.test(discovery)],
- ['authoritative-categories',/authoritative-strict-categories/.test(channels)],
+ ['authoritative-categories',/MAIRStationController/.test(channels)&&/mair-station-controller-v1/.test(channels)],
  ['popular-category-pools',/buildPool/.test(channels)&&/popularity/.test(channels)],
  ['dutch-filter',/strictSemanticFilter/.test(channels)&&/\/api\/category-filter/.test(channels)&&/hoofdzakelijk Nederlands/.test(classifier)&&!/nlArtists/.test(channels)],
  ['v226-bootstrap',bootstrap.includes('progress-clock-v226.js')&&bootstrap.includes('dj-authoritative-v226.js')],
