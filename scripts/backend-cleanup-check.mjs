@@ -15,11 +15,14 @@ if(!station.includes('window.MAIRStationController'))fail('Station controller he
 if(!station.includes('MAIRStationPolicy')&&!station.includes('mair-station-policy.js'))fail('Station controller gebruikt geen centrale policy');
 if(!policy.includes('MAIR NEDERLANDSTALIG')||!policy.includes("language:'nl'")||!policy.includes('minConfidence:.95'))fail('Nederlandstalig policy is niet expliciet fail-closed op 0.95');
 if(/status\(`Josh FM/.test(station))fail('Station controller bevat nog zichtbare Josh FM statusbranding');
-const voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js'),runtime=read('mair-runtime-core.js'),controls=read('mair-user-controls.js'),visuals=read('mair-dj-visuals.js'),sw=read('sw.js');
+const voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js'),runtime=read('mair-runtime-core.js'),controls=read('mair-user-controls.js'),modes=read('runtime-modes.js'),visuals=read('mair-dj-visuals.js'),sw=read('sw.js');
 if(!voice.includes("'mair:dj-speaking'")||!easy.includes("'mair:dj-speaking'"))fail('DJ LIVE is niet gekoppeld aan de echte voice-engine');
 if(!easy.includes("'mair:dj-schedule'"))fail('DJ countdown gebruikt niet de authoritative scheduler event');
 if(!runtime.includes('window.MAIRRuntime')||!runtime.includes("playback:'playback-primary'"))fail('Centrale MAIR runtime facade ontbreekt');
 if(!controls.includes('Car Mode')||!controls.includes('Sleeptimer')||!controls.includes('Na dit nummer'))fail('Car Mode/Sleeptimer controls ontbreken');
+for(const retired of ['Data Saver','Battery Friendly Mode','Night Interface nu','Night Interface automatisch','Webapp gedrag'])if(modes.includes(retired))fail(`Legacy instelling is terug in runtime-modes.js: ${retired}`);
+if(modes.includes('jfmRuntimeModes')||modes.includes('ensureSettings'))fail('runtime-modes.js injecteert nog een legacy instellingenkaart');
+if(!controls.includes("$('jfmRuntimeModes')")||!controls.includes('legacy.remove()'))fail('Nieuwe instellingenlaag verwijdert geen eventueel gecachete legacy kaart');
 for(const id of ['josh','maya','max','noah']){const asset=`assets/dj-${id}.webp`;if(!exists(asset))fail(`Concept DJ asset ontbreekt: ${asset}`);if(!visuals.includes(`./${asset}`))fail(`DJ visuals verwijst niet naar ${asset}`);if(!sw.includes(`'./${asset}'`))fail(`PWA cache mist ${asset}`)}
 if(!sw.includes("'./mair-dj-visuals.js'"))fail('PWA cache mist mair-dj-visuals.js');
 console.log('MAIR backend cleanup checks: OK');
