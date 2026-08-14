@@ -1,0 +1,4 @@
+import fs from 'node:fs';
+const html=fs.readFileSync('index.html','utf8'),js=fs.readFileSync('build7.js','utf8'),css=fs.readFileSync('styles.css','utf8');
+const checks=[['Build 7 loaded',html.includes('build7.js')],['MAIR branding',html.includes('<h1>MAIR</h1>')],['DJ rotation',js.includes('b7Rotation')&&js.includes("rotation:60")],['Four DJs', ['josh','maya','max','noah'].every(x=>js.includes(x))],['Live Context',js.includes('liveContext')],['Voor Jou',js.includes('VOOR JOU')],['Request sheet',js.includes('mair:request-preview')&&css.includes('.mair-request-sheet')],['Local prefs',js.includes("localStorage.setItem(KEY")]];
+let fail=0;for(const [n,ok] of checks){console.log(`${ok?'PASS':'FAIL'} ${n}`);if(!ok)fail++}if(fail)process.exit(1);console.log(`Build 7: ${checks.length} PASS / 0 FAIL`);
