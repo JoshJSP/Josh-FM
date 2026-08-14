@@ -2,6 +2,7 @@ import fs from 'node:fs';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const discovery=read('discovery.js');
 const channels=read('channel-click-fix.js');
+const policy=read('mair-station-policy.js');
 const classifier=read('api/category-filter.js');
 const bootstrap=read('dj-now-queue.js');
 const dj=read('dj-authoritative-v226.js');
@@ -11,9 +12,9 @@ const checks=[
  ['discovery-v5',/playback-first-discovery-v5/.test(discovery)],
  ['discovery-retry',/awaitCooldown/.test(discovery)&&/setTimeout\(\(\)=>buildSet\(\)/.test(discovery)],
  ['max-five-searches',/MAX_SEARCHES=5/.test(discovery)],
- ['authoritative-categories',/MAIRStationController/.test(channels)&&/mair-station-controller-v1/.test(channels)],
+ ['authoritative-categories',/MAIRStationController/.test(channels)&&/mair-station-controller-v3/.test(channels)&&/MAIRStationPolicy/.test(channels)],
  ['popular-category-pools',/buildPool/.test(channels)&&/popularity/.test(channels)],
- ['dutch-filter',/strictSemanticFilter/.test(channels)&&/\/api\/category-filter/.test(channels)&&/hoofdzakelijk Nederlands/.test(classifier)&&!/nlArtists/.test(channels)],
+ ['dutch-filter',/strictSemanticFilter/.test(channels)&&/\/api\/category-filter/.test(channels)&&/minConfidence:.95/.test(policy)&&/hoofdzakelijk Nederlands/.test(classifier)&&!/nlArtists/.test(channels)],
  ['v226-bootstrap',bootstrap.includes('progress-clock-v226.js')&&bootstrap.includes('dj-authoritative-v226.js')],
  ['dj-pauses-before-speech',dj.indexOf('await pause(uri)')<dj.indexOf('window.speakText')],
  ['dj-rewind-resume',dj.includes('await rewind(uri)')&&dj.includes('await resume(uri)')],
