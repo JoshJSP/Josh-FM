@@ -9,6 +9,8 @@ const suite=read('radio-suite.js');
 const pwa=read('pwa-platform.js');
 const voice=read('debug-tts.js');
 const polish=read('mair-pwa-polish.js');
+const foundation=read('mair-foundation.js');
+const artwork=read('mair-artwork-fix.css');
 const sw=read('sw.js');
 
 expect(!live.includes("live.id='jfmLiveMeta'"),'live-ui mag geen tweede live-metablok meer toevoegen');
@@ -26,6 +28,10 @@ expect(polish.includes('padding-top:max(52px,calc(env(safe-area-inset-top) + 16p
 expect(polish.includes('height:max(44px,env(safe-area-inset-top))'),'iPhone top-scrim dekt de statusbalkzone niet af');
 expect(polish.includes('pointer-events:none'),'top-scrim mag taps nooit onderscheppen');
 expect(polish.includes('#jfmLiveMeta,#showMini'),'legacy live/show overlays moeten defensief verborgen worden');
+expect(polish.includes('mair-artwork-fix.css'),'betrouwbare artwork-styles worden niet geladen');
+expect(foundation.includes('mair-sprite-img'),'stations en DJ-profielen gebruiken nog geen echte image-elementen');
+expect(artwork.includes('background-image:none!important'),'oude CSS-background sprite is niet uitgeschakeld');
+expect(artwork.includes('pointer-events:none!important'),'artwork mag taps niet onderscheppen');
 expect(sw.includes("const CACHE='mair-"),'service-worker cache moet een MAIR-versie gebruiken');
 expect(sw.includes("k.startsWith('josh-fm-')"),'service worker moet oude Josh FM caches opruimen');
 
