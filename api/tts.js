@@ -1,9 +1,15 @@
 const DEFAULT_VOICE='b347db033a6549378b48d00acb0d06cd';
+const DEFAULT_VOICES={
+  josh:'88e8f699776e4bacbf6ef55c2aecfb36',
+  maya:'a8673b1ff5e640c8abb9d3af550a46e9',
+  max:'802e3bc2b27e49c2995d23ef70e6ac89',
+  noah:'a5f24be3b55c45b7923c4d8ca02aba9a'
+};
 const DEFAULT_MODELS=['s2.1-pro-free','s2-pro'];
 const FISH='https://api.fish.audio';
 const DJ_ENV={josh:'FISH_AUDIO_VOICE_JOSH',maya:'FISH_AUDIO_VOICE_MAYA',max:'FISH_AUDIO_VOICE_MAX',noah:'FISH_AUDIO_VOICE_NOAH'};
 const DJ_STYLE={josh:{speed:1.0,temperature:.74,topP:.72},maya:{speed:.98,temperature:.76,topP:.74},max:{speed:1.07,temperature:.8,topP:.76},noah:{speed:.93,temperature:.68,topP:.68}};
-function voiceFor(profile='josh'){const env=DJ_ENV[String(profile||'').toLowerCase()]||DJ_ENV.josh;return String(process.env[env]||process.env.FISH_AUDIO_VOICE_ID||DEFAULT_VOICE).trim()}
+function voiceFor(profile='josh'){const id=String(profile||'josh').toLowerCase(),env=DJ_ENV[id]||DJ_ENV.josh,fallback=DEFAULT_VOICES[id]||DEFAULT_VOICE;return String(process.env[env]||process.env.FISH_AUDIO_VOICE_ID||fallback).trim()}
 function styleFor(profile='josh'){return DJ_STYLE[String(profile||'').toLowerCase()]||DJ_STYLE.josh}
 function config(profile='josh'){const explicit=String(process.env.FISH_AUDIO_MODEL||'').trim();return{key:process.env.FISH_AUDIO_API_KEY||'',voiceId:voiceFor(profile),models:explicit?[explicit]:DEFAULT_MODELS,style:styleFor(profile)}}
 function safeDetail(raw=''){try{const d=JSON.parse(raw);return String(d?.message||d?.error?.message||d?.detail||raw).slice(0,500)}catch{return String(raw||'Unknown Fish Audio error').slice(0,500)}}
