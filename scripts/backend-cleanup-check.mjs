@@ -6,8 +6,17 @@ for(const p of ['.build-trigger-v2b-20260813-2229','.vercel-preview-trigger-2026
 const build7=read('build7.js');
 if(/b7ForYou|b7DjCard/.test(build7))fail('Build7 injecteert nog dubbele Voor jou/DJ UI');
 if(!build7.includes('window.MAIRRuntimePrefs'))fail('Runtime preferences hebben geen MAIR eigenaar');
-const station=read('channel-click-fix.js');
+const foundation=read('mair-foundation.js');
+if(foundation.includes('data-mair-tab="for-you"')||foundation.includes('mair-daily-hero'))fail('Voor jou bestaat nog als legacy bron-tab');
+if(!foundation.includes('data-mair-tab="radio"')||!foundation.includes('data-mair-tab="stations"')||!foundation.includes('data-mair-tab="requests"')||!foundation.includes('data-mair-tab="settings"'))fail('Vier-tab navigatiecontract is incompleet');
+const station=read('channel-click-fix.js'),policy=read('mair-station-policy.js');
 if(station.includes('setInterval(boot,1000)'))fail('Station controller gebruikt nog permanente ownership polling');
 if(!station.includes('window.MAIRStationController'))fail('Station controller heeft geen MAIR eigenaar');
+if(!station.includes('MAIRStationPolicy')&&!station.includes('mair-station-policy.js'))fail('Station controller gebruikt geen centrale policy');
+if(!policy.includes('MAIR NEDERLANDSTALIG')||!policy.includes("language:'nl'"))fail('Nederlandstalig policy is niet expliciet fail-closed');
 if(/status\(`Josh FM/.test(station))fail('Station controller bevat nog zichtbare Josh FM statusbranding');
+const voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js'),runtime=read('mair-runtime-core.js');
+if(!voice.includes("'mair:dj-speaking'")||!easy.includes("'mair:dj-speaking'"))fail('DJ LIVE is niet gekoppeld aan de echte voice-engine');
+if(!easy.includes("'mair:dj-schedule'"))fail('DJ countdown gebruikt niet de authoritative scheduler event');
+if(!runtime.includes('window.MAIRRuntime')||!runtime.includes("playback:'playback-primary'"))fail('Centrale MAIR runtime facade ontbreekt');
 console.log('MAIR backend cleanup checks: OK');
