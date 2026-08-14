@@ -1,0 +1,7 @@
+(()=>{
+'use strict';
+if(window.__mairBuildOrchestrator)return;window.__mairBuildOrchestrator=true;
+let generation=0,installed=false;
+function install(){if(installed||typeof window.buildSet!=='function'||!window.MAIRCategoryPurity)return false;const original=window.buildSet;window.buildSet=buildSet=async function(...args){const mine=++generation,startChannel=window.MAIRCategoryPurity.active(),before=Array.isArray(window.queue)?[...window.queue]:[];const result=await original.apply(this,args);if(mine!==generation||window.MAIRCategoryPurity.active()!==startChannel){window.queue=before;return before}let next=Array.isArray(window.queue)&&window.queue.length?window.queue:result;if(startChannel!=='mix'){try{next=await window.MAIRCategoryPurity.validate(startChannel,next,{minimum:Math.min(5,Math.max(1,next?.length||1))})}catch{window.queue=before;return before}}window.queue=Array.isArray(next)?next:before;return window.queue};installed=true;window.MAIRBuildOrchestrator={version:'mair-build-orchestrator-v1',invalidate:()=>{generation++},get generation(){return generation}};return true}
+let tries=0;const boot=()=>{if(!install()&&++tries<80)setTimeout(boot,150)};boot();document.addEventListener('click',e=>{if(e.target?.closest?.('[data-mair-station],[data-jfm-channel]'))generation++},true);window.addEventListener('pageshow',()=>setTimeout(install,100));
+})();

@@ -14,6 +14,8 @@
     "mair-ui-contract": "node scripts/mair-ui-contract-check.mjs",
     "build-checks": "node scripts/build1-radio-core-check-v2.mjs && node scripts/build2-check.mjs && node scripts/build3-check.mjs && node scripts/build4-check.mjs && node scripts/build5-check.mjs && node scripts/build6-check.mjs && node scripts/build9-check.mjs",
     "stabilization-check": "node scripts/product-beta-stabilization-check.mjs",
-    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check"
+    "category-purity": "node --check channel-click-fix.js && node --check music-intelligence-v3.js && node --check api/category-filter.js && node --check mair-category-purity.js && node --check mair-playback-category-guard.js && node --check mair-build-orchestrator.js && node scripts/category-purity-check.mjs",
+    "mair-hardening": "node --check mair-ui-hardening.js && node --check mair-pwa-polish.js && node scripts/mair-hardening-check.mjs",
+    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check && npm run category-purity && npm run mair-hardening"
   }
 }
