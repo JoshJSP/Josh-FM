@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+const exists=p=>fs.existsSync(new URL('../'+p,import.meta.url));
+const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const fail=msg=>{throw new Error(msg)};
+for(const p of ['.build-trigger-v2b-20260813-2229','.vercel-preview-trigger-20260812.txt','.vercel-redeploy','backups','assets/mair-visual-sprite.svg'])if(exists(p))fail(`Obsolete repository artifact bestaat nog: ${p}`);
+const build7=read('build7.js');
+if(/b7ForYou|b7DjCard/.test(build7))fail('Build7 injecteert nog dubbele Voor jou/DJ UI');
+if(!build7.includes('window.MAIRRuntimePrefs'))fail('Runtime preferences hebben geen MAIR eigenaar');
+const station=read('channel-click-fix.js');
+if(station.includes('setInterval(boot,1000)'))fail('Station controller gebruikt nog permanente ownership polling');
+if(!station.includes('window.MAIRStationController'))fail('Station controller heeft geen MAIR eigenaar');
+if(/status\(`Josh FM/.test(station))fail('Station controller bevat nog zichtbare Josh FM statusbranding');
+console.log('MAIR backend cleanup checks: OK');
