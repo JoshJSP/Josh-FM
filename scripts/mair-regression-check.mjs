@@ -61,7 +61,8 @@ expect(dj.includes("talk.addEventListener('input',replanFromSetting)")&&dj.inclu
 expect(dj.includes('DJ over ${s.remaining} nummer'),'UI toont niet hoeveel nummers er nog tot de volgende DJ zijn');
 expect(dj.includes("result:'prepare-failed'")&&dj.includes("result:'pause-failed'")&&dj.includes("'tts-failed'"),'DJ scheduler mist diagnose voor overgeslagen breaks');
 expect(dj.includes("version:'v227-frequency-replan-diagnostics'"),'Nieuwe DJ scheduler-versie ontbreekt');
-expect(sw.includes("const CACHE='mair-v47-artwork-header-dj-20260814'"),'service-worker cache is niet verhoogd voor artwork/header-fix');
+expect(sw.includes("const CACHE='mair-v48-category-search-20260814'"),'service-worker cache is niet verhoogd voor categoriezoeken');
+expect(sw.includes("'./mair-category-search.js'")&&sw.includes("'./mair-category-search.css'"),'service worker cachet categoriezoeker niet');
 expect(sw.includes("'./mair-template-assets.css'")&&sw.includes("'./assets/mair-hits.svg'")&&sw.includes("'./assets/mair-mix.svg'"),'service worker cachet de nieuwe MAIR-artwork niet');
 expect(sw.includes("k.startsWith('josh-fm-')"),'service worker moet oude Josh FM caches opruimen');
 
