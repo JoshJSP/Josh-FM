@@ -10,8 +10,9 @@
     "smoke": "node scripts/app-smoke-check-v362.mjs",
     "channel-tap": "node scripts/channel-tap-check.mjs",
     "hotfix-check": "node scripts/hotfix-release-check.mjs",
+    "mair-regression-check": "node scripts/mair-regression-check.mjs",
     "build-checks": "node scripts/build1-radio-core-check-v2.mjs && node scripts/build2-check.mjs && node scripts/build3-check.mjs && node scripts/build4-check.mjs && node scripts/build5-check.mjs && node scripts/build6-check.mjs && node scripts/build9-check.mjs",
     "stabilization-check": "node scripts/product-beta-stabilization-check.mjs",
-    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run build-checks && npm run stabilization-check"
+    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run mair-regression-check && npm run build-checks && npm run stabilization-check"
   }
 }
