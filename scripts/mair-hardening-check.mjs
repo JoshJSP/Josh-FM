@@ -8,6 +8,8 @@ if(/new\s+MutationObserver\s*\(\s*\(\)\s*=>\s*sync\s*\(\s*\)\s*\)/.test(ui))thro
 for(const id of ['nl','party','chill','summer'])if(!purity.includes(`'${id}'`))throw Error('Semantische purity ontbreekt: '+id);
 if(!purity.includes('confidence')&& !read('api/category-filter.js').includes('confidence>=0.90'))throw Error('Confidence gate ontbreekt');
 if(!guard.includes("channel==='mix'")||!guard.includes("api('/tracks/'"))throw Error('Direct-play category guard ontbreekt');
+if(guard.includes('if(already)return original'))throw Error('Queued tracks mogen strict-category validatie niet omzeilen');
+if(!guard.includes("version:'mair-playback-category-guard-v1.1-validate-queued'"))throw Error('Queued-track category guard versie ontbreekt');
 if(!orchestrator.includes('startChannel')||!orchestrator.includes('generation'))throw Error('Stale build guard ontbreekt');
 const hardeningFiles=['mair-category-purity.js','mair-ui-hardening.js','mair-playback-category-guard.js','mair-build-orchestrator.js'];
 for(const file of hardeningFiles){
