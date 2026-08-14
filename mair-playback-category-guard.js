@@ -1,0 +1,10 @@
+(()=>{
+'use strict';
+if(window.__mairPlaybackCategoryGuard)return;window.__mairPlaybackCategoryGuard=true;
+const trackFromSpotify=t=>({id:t.id,uri:t.uri,name:t.name,artists:(t.artists||[]).map(a=>a.name),album:t.album?.name||'',release:t.album?.release_date||'',image:t.album?.images?.[1]?.url||t.album?.images?.[0]?.url||'',url:t.external_urls?.spotify||'',duration:t.duration_ms||0,popularity:Number(t.popularity||0)});
+function idFromUri(uri=''){const m=String(uri).match(/spotify:track:([A-Za-z0-9]+)/);return m?.[1]||''}
+function status(text,bad=false){const q=document.getElementById('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}}
+let wrapped=false;
+function install(){if(wrapped||!window.JFMPlayback?.playUri||!window.MAIRCategoryPurity)return false;const original=window.JFMPlayback.playUri.bind(window.JFMPlayback);window.JFMPlayback.playUri=async function(uri,...args){const channel=window.MAIRCategoryPurity.active();if(channel==='mix')return original(uri,...args);const id=idFromUri(uri);if(!id)return false;const already=(Array.isArray(window.queue)?window.queue:[]).some(t=>String(t?.id)===id);if(already)return original(uri,...args);try{status(`Controleren of dit verzoek bij ${channel} past…`);const raw=await api('/tracks/'+encodeURIComponent(id));const candidate=trackFromSpotify(raw);const accepted=await window.MAIRCategoryPurity.validate(channel,[candidate],{minimum:1});if(!accepted.length)throw Error('niet passend');status(`Verzoek past bij ${channel}.`);return original(uri,...args)}catch(e){status(`Dit nummer past niet betrouwbaar bij het actieve station ${channel}.`,true);return false}};wrapped=true;window.MAIRPlaybackCategoryGuard={version:'mair-playback-category-guard-v1',installed:true};return true}
+let tries=0;const boot=()=>{if(!install()&&++tries<60)setTimeout(boot,150)};boot();window.addEventListener('pageshow',()=>setTimeout(install,100));
+})();
