@@ -11,6 +11,7 @@ const voice=read('debug-tts.js');
 const polish=read('mair-pwa-polish.js');
 const foundation=read('mair-foundation.js');
 const foundationCss=read('mair-foundation.css');
+const templateAssets=read('mair-template-assets.css');
 const manifest=read('manifest.webmanifest');
 const logo=read('mair-logo.svg');
 const health=read('station-health.js');
@@ -31,12 +32,16 @@ expect(polish.includes('safe-area-inset-top'),'iPhone safe-area bescherming ontb
 expect(polish.includes('height:max(44px,env(safe-area-inset-top))'),'iPhone top-scrim dekt de statusbalkzone niet af');
 expect(polish.includes('pointer-events:none'),'top-scrim mag taps nooit onderscheppen');
 expect(polish.includes('#jfmLiveMeta,#showMini'),'legacy live/show overlays moeten defensief verborgen worden');
+expect(polish.includes('mair-template-assets.css?v=1'),'template-artwork stylesheet wordt niet geladen');
+expect(polish.includes("behavior:'auto'"),'tabwissel moet direct naar de correcte bovenkant scrollen');
 expect(!polish.includes('mair-artwork-fix.css'),'legacy artwork sprite stylesheet mag niet meer geladen worden');
 expect(!foundation.includes('mair-sprite-img'),'MAIR UI mag niet meer afhankelijk zijn van defecte sprite image-elementen');
 expect(!foundation.includes('mair-visual-sprite.svg'),'MAIR UI mag niet meer afhankelijk zijn van defecte sprite asset');
 expect(foundationCss.includes('.mair-station-art:before'),'station artwork fallback ontbreekt');
 expect(foundationCss.includes('.mair-avatar-initial'),'DJ avatar fallback ontbreekt');
 expect(foundation.includes('purgeLegacyNowNextLater'),'NU/STRAKS/LATER legacy guard ontbreekt');
+for(const asset of ['mair-hits.svg','mair-throwback.svg','mair-chill.svg','mair-party.svg','mair-discovery.svg','mair-mix.svg'])expect(templateAssets.includes(`./assets/${asset}`),`template artwork ontbreekt: ${asset}`);
+expect(templateAssets.includes('.top{display:flex!important'),'MAIR-header wordt niet expliciet hersteld op Stations/Voor jou');
 expect(logo.includes('MAIR app icon')&&logo.includes('▥')===false,'app icon moet de nieuwe MAIR templateversie zijn');
 expect(manifest.includes('mair-logo.svg?v=12'),'manifest gebruikt niet het vernieuwde MAIR-icoon');
 expect(!health.includes('Test Josh FM opnieuw'),'Self Test bevat nog oude Josh FM-knoptekst');
@@ -47,7 +52,8 @@ expect(dj.includes("talk.addEventListener('input',replanFromSetting)")&&dj.inclu
 expect(dj.includes('DJ over ${s.remaining} nummer'),'UI toont niet hoeveel nummers er nog tot de volgende DJ zijn');
 expect(dj.includes("result:'prepare-failed'")&&dj.includes("result:'pause-failed'")&&dj.includes("result:'tts-failed'"),'DJ scheduler mist diagnose voor overgeslagen breaks');
 expect(dj.includes("version:'v227-frequency-replan-diagnostics'"),'Nieuwe DJ scheduler-versie ontbreekt');
-expect(sw.includes("const CACHE='mair-v46-template-fixes-20260814'"),'service-worker cache is niet verhoogd voor de templatefix');
+expect(sw.includes("const CACHE='mair-v47-artwork-header-dj-20260814'"),'service-worker cache is niet verhoogd voor artwork/header-fix');
+expect(sw.includes("'./mair-template-assets.css'")&&sw.includes("'./assets/mair-hits.svg'")&&sw.includes("'./assets/mair-mix.svg'"),'service worker cachet de nieuwe MAIR-artwork niet');
 expect(sw.includes("k.startsWith('josh-fm-')"),'service worker moet oude Josh FM caches opruimen');
 
 if(failures.length){
