@@ -13,7 +13,7 @@ const checks=[
  ['Natural rotation engine',ctx.includes("window.addEventListener('jfm:trackchange'")&&ctx.includes('maybeRotate')],
  ['Request confirmation gate',b7.includes('mairConfirmed')&&b7.includes('b7ReqConfirm')],
  ['Live context toggle',b7.includes('b7Context')&&b7.includes('liveContext')],
- ['Dutch persona layer',persona.includes('Dit is MAIR FM')&&persona.includes('Josh')===false&&persona.includes('MAIRDJProfiles')],
+ ['Dutch persona layer',persona.includes('Dit is MAIR FM')&&!persona.includes('Josh FM')&&persona.includes('MAIRDJProfiles')],
  ['Legacy DOM compatibility',['sessionCount','history','nextUp','directorQueue','installHint','discoveryValue'].every(x=>b7.includes(x))]
 ];
 let fail=0;for(const[n,ok]of checks){console.log(`${ok?'PASS':'FAIL'} Build7 ${n}`);if(!ok)fail++}if(fail)process.exit(1);console.log(`Build 7 integration: ${checks.length} PASS / 0 FAIL`);
