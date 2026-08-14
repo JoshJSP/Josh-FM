@@ -8,6 +8,8 @@ const live=read('live-ui.js');
 const suite=read('radio-suite.js');
 const pwa=read('pwa-platform.js');
 const voice=read('debug-tts.js');
+const voiceEngine=read('mair-voice-engine.js');
+const smartDj=read('smart-dj.js');
 const polish=read('mair-pwa-polish.js');
 const foundation=read('mair-foundation.js');
 const foundationCss=read('mair-foundation.css');
@@ -30,6 +32,9 @@ expect(pwa.includes('Nieuwe MAIR-versie klaar.'),'PWA-updatebanner moet MAIR het
 expect(voice.includes("selectedLanguage='nl'"),'DJ-taal moet Nederlands zijn');
 expect(!voice.includes("['pointerdown','touchstart','click']"),'TTS mag geen globale click-capture listener installeren');
 expect(voice.includes('Nederlandse MAIR DJ'),'stemkeuze moet de Nederlandse MAIR DJ tonen');
+expect(!smartDj.includes('Josh FM')&&!smartDj.includes("return'en'"),'Smart DJ bevat nog Engelse/oude branding');
+expect(smartDj.includes("return'nl'")&&smartDj.includes('Je luistert naar MAIR.'),'Smart DJ moet Nederlands en MAIR-branded zijn');
+expect(!voiceEngine.includes("'MAIR FM'")&&voiceEngine.includes("replace(/MAIR\\s*FM/gi,'MAIR')"),'Voice Engine mag MAIR FM niet uitspreken');
 expect(polish.includes('safe-area-inset-top'),'iPhone safe-area bescherming ontbreekt');
 expect(polish.includes('height:max(44px,env(safe-area-inset-top))'),'iPhone top-scrim dekt de statusbalkzone niet af');
 expect(polish.includes('pointer-events:none'),'top-scrim mag taps nooit onderscheppen');
