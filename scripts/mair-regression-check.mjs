@@ -64,8 +64,10 @@ expect(health.includes("name:brand(c.show.name)")&&health.includes("esc(brand(s.
 expect(dj.includes('TALK_RANGES=[[6,9],[3,5],[2,4],[1,3]]'),'DJ praatfrequentie-ranges zijn onverwacht gewijzigd');
 expect(dj.includes("talk.addEventListener('input',replanFromSetting)")&&dj.includes("talk.addEventListener('change',replanFromSetting)"),'Praatfrequentie moet de DJ-planning direct opnieuw berekenen');
 expect(dj.includes('DJ over ${s.remaining} nummer'),'UI toont niet hoeveel nummers er nog tot de volgende DJ zijn');
-expect(dj.includes("result:'prepare-failed'")&&dj.includes("result:'pause-failed'")&&dj.includes("'tts-failed'"),'DJ scheduler mist diagnose voor overgeslagen breaks');
-expect(dj.includes("version:'v227-frequency-replan-diagnostics'"),'Nieuwe DJ scheduler-versie ontbreekt');
+expect(dj.includes("result:lastFailure")&&dj.includes("lastFailure='pause-failed'")&&dj.includes("lastFailure='tts-failed'"),'DJ scheduler mist diagnose voor mislukte breaks');
+expect(dj.includes('pendingAuto')&&dj.includes("attemptPending('next-track-retry')")&&dj.includes('schedulePendingRetry'),'Mislukte DJ-break moet pending blijven en automatisch opnieuw proberen');
+expect(dj.includes('DJ klaar voor volgende overgang'),'UI moet tonen dat een break klaarstaat maar nog niet hoorbaar is');
+expect(dj.includes("version:'v228-pending-break-delivery'"),'Nieuwe DJ delivery scheduler-versie ontbreekt');
 expect(sw.includes("const CACHE='mair-v48-category-search-20260814'"),'service-worker cache is niet verhoogd voor categoriezoeken');
 expect(sw.includes("'./mair-category-search.js'")&&sw.includes("'./mair-category-search.css'"),'service worker cachet categoriezoeker niet');
 expect(sw.includes("'./mair-template-assets.css'")&&sw.includes("'./assets/mair-hits.svg'")&&sw.includes("'./assets/mair-mix.svg'"),'service worker cachet de nieuwe MAIR-artwork niet');
