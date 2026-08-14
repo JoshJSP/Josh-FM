@@ -5,6 +5,8 @@ for(const id of ['hits','top40','new','nl','party','chill','summer','throwback',
 if(/Today's biggest hits|The songs you love|Relax & unwind|Energy\. Dance\. Repeat\.|Find your next favorite|Your radio\. Your way\./.test(ui))throw Error('Engelse stationtekst teruggevonden');
 if(!ui.includes(".mair-personal-row>strong,.mair-station-card>strong"))throw Error('Pijl-opruiming ontbreekt');
 if(/new\s+MutationObserver\s*\(\s*\(\)\s*=>\s*sync\s*\(\s*\)\s*\)/.test(ui))throw Error('UI-hardening mag geen zelf-triggerende MutationObserver sync-loop bevatten');
+if(/\.mair-station-card\.loading\{[^}]*pointer-events\s*:\s*none/.test(pwa))throw Error('Station loading-state mag taps niet blokkeren');
+if(!ui.includes("setTimeout(()=>{b.classList.remove('loading');sync()},4000)"))throw Error('Station loading-state moet snel herstellen naar de werkelijk actieve categorie');
 for(const id of ['nl','party','chill','summer'])if(!purity.includes(`'${id}'`))throw Error('Semantische purity ontbreekt: '+id);
 if(!purity.includes('confidence')&& !read('api/category-filter.js').includes('confidence>=0.90'))throw Error('Confidence gate ontbreekt');
 if(!guard.includes("channel==='mix'")||!guard.includes("api('/tracks/'"))throw Error('Direct-play category guard ontbreekt');
