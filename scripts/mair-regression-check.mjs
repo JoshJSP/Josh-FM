@@ -13,6 +13,7 @@ const foundation=read('mair-foundation.js');
 const foundationCss=read('mair-foundation.css');
 const manifest=read('manifest.webmanifest');
 const logo=read('mair-logo.svg');
+const health=read('station-health.js');
 const sw=read('sw.js');
 
 expect(!live.includes("live.id='jfmLiveMeta'"),'live-ui mag geen tweede live-metablok meer toevoegen');
@@ -37,6 +38,9 @@ expect(foundationCss.includes('.mair-avatar-initial'),'DJ avatar fallback ontbre
 expect(foundation.includes('purgeLegacyNowNextLater'),'NU/STRAKS/LATER legacy guard ontbreekt');
 expect(logo.includes('MAIR app icon')&&logo.includes('▥')===false,'app icon moet de nieuwe MAIR templateversie zijn');
 expect(manifest.includes('mair-logo.svg?v=12'),'manifest gebruikt niet het vernieuwde MAIR-icoon');
+expect(!health.includes('Test Josh FM opnieuw'),'Self Test bevat nog oude Josh FM-knoptekst');
+expect(health.includes("btn.textContent='Test MAIR opnieuw'")&&health.includes("b.textContent='Test MAIR opnieuw'"),'Self Test gebruikt niet overal MAIR');
+expect(health.includes("name:brand(c.show.name)")&&health.includes("esc(brand(s.show?.name||'—'))"),'Self Test scrubt oude programmanaam niet');
 expect(sw.includes("const CACHE='mair-v46-template-fixes-20260814'"),'service-worker cache is niet verhoogd voor de templatefix');
 expect(sw.includes("k.startsWith('josh-fm-')"),'service worker moet oude Josh FM caches opruimen');
 
