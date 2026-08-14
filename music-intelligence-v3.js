@@ -4,14 +4,16 @@
   const HISTORY='jfm_music_recent_v3',norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
   const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(d))}catch{return d}},save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
   const year=t=>Number(String(t?.release||'').slice(0,4))||0,artist=t=>norm(t?.artists?.[0]||''),sig=t=>norm(t?.name)+'|'+artist(t),channel=()=>localStorage.getItem('jfm_music_channel_v1')||'mix';
-  const nlArtists=['roxy dekker','yves berendse','suzan freek','flemming','snelle','maan','antoon','s10','goldband','claude','bankzitters','bizzey','ronnie flex','frenna','broederliefde','donnie','gers pardoel','guus meeuwis','andre hazes','tino martin','mart hoogkamer','wesly bronkhorst','jan smit','nick simon','blof','acda en de munnik','de jeugd van tegenwoordig','kris kross amsterdam','nielson','diggy dex','jaap reesema','meau','hannah mae'];
   function pure(t,id=channel()){
-    const y=year(t),a=artist(t);if(!t?.id||!t?.uri)return false;
+    const y=year(t);if(!t?.id||!t?.uri)return false;
     if(id==='new')return y===new Date().getFullYear();
     if(id==='throwback')return y>0&&y<=2016;
     if(id==='00s')return y>=2000&&y<=2009;
     if(id==='10s')return y>=2010&&y<=2019;
-    if(id==='nl')return nlArtists.some(n=>a.includes(n));
+    if(id==='hits')return y>=new Date().getFullYear()-3&&Number(t?.popularity||0)>=65;
+    if(id==='top40')return y>=new Date().getFullYear()-1&&Number(t?.popularity||0)>=70;
+    // Taal- en sfeerkanalen worden fail-closed gevalideerd in channel-click-fix.js
+    // vóórdat de queue wordt geactiveerd. Hier nooit terugvallen op artiestnationaliteit.
     return true;
   }
   function history(){return load(HISTORY,[])}
@@ -32,5 +34,5 @@
   function rerank(){lastSig='';reconcile()}
   window.addEventListener('jfm:trackchange',e=>{const id=e?.detail?.trackId;const t=(window.queue||[]).find(x=>x?.id===id);if(t)remember(t);setTimeout(reconcile,100)});
   setInterval(reconcile,900);setTimeout(reconcile,800);
-  window.JFMMusicIntelligence={version:'music-intelligence-v3',optimize,pure,score:baseScore,recent:history,reconcile,rerank};
+  window.JFMMusicIntelligence={version:'music-intelligence-v3-strict-categories',optimize,pure,score:baseScore,recent:history,reconcile,rerank};
 })();
