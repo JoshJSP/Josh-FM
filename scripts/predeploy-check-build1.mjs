@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process';
 const source=fs.readFileSync(new URL('./predeploy-check.mjs',import.meta.url),'utf8');
 const sw=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');
 const oldCache='josh-fm-v39-v22-hardening';
-const newCache='mair-v45-stability-20260814';
+const newCache='mair-v46-template-fixes-20260814';
 if(!source.includes(oldCache))throw new Error('Predeploy cache baseline changed.');
 for(const asset of ['./dj-authoritative-v226.js','./progress-clock-v226.js','./radio-core-health-v1.js','./dj-quality-v2.js','./dj-context-v2.js','./music-intelligence-v3.js','./personal-learning-v4.js','./product-model-v6.js','./product-ux-v5.js','./brand-config.js','./brand-runtime-v9.js','./channel-start-guard-v2b01.js','./dj-handoff-bootstrap-v2b02.js','./ios-transport-v2b02.js'])if(!sw.includes(`'${asset}'`))throw new Error(`PWA core cache mist ${asset}.`);
 const betaPath=new URL('../beta-status.js',import.meta.url),bootstrap=fs.readFileSync(new URL('../dj-now-queue.js',import.meta.url),'utf8');
@@ -28,10 +28,10 @@ const oldPwaOwner="ok('PWA sole MediaSession owner',pwa.includes('pwa-v4-single-
 const newPwaOwner="ok('PWA sole MediaSession owner',pwa.includes('mair-pwa-v5')&&pwa.includes('safePositionState'));";
 if(patched.includes(oldPwaOwner))patched=patched.replace(oldPwaOwner,newPwaOwner);
 const oldPwaCache="ok('PWA cache v39',sw.includes(\"josh-fm-v39-v22-hardening\")&&sw.includes(\"'./version.js'\")&&sw.includes(\"'./music-choice.js'\")&&sw.includes(\"'./release-diagnostics.js'\"));";
-const newPwaCache="ok('PWA cache MAIR stability',sw.includes(\"mair-v45-stability-20260814\")&&sw.includes(\"'./version.js'\")&&sw.includes(\"'./music-choice.js'\")&&sw.includes(\"'./release-diagnostics.js'\"));";
+const newPwaCache="ok('PWA cache MAIR template fixes',sw.includes(\"mair-v46-template-fixes-20260814\")&&sw.includes(\"'./version.js'\")&&sw.includes(\"'./music-choice.js'\")&&sw.includes(\"'./release-diagnostics.js'\"));";
 if(patched.includes(oldPwaCache))patched=patched.replace(oldPwaCache,newPwaCache);
 const oldReleaseCache="ok('release endpoint exposes v39 cache',versionApi.includes(\"cache:'josh-fm-v39-v22-hardening'\")&&versionJs.includes('updateAvailable'));";
-const newReleaseCache="ok('release endpoint exposes MAIR cache',versionApi.includes(\"cache:'mair-v45-stability-20260814'\")&&versionJs.includes('updateAvailable'));";
+const newReleaseCache="ok('release endpoint exposes MAIR cache',versionApi.includes(\"cache:'mair-v46-template-fixes-20260814'\")&&versionJs.includes('updateAvailable'));";
 if(patched.includes(oldReleaseCache))patched=patched.replace(oldReleaseCache,newReleaseCache);
 const temp=path.join(os.tmpdir(),`josh-fm-build1-predeploy-${process.pid}.mjs`);
 try{fs.writeFileSync(temp,patched,'utf8');execFileSync(process.execPath,[temp],{cwd:process.cwd(),stdio:'inherit'})}finally{try{fs.unlinkSync(temp)}catch{}}

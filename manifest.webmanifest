@@ -4,12 +4,12 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#070707",
-  "theme_color": "#ff6a00",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "lang": "nl-NL",
   "description": "MAIR is je persoonlijke AI-radiostation bovenop Spotify.",
   "icons": [
-    {"src":"mair-logo.svg","sizes":"512x512","type":"image/svg+xml","purpose":"any"},
-    {"src":"mair-logo.svg","sizes":"512x512","type":"image/svg+xml","purpose":"maskable"}
+    {"src":"mair-logo.svg?v=12","sizes":"512x512","type":"image/svg+xml","purpose":"any"},
+    {"src":"mair-logo.svg?v=12","sizes":"512x512","type":"image/svg+xml","purpose":"maskable"}
   ]
 }
