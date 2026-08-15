@@ -38,3 +38,5 @@ Voordat de update branch naar `main` wordt gemerged, wordt de huidige `main` com
 8. Strikte stations controleren, met extra aandacht voor Nederlandstalig en jaartalcategorieën.
 9. Station Health Self Test uitvoeren.
 10. Alleen na expliciete toestemming de update branch naar `main` mergen en Vercel-status controleren.
+
+Laatste handmatige productie-retrigger: 2026-08-15 20:46 CEST.
