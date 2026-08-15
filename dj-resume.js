@@ -1,15 +1,5 @@
-// DJ compatibility shim. Playback handoff is owned only by dj-handoff-v34.js.
+// MAIR DJ compatibility shim.
+// DJ v3 uses the central Fish Audio engine only; no second iOS audio wrapper is loaded here.
 (()=>{
-  window.JFMDJResume={version:'single-owner-v35-ios-audio',owner:'dj-handoff-v34.js'};
-  function loadIOSBridge(){
-    if(document.getElementById('jfm-ios-dj-audio'))return;
-    const s=document.createElement('script');
-    s.id='jfm-ios-dj-audio';
-    s.src='./ios-dj-audio.js?v=35';
-    s.async=false;
-    s.onerror=()=>console.warn('Josh FM: iOS DJ audio bridge kon niet laden');
-    document.body.appendChild(s);
-  }
-  if(document.readyState==='complete')setTimeout(loadIOSBridge,0);
-  else window.addEventListener('load',()=>setTimeout(loadIOSBridge,0),{once:true});
+  window.JFMDJResume={version:'single-voice-route-v3',owner:'mair-dj-v2.js',duplicateIOSBridge:false};
 })();
