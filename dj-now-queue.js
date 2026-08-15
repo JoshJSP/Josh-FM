@@ -10,10 +10,11 @@
     await load('./progress-clock-v226.js','jfm-progress-v226');
     await load('./mair-dj-v2.js','mair-dj-v2');
     await load('./mair-audio-unlock-v1.js','mair-audio-unlock-v1');
+    await load('./mair-background-guard.js','mair-background-guard-v1');
     await load('./mair-voice-check.js','mair-voice-check-v1');
     await load('./mair-diagnostics-hub.js','mair-diagnostics-hub-v1');
     setTimeout(()=>load('./beta-status.js','jfm-beta-status-v8'),2600);
   }
   boot();
-  window.JFMV226Bootstrap={version:'mair-dj-v2-audio-diagnostics-bootstrap',get ready(){return !!(window.MAIRDJ&&window.JFMProgressClock&&window.MAIRAudioUnlock)}};
+  window.JFMV226Bootstrap={version:'mair-dj-v2-audio-diagnostics-background-bootstrap',get ready(){return !!(window.MAIRDJ&&window.JFMProgressClock&&window.MAIRAudioUnlock&&window.MAIRBackgroundGuard)}};
 })();
