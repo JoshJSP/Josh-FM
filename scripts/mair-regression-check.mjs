@@ -20,6 +20,7 @@ const manifest=read('manifest.webmanifest');
 const logo=read('mair-logo.svg');
 const health=read('station-health.js');
 const dj=read('dj-authoritative-v226.js');
+const handoff=read('dj-handoff-v34.js');
 const sw=read('sw.js');
 
 expect(!live.includes("live.id='jfmLiveMeta'"),'live-ui mag geen tweede live-metablok meer toevoegen');
@@ -64,12 +65,12 @@ expect(health.includes("name:brand(c.show.name)")&&health.includes("esc(brand(s.
 expect(dj.includes('TALK_RANGES=[[6,9],[3,5],[2,4],[1,3]]'),'DJ praatfrequentie-ranges zijn onverwacht gewijzigd');
 expect(dj.includes("talk.addEventListener('input',replanFromSetting)")&&dj.includes("talk.addEventListener('change',replanFromSetting)"),'Praatfrequentie moet de DJ-planning direct opnieuw berekenen');
 expect(dj.includes('DJ over ${s.remaining} nummer'),'UI toont niet hoeveel nummers er nog tot de volgende DJ zijn');
-expect(dj.includes("result:lastFailure")&&dj.includes("lastFailure='pause-failed'")&&dj.includes("lastFailure='tts-failed'"),'DJ scheduler mist diagnose voor mislukte breaks');
+expect(dj.includes("window.JFMDJTransition?.lastFailure")&&handoff.includes("lastFailure=String(e?.message||e||'DJ-handoff mislukt.')"),'DJ scheduler mist diagnose voor mislukte breaks');
 expect(dj.includes('pendingAuto')&&dj.includes("attemptPending('next-track-retry')")&&dj.includes('schedulePendingRetry'),'Mislukte DJ-break moet pending blijven en automatisch opnieuw proberen');
 expect(dj.includes('DJ klaar voor volgende overgang'),'UI moet tonen dat een break klaarstaat maar nog niet hoorbaar is');
-expect(dj.includes("const voiceReady=()=>typeof window['speak'+'Text']==='function'")&&dj.includes("lastFailure='voice-unavailable'"),'DJ mag een ontbrekende voice runtime niet als hoorbare break tellen');
-expect(!dj.includes('window.speakText?.'),'DJ delivery mag optional chaining niet als stil succes behandelen');
-expect(dj.includes("version:'v229-voice-runtime-guard'"),'Nieuwe DJ voice-runtime guard ontbreekt');
+expect(handoff.includes("const voiceReady=()=>typeof window.speakText==='function'")&&handoff.includes("throw Error('Stemruntime is nog niet beschikbaar.')"),'DJ mag een ontbrekende voice runtime niet als hoorbare break tellen');
+expect(!handoff.includes('window.speakText?.'),'DJ delivery mag optional chaining niet als stil succes behandelen');
+expect(dj.includes("version:'v230.1-event-driven-single-owner'")&&handoff.includes("version:'handoff-v37.1-voice-guard'"),'Nieuwe DJ single-owner voice-runtime guard ontbreekt');
 expect(sw.includes("const CACHE='mair-v49-hardening-cache-20260814'"),'service-worker cache is niet verhoogd voor hardening-update');
 expect(sw.includes("'./mair-category-search.js'")&&sw.includes("'./mair-category-search.css'"),'service worker cachet categoriezoeker niet');
 expect(sw.includes("'./mair-category-purity.js'")&&sw.includes("'./mair-ui-hardening.js'")&&sw.includes("'./mair-playback-category-guard.js'")&&sw.includes("'./mair-build-orchestrator.js'"),'service worker cachet de hardening runtime niet volledig');
