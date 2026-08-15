@@ -45,8 +45,8 @@ expect(dj.includes('TALK_RANGES=[[6,9],[3,5],[2,4],[1,3]]'),'DJ praatfrequentie-
 expect(dj.includes("phase:'IDLE'")&&dj.includes("'PLANNED'")&&dj.includes("'WRITING'")&&dj.includes("'GENERATING'")&&dj.includes("'READY'")&&dj.includes("'ON_AIR'")&&dj.includes("'FAILED'"),'Nieuwe DJ state machine is incompleet');
 expect(writer.includes('process.env.GROQ_API_KEY')&&writer.includes('llama-3.3-70b-versatile'),'Groq DJ Writer ontbreekt of key is niet server-side');
 expect(writer.includes('Nederlandse muziek-radio-DJ'),'Groq DJ Writer is niet strikt Nederlands');
-expect(dj.indexOf("fetch('/api/tts'")<dj.indexOf('await pause(uri)'),'DJ-audio moet vóór Spotify-pauze gegenereerd zijn');
-expect(dj.includes('audio.onended')&&dj.includes("speaking:true")&&dj.includes("speaking:false"),'Hoorbare DJ-completion/DJ LIVE-signalen ontbreken');
+expect(dj.indexOf('window.prepareSpeech')<dj.indexOf('await pause(uri)'),'DJ-audio moet vóór Spotify-pauze voorbereid zijn');
+expect(dj.includes('const ok=await window.speakText(pack.text,false)')&&dj.includes("speaking:true")&&dj.includes("speaking:false")&&!dj.includes('const audio=new Audio()'),'Hoorbare DJ-completion moet via de centrale Voice Engine lopen');
 expect(dj.includes('pendingAir=true')&&dj.includes('if(pendingAir)'),'Mislukte of niet-klare DJ-break moet pending blijven');
 expect(dj.includes("window.addEventListener('jfm:trackchange'")&&!dj.includes('setInterval('),'DJ scheduler moet event-driven zijn');
 expect(dj.includes('await pause(uri)')&&dj.includes('await seekStart(uri)')&&dj.includes('await resume(uri)'),'DJ Spotify handoff is incompleet');
@@ -54,7 +54,7 @@ expect(bootstrap.includes('mair-dj-v2.js')&&!bootstrap.includes('dj-authoritativ
 expect(handoff.includes('legacy-shim-to-mair-dj-v2')&&!handoff.includes('/me/player/pause'),'Legacy handoff bezit nog playbacklogica');
 expect(voiceCheck.includes('Complete Voice Check')&&voiceCheck.includes('Groq schrijver')&&voiceCheck.includes('Spotify pauze/hervatten'),'Tijdelijke complete Voice Check ontbreekt');
 expect(voiceCheck.includes("dataset.temporaryRelease='voice-check-v1'"),'Voice Check is niet als tijdelijk gemarkeerd');
-expect(sw.includes("const CACHE='mair-v51-consolidated-20260815'"),'service-worker cache is niet verhoogd voor geconsolideerde release');
+expect(sw.includes("const CACHE='mair-v52-central-voice-engine-20260815'"),'service-worker cache is niet verhoogd voor centrale Voice Engine release');
 expect(sw.includes("'./mair-dj-v2.js'")&&sw.includes("'./mair-voice-check.js'"),'service worker cachet DJ v2/Voice Check niet');
 expect(sw.includes("'./mair-category-search.js'")&&sw.includes("'./mair-category-search.css'"),'service worker cachet categoriezoeker niet');
 expect(sw.includes("'./mair-category-purity.js'")&&sw.includes("'./mair-ui-hardening.js'")&&sw.includes("'./mair-playback-category-guard.js'")&&sw.includes("'./mair-build-orchestrator.js'"),'service worker cachet de hardening runtime niet volledig');
