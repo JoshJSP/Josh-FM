@@ -1,10 +1,10 @@
-// MAIR rebrand preview keeps the tested Product Beta release identity while loading rebrand UI assets.
-window.JFM_RELEASE={version:'2.0.0-beta.2',displayVersion:'2b.0.2',build:'unknown',asset:'44',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
-window.JFM_ASSET_VERSION='44';
+// MAIR release metadata and cache/build reconciliation.
+window.JFM_RELEASE={version:'2.0.0-beta.3',displayVersion:'2b.0.3',build:'unknown',asset:'45',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
+window.JFM_ASSET_VERSION='45';
 (()=>{
   function addStyle(id,src){if(document.getElementById(id))return;const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=src;document.head.appendChild(l)}
   function addSyncScript(id,src){if(document.getElementById(id))return;const s=document.createElement('script');s.id=id;s.src=src;s.async=false;document.head.appendChild(s)}
-  function loadMairUI(){addStyle('mair-foundation-css','./mair-foundation.css');addStyle('mair-radio-home-css','./mair-radio-home.css');addSyncScript('mair-foundation-js','./mair-foundation.js');addSyncScript('mair-radio-home-js','./mair-radio-home.js')}
+  function loadMairUI(){addStyle('mair-foundation-css','./mair-foundation.css');addStyle('mair-radio-home-css','./mair-radio-home.css');addStyle('mair-station-art-css','./mair-station-art.css?v=45');addSyncScript('mair-foundation-js','./mair-foundation.js');addSyncScript('mair-radio-home-js','./mair-radio-home.js')}
   loadMairUI();
   function sanitizeSleepState(){try{const key='jfm_sleep_timer_v1',raw=localStorage.getItem(key);if(!raw)return;const x=JSON.parse(raw),expired=x?.mode==='time'&&Number(x?.at||0)<=Date.now(),unsafe=x?.mode==='after-track';if(expired||unsafe)localStorage.setItem(key,'null')}catch{try{localStorage.setItem('jfm_sleep_timer_v1','null')}catch{}}}
   sanitizeSleepState();
@@ -19,7 +19,7 @@ window.JFM_ASSET_VERSION='44';
   function loadProductUX(){loadScript('jfm-product-ux-v5','./product-ux-v5.js')}
   function loadDataPortability(){loadScript('jfm-data-portability-v9','./data-portability-v9.js')}
   async function resolveBuild(){render();try{const r=await fetch('/api/version',{cache:'no-store',headers:{accept:'application/json'}});if(r.ok){const data=await r.json();if(data?.version)window.JFM_RELEASE.version=String(data.version);if(data?.displayVersion)window.JFM_RELEASE.displayVersion=String(data.displayVersion);if(data?.commit)window.JFM_RELEASE.build=String(data.commit).slice(0,8);if(data?.cache)window.JFM_RELEASE.serverCache=String(data.cache)}}catch{}render();requestCacheVersion();setTimeout(requestCacheVersion,300);emit()}
-  navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.type!=='CACHE_VERSION')return;window.JFM_RELEASE.localCache=String(e.data.cache||'unknown');window.JFM_RELEASE.updateAvailable=!!(window.JFM_RELEASE.serverCache&&window.JFM_RELEASE.serverCache!=='unknown'&&window.JFM_RELEASE.localCache!==window.JFM_RELEASE.serverCache);emit()});
+  navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.type!=='CACHE_VERSION')return;window.JFM_RELEASE.localCache=String(e.data.cache||'unknown');const server=window.JFM_RELEASE.serverCache,local=window.JFM_RELEASE.localCache;window.JFM_RELEASE.updateAvailable=!!(server&&local&&server!=='unknown'&&local!=='unknown'&&local!==server);emit()});
   window.addEventListener('jfm:diagnostics-refresh',resolveBuild);
   loadBuild1Health();setTimeout(loadMusicIntelligence,1200);setTimeout(loadPersonalLearning,1500);setTimeout(loadProductModel,1700);setTimeout(loadProductUX,2000);setTimeout(loadDataPortability,2300);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',resolveBuild,{once:true});else resolveBuild();
