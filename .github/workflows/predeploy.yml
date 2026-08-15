@@ -7,6 +7,7 @@ on:
     branches:
       - main
       - 'agent/**'
+      - 'update/mair-easy-use-redesign'
 
 jobs:
   predeploy:

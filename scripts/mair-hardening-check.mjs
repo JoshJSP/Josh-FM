@@ -24,7 +24,9 @@ for(const file of hardeningFiles){
 if(!/const CACHE='mair-v55-dj-background-transition-20260815'/.test(sw))throw Error('PWA cacheversie klopt niet met de DJ/background transition release');
 if(!sw.includes("'./mair-background-guard.js'"))throw Error('Background guard ontbreekt in PWA CORE-cache');
 if(!background.includes("recover?.('foreground-return')")||!primary.includes('if(backgrounded())return false'))throw Error('Foreground-only background recovery guard ontbreekt');
-if(!dj.includes('voiceReadyBeforePause')||dj.indexOf('await voiceReadyBeforePause()')>dj.indexOf('await pause(uri)'))throw Error('DJ voice-ready gate moet vóór Spotify-pauze staan');
+if(!dj.includes('ensureVoiceReady')||dj.indexOf('await ensureVoiceReady()')>dj.indexOf('await pauseMusic(uri)'))throw Error('DJ voice-ready gate moet vóór Spotify-pauze staan');
+if(dj.includes('schedulePendingRetry')||dj.includes('retryTimer')||dj.includes('retryAfter'))throw Error('DJ mag een mislukte handoff niet binnen dezelfde track blijven retryen');
+if(!dj.includes("truthApi()?.begin?.('dj-handoff'")||!dj.includes('endHandoff'))throw Error('DJ-handoff moet playback recovery expliciet blokkeren');
 if(!sw.includes("'./mair-easy-use-v1.js'"))throw Error('Easy-use DJ UI ontbreekt in PWA CORE-cache');
 const voices=[...tts.matchAll(/\b(josh|maya|max|noah):'([a-f0-9]{32})'/g)].map(m=>m[2]);if(voices.length<4||new Set(voices).size<4)throw Error('DJ-profielen hebben geen vier unieke standaardstemmen');
 console.log('MAIR hardening checks: OK');
