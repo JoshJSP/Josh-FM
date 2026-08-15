@@ -6,6 +6,7 @@ const policy=read('mair-station-policy.js');
 const classifier=read('api/category-filter.js');
 const bootstrap=read('dj-now-queue.js');
 const dj=read('dj-authoritative-v226.js');
+const handoff=read('dj-handoff-v34.js');
 const progress=read('progress-clock-v226.js');
 const apiDj=read('api/dj.js');
 const checks=[
@@ -16,10 +17,10 @@ const checks=[
  ['popular-category-pools',/buildPool/.test(channels)&&/popularity/.test(channels)],
  ['dutch-filter',/strictSemanticFilter/.test(channels)&&/\/api\/category-filter/.test(channels)&&/minConfidence:.95/.test(policy)&&/hoofdzakelijk Nederlands/.test(classifier)&&!/nlArtists/.test(channels)],
  ['v226-bootstrap',bootstrap.includes('progress-clock-v226.js')&&bootstrap.includes('dj-authoritative-v226.js')],
- ['dj-pauses-before-speech',dj.indexOf('await pause(uri)')<dj.indexOf('window.speakText')],
- ['dj-rewind-resume',dj.includes('await rewind(uri)')&&dj.includes('await resume(uri)')],
- ['dj-auto-scheduler',dj.includes('autoCount>=nextAuto')&&dj.includes('run(false)')],
- ['dj-manual-next',dj.includes('armedFrom')&&dj.includes('run(true)')],
+ ['dj-prepares-before-pause',handoff.indexOf('const pack=await buildSpeech')<handoff.indexOf('pausedForDJ=await pauseExpected')&&handoff.includes('await speak(pack,manual)')],
+ ['dj-rewind-resume',handoff.includes('rewindExpected(expectedUri)')&&handoff.includes('resumeExpected(expectedUri)')],
+ ['dj-auto-scheduler',dj.includes('autoCount>=nextAuto')&&dj.includes('run(false)')&&dj.includes('JFMDJTransition.transition')],
+ ['dj-manual-next',dj.includes('armedFrom')&&dj.includes('run(true)')&&dj.includes("dataset.mairDjOwner='authoritative'")],
  ['progress-local-clock',progress.includes('performance.now()')&&progress.includes('setInterval(tick,250)')&&progress.includes("$('elapsed')")],
  ['radio-copy',/music-radio presenter/.test(apiDj)&&/REAL RADIO STRUCTURE/.test(apiDj)&&/live radio link/.test(apiDj)]
 ];
