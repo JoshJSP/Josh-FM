@@ -18,6 +18,7 @@
     "mair-hardening": "node --check mair-ui-hardening.js && node --check mair-pwa-polish.js && node scripts/mair-hardening-check.mjs",
     "backend-cleanup": "node --check build7.js && node scripts/backend-cleanup-check.mjs",
     "dj-v2": "node --check mair-dj-v2.js && node --check mair-voice-check.js && node --check api/dj-writer.js && node scripts/dj-v2-regression.mjs",
-    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check && npm run category-purity && npm run mair-hardening && npm run backend-cleanup && npm run dj-v2"
+    "dj-behavior": "node scripts/dj-v3-behavior-check.mjs",
+    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check && npm run category-purity && npm run mair-hardening && npm run backend-cleanup && npm run dj-v2 && npm run dj-behavior"
   }
 }
