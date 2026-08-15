@@ -1,40 +1,61 @@
-// MAIR release/update diagnostics — general status checker + strict category engine.
+// MAIR release/update diagnostics — diagnostics only; station playback has one owner.
 (()=>{
-  const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));let repairing=false,lastRepair='';
-  function ensureUi(){
-    if(!$('jfmUpdateBanner')){const b=document.createElement('div');b.id='jfmUpdateBanner';b.style.cssText='display:none;margin:0 0 14px;padding:12px 14px;border:1px solid #6b4d17;background:#2a2110;border-radius:14px;color:#ffd27b;font-size:12px;font-weight:700';b.innerHTML='<b>Update beschikbaar</b><div style="margin-top:4px;font-weight:500">Sluit MAIR volledig en open de app opnieuw om de nieuwste versie te laden.</div>';document.querySelector('.shell')?.insertBefore(b,document.querySelector('.tabs')?.nextSibling||null)}
-    if(!$('jfmDiagnostics')){const pane=$('tab-settings');if(!pane)return;const a=document.createElement('article');a.id='jfmDiagnostics';a.className='card';a.innerHTML='<div class="kicker">ALGEMENE MAIR STATUS</div><h3>App-status</h3><p class="muted">Controleert versie, cache, Spotify-device, playback en herstelstatus.</p><div id="diagRows" class="muted">Diagnose wordt geladen…</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button id="diagRefresh" class="secondary" type="button">Vernieuw status</button><button id="diagRepair" class="secondary" type="button">Herstel MAIR</button></div><p id="diagRepairInfo" class="muted" style="margin-top:9px">Herstel synchroniseert cache, Spotify-device, playerstate en wachtrij zonder je voorkeuren te wissen.</p>';const version=document.querySelector('.versionbox');pane.insertBefore(a,version||null);$('diagRefresh')?.addEventListener('click',refresh);$('diagRepair')?.addEventListener('click',repair)}
+  'use strict';
+  const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
+  let repairing=false,lastRepair='';
+
+  function removeLegacyUpdateBanner(){
+    const banner=$('jfmUpdateBanner');
+    if(banner&&/Sluit MAIR volledig/i.test(banner.textContent||''))banner.remove();
   }
+
+  function ensureUi(){
+    removeLegacyUpdateBanner();
+    if(!$('jfmDiagnostics')){
+      const pane=$('tab-settings');if(!pane)return;
+      const a=document.createElement('article');a.id='jfmDiagnostics';a.className='card';
+      a.innerHTML='<div class="kicker">ALGEMENE MAIR STATUS</div><h3>App-status</h3><p class="muted">Controleert versie, cache, Spotify-device, playback en herstelstatus.</p><div id="diagRows" class="muted">Diagnose wordt geladen…</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><button id="diagRefresh" class="secondary" type="button">Vernieuw status</button><button id="diagRepair" class="secondary" type="button">Herstel MAIR</button></div><p id="diagRepairInfo" class="muted" style="margin-top:9px">Herstel synchroniseert cache, Spotify-device, playerstate en wachtrij zonder je voorkeuren te wissen.</p>';
+      const version=document.querySelector('.versionbox');pane.insertBefore(a,version||null);
+      $('diagRefresh')?.addEventListener('click',refresh);$('diagRepair')?.addEventListener('click',repair);
+    }
+  }
+
   function playbackText(){try{const s=window.JFMPlayback?.state||window.JFMPlaybackState?.get?.();if(!s)return'Onbekend';return s.isPlaying||s.is_playing?'Speelt':'Gepauzeerd'}catch{return'Onbekend'}}
-  function rows(){const r=window.JFM_RELEASE||{},device=localStorage.getItem('jfm_spotify_device_id')||'geen',health=window.JFMPlayback?.health||{};return [
-    ['Versie','v'+(r.version||'?')],['Server build',r.build||'onbekend'],['Assetversie',String(r.asset||window.JFM_ASSET_VERSION||'?')],['App-cache',r.localCache||'geen actieve cache'],['Server-cache',r.serverCache||'onbekend'],['Update',r.updateAvailable?'Beschikbaar':'Actueel'],['Spotify-device',device?device.slice(0,12)+(device.length>12?'…':''):'geen'],['Playback',playbackText()],['Playback-fouten',String(health.failures??0)],['Herstelacties',String(health.recoveries??0)],['Laatste herstel',lastRepair||'nog niet']
-  ]}
-  function render(){ensureUi();const r=window.JFM_RELEASE||{},banner=$('jfmUpdateBanner');if(banner)banner.style.display=r.updateAvailable?'block':'none';const diag=$('jfmDiagnostics');if(diag){diag.style.display='';diag.removeAttribute('aria-hidden')}const host=$('diagRows');if(host)host.innerHTML=rows().map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #222831"><span>${k}</span><b style="color:#d7dde6;text-align:right;overflow-wrap:anywhere">${v}</b></div>`).join('');installStrictChannels();window.MAIRDiagnosticsHub?.sync?.()}
-  async function refresh(){try{window.dispatchEvent(new Event('jfm:diagnostics-refresh'));navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'});await navigator.serviceWorker?.getRegistration?.().then(r=>r?.update?.()).catch(()=>{});await wait(220)}catch{}render()}
-  async function repair(){if(repairing)return;repairing=true;const b=$('diagRepair'),info=$('diagRepairInfo');if(b){b.disabled=true;b.textContent='Herstellen…'}if(info)info.textContent='MAIR synchroniseert de app veilig…';const results=[];try{
+  function rows(){
+    const r=window.JFM_RELEASE||{},device=localStorage.getItem('jfm_spotify_device_id')||'geen',health=window.JFMPlayback?.health||{};
+    return [
+      ['Versie','v'+(r.version||'?')],['Server build',r.build||'onbekend'],['Assetversie',String(r.asset||window.JFM_ASSET_VERSION||'?')],
+      ['App-cache',r.localCache||'geen actieve cache'],['Server-cache',r.serverCache||'onbekend'],['Update',r.updateAvailable?'Beschikbaar':'Actueel'],
+      ['Spotify-device',device?device.slice(0,12)+(device.length>12?'…':''):'geen'],['Playback',playbackText()],
+      ['Playback-fouten',String(health.failures??0)],['Herstelacties',String(health.recoveries??0)],['Laatste herstel',lastRepair||'nog niet']
+    ];
+  }
+  function render(){
+    ensureUi();
+    const diag=$('jfmDiagnostics');if(diag){diag.style.display='';diag.removeAttribute('aria-hidden')}
+    const host=$('diagRows');if(host)host.innerHTML=rows().map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #222831"><span>${k}</span><b style="color:#d7dde6;text-align:right;overflow-wrap:anywhere">${v}</b></div>`).join('');
+    window.MAIRDiagnosticsHub?.sync?.();
+  }
+  async function refresh(){
+    try{window.dispatchEvent(new Event('jfm:diagnostics-refresh'));navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'});await navigator.serviceWorker?.getRegistration?.().then(r=>r?.update?.()).catch(()=>{});await wait(220)}catch{}
+    render();
+  }
+  async function repair(){
+    if(repairing)return;repairing=true;const b=$('diagRepair'),info=$('diagRepairInfo');
+    if(b){b.disabled=true;b.textContent='Herstellen…'}if(info)info.textContent='MAIR synchroniseert de app veilig…';const results=[];
+    try{
       try{await navigator.serviceWorker?.getRegistration?.().then(r=>r?.update?.());results.push('cache')}catch{}
       try{window.dispatchEvent(new Event('jfm:diagnostics-refresh'));navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'})}catch{}
-      try{if(window.JFMPlayback?.ensureDevice){await window.JFMPlayback.ensureDevice();results.push('device')}}catch(e){results.push('device-fout')}
-      try{if(window.JFMPlayback?.recover){await window.JFMPlayback.recover('manual-diagnostics');results.push('playback')}}catch(e){results.push('playback-fout')}
+      try{if(window.JFMPlayback?.ensureDevice){await window.JFMPlayback.ensureDevice();results.push('device')}}catch{results.push('device-fout')}
+      try{if(window.JFMPlayback?.recover){await window.JFMPlayback.recover('manual-diagnostics');results.push('playback')}}catch{results.push('playback-fout')}
       try{await window.JFMStationQueue?.maintain?.('manual-diagnostics');results.push('wachtrij')}catch{}
       try{window.JFMIntegrationGuards?.sanity?.();window.JFMStationHealth?.applySafeMode?.()}catch{}
-      lastRepair=new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});await wait(250);render();if(info)info.textContent=results.includes('playback-fout')||results.includes('device-fout')?'Herstel deels uitgevoerd. Controleer de regels hierboven of koppel Spotify opnieuw.':'Herstel voltooid zonder je persoonlijke voorkeuren te wissen.'
+      lastRepair=new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});await wait(250);render();
+      if(info)info.textContent=results.includes('playback-fout')||results.includes('device-fout')?'Herstel deels uitgevoerd. Controleer de regels hierboven of koppel Spotify opnieuw.':'Herstel voltooid zonder je persoonlijke voorkeuren te wissen.';
     }finally{repairing=false;if(b){b.disabled=false;b.textContent='Herstel MAIR'}}
   }
 
-  // Strict category engine: the selected channel is authoritative and may not roll back when Spotify starts slowly.
-  const CHANNEL_KEY='jfm_music_channel_v1',STRICT_CACHE='jfm_strict_channel_cache_v2';let strictInstalled=false,buildWrapped=false,selected=localStorage.getItem(CHANNEL_KEY)||'mix';
-  const channelQuery=id=>({hits:'year:2023-2026 genre:pop',top40:'year:2025-2026 genre:pop',new:'year:2026',throwback:'year:1980-2016','00s':'year:2000-2009','10s':'year:2010-2019',nl:'genre:dutch',party:'genre:dance',chill:'genre:chill',summer:'genre:"tropical house"'})[id]||'';
-  const mapTrack=t=>({id:t.id,uri:t.uri,name:t.name,artists:(t.artists||[]).map(a=>a.name),album:t.album?.name||'',release:t.album?.release_date||'',image:t.album?.images?.[1]?.url||t.album?.images?.[0]?.url||'',url:t.external_urls?.spotify||'',duration:Number(t.duration_ms||0),popularity:Number(t.popularity||0)});
-  const qget=()=>{try{return Array.isArray(queue)?queue:[]}catch{return[]}},qset=x=>{try{queue=x}catch{}},currentId=()=>{try{return playback?.item?.id||''}catch{return''}};
-  const channelStatus=(text,bad=false)=>{const q=$('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}};
-  function strictCache(){try{return JSON.parse(localStorage.getItem(STRICT_CACHE)||'{}')}catch{return{}}}function saveStrictCache(x){try{localStorage.setItem(STRICT_CACHE,JSON.stringify(x))}catch{}}
-  function diversify(list){const seen=new Set(),artists=new Map(),out=[];for(const t of list){if(!t?.id||!t?.uri||seen.has(t.id))continue;const a=String(t.artists?.[0]||'').toLowerCase(),n=artists.get(a)||0;if(a&&n>=2)continue;seen.add(t.id);if(a)artists.set(a,n+1);out.push(t)}return out}
-  async function strictTracks(id){const query=channelQuery(id);if(!query)return qget();const cache=strictCache(),hit=cache[id];if(hit?.at&&Date.now()-hit.at<45*60*1000&&Array.isArray(hit.items)&&hit.items.length>=5)return hit.items;const d=await api('/search?type=track&limit=50&q='+encodeURIComponent(query));let items=(d?.tracks?.items||[]).filter(t=>t?.id&&t?.uri).map(mapTrack),now=new Date().getFullYear(),yr=t=>Number(String(t.release||'').slice(0,4))||0;if(id==='new')items=items.filter(t=>yr(t)===now);if(id==='throwback')items=items.filter(t=>yr(t)>0&&yr(t)<=2016);if(id==='00s')items=items.filter(t=>yr(t)>=2000&&yr(t)<=2009);if(id==='10s')items=items.filter(t=>yr(t)>=2010&&yr(t)<=2019);items=diversify(items.sort((a,b)=>b.popularity-a.popularity));if(items.length<5)throw Error('Spotify gaf te weinig passende nummers voor dit kanaal.');cache[id]={at:Date.now(),items};saveStrictCache(cache);return items}
-  function paintChannel(id){const c=window.JFMMusicChoice?.channels?.[id];document.querySelectorAll('[data-jfm-channel]').forEach(b=>{const on=b.dataset.jfmChannel===id;b.classList.toggle('active',on);b.setAttribute('aria-pressed',on?'true':'false')});const d=$('channelDescription');if(d&&c)d.textContent=c.desc;const mini=$('channelMini');if(mini&&c)mini.textContent=c.label;document.body.dataset.musicChannel=id;if(c)window.JFMMusicChannelContext={id,...c}}
-  async function chooseStrict(id){const choice=window.JFMMusicChoice,c=choice?.channels?.[id];if(!c)return false;selected=id;try{localStorage.setItem(CHANNEL_KEY,id)}catch{}paintChannel(id);if(id==='mix')return choice.__jfmOriginalChoose?choice.__jfmOriginalChoose(id):true;channelStatus(`MAIR ${c.label} wordt gemaakt…`);try{let list=await strictTracks(id),playing=currentId();const idx=list.findIndex(t=>t.id!==playing);if(idx>0)list=[list[idx],...list.slice(0,idx),...list.slice(idx+1)];qset(list.slice(0,id==='top40'?40:50));try{window.__jfmStationQueueSig='';window.JFMProgramDirector?.invalidateUpcoming?.('strict-category');window.jfmRenderNext?.();window.JFMProgramDirector?.render?.()}catch{}const first=qget()[0];if(first?.uri&&window.JFMPlayback?.playUri){const ok=await window.JFMPlayback.playUri(first.uri);channelStatus(ok===false?`${c.label} is gekozen · tik Play als Spotify niet direct overschakelt.`:`${c.label} speelt.`,ok===false)}setTimeout(()=>window.JFMProgramDirector?.syncSpotifyUpcoming?.(true).catch(()=>{}),450);return true}catch(e){channelStatus(`${c.label} blijft gekozen · ${String(e?.message||e)}`,true);return true}}
-  function installStrictChannels(){const choice=window.JFMMusicChoice;if(!choice||strictInstalled)return false;strictInstalled=true;selected=localStorage.getItem(CHANNEL_KEY)||choice.channel||'mix';choice.__jfmOriginalChoose=choice.chooseChannel.bind(choice);try{Object.defineProperty(choice,'channel',{configurable:true,get:()=>selected})}catch{}choice.chooseChannel=chooseStrict;choice.rebuild=()=>chooseStrict(selected);paintChannel(selected);if(!buildWrapped&&typeof window.buildSet==='function'){buildWrapped=true;const prior=window.buildSet;window.buildSet=async(...args)=>{const r=await prior(...args);if(selected!=='mix')try{qset((await strictTracks(selected)).slice(0,selected==='top40'?40:50))}catch{}paintChannel(selected);try{window.JFMProgramDirector?.invalidateUpcoming?.('strict-build');window.jfmRenderNext?.()}catch{}return qget().length?qget():r}}return true}
-
-  ensureUi();render();window.addEventListener('jfm:release-status',render);window.addEventListener('jfm:trackchange',render);window.addEventListener('pageshow',()=>setTimeout(render,250));setInterval(()=>{render();installStrictChannels()},15000);
-  window.JFMReleaseDiagnostics={version:'diagnostics-v3-mair-visible-hub',refresh,repair,render,get lastRepair(){return lastRepair}};
+  ensureUi();render();
+  window.addEventListener('jfm:release-status',render);window.addEventListener('jfm:trackchange',render);window.addEventListener('pageshow',()=>setTimeout(render,250));
+  window.JFMReleaseDiagnostics={version:'diagnostics-v4-single-station-owner',refresh,repair,render,get lastRepair(){return lastRepair}};
 })();

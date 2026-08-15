@@ -1,0 +1,9 @@
+@import url('./mair-station-art-1.css?v=45');
+@import url('./mair-station-art-2.css?v=45');
+@import url('./mair-station-art-3.css?v=45');
+@import url('./mair-station-art-4.css?v=45');
+
+.mair-station-art{background:#111!important;isolation:isolate}
+.mair-station-art:before{inset:0!important;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;transform:none!important;opacity:1!important}
+.mair-station-art .mair-art-word,.mair-station-art .mair-art-wave{display:none!important}
+.mair-station-art.art-mix:before{background-image:url('./assets/mair-mix.svg')!important;background-color:#110a07!important}
