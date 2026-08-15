@@ -10,8 +10,8 @@ function addSection(id,title){const body=$('mairDiagnosticsBody');if(!body)retur
 function moveCard(id,sectionTitle){const card=$(id);if(!card||card.closest('#mairDiagnosticsBody'))return;const sec=addSection('diag-'+id,sectionTitle);sec?.appendChild(card)}
 function moveSelfTest(){const b=$('selfTest');const card=b?.closest('article.card');if(!card||card.closest('#mairDiagnosticsBody'))return;const sec=addSection('diag-selftest','SELF TEST');sec?.appendChild(card)}
 function moveVoiceTest(){const btn=$('testVoice');if(!btn||btn.closest('#mairDiagnosticsBody'))return;const sec=addSection('diag-voice-test','STEMTEST');const info=$('voiceInfo');sec?.appendChild(btn);if(info)sec?.appendChild(info)}
-function sync(){if(!ensureHub())return;moveVoiceTest();moveCard('mairVoiceCheckCard','COMPLETE VOICE CHECK');moveCard('jfmHealthCard','MAIR STATUS');moveSelfTest();const pane=$('tab-settings'),version=pane?.querySelector('.versionbox');if(pane&&version)pane.appendChild(version)}
-function boot(){sync();let ticks=0;const timer=setInterval(()=>{sync();if(++ticks>40)clearInterval(timer)},250);const pane=$('tab-settings');if(pane){const mo=new MutationObserver(()=>sync());mo.observe(pane,{childList:true,subtree:true});setTimeout(()=>mo.disconnect(),15000)}}
+function sync(){if(!ensureHub())return;moveVoiceTest();moveCard('mairVoiceCheckCard','COMPLETE VOICE CHECK');moveCard('jfmHealthCard','MAIR STATUS');moveSelfTest();const pane=$('tab-settings'),version=pane?.querySelector('.versionbox');if(pane&&version&&pane.lastElementChild!==version)pane.appendChild(version)}
+function boot(){sync();let ticks=0;const timer=setInterval(()=>{sync();if(++ticks>40)clearInterval(timer)},250);const pane=$('tab-settings');if(pane){let scheduled=false;const mo=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;sync()})});mo.observe(pane,{childList:true,subtree:true});setTimeout(()=>mo.disconnect(),15000)}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.addEventListener('pageshow',()=>setTimeout(sync,120));
-window.MAIRDiagnosticsHub={version:'mair-diagnostics-hub-v1',sync};
+window.MAIRDiagnosticsHub={version:'mair-diagnostics-hub-v1.1-loop-safe',sync};
 })();
