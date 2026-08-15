@@ -13,39 +13,15 @@
   function clearRetry(){if(retryTimer){clearTimeout(retryTimer);retryTimer=null}}
   function plan(reason='scheduled'){clearRetry();const v=talkValue(),r=TALK_RANGES[v]||TALK_RANGES[1];nextAuto=Math.floor(Math.random()*(r[1]-r[0]+1))+r[0];autoCount=0;pendingAuto=false;pendingSince=0;pendingAttempts=0;lastFailure='';lastPlanReason=reason;renderSchedule();return scheduleState()}
   function replanFromSetting(){plan('frequency-change');status(`Praatfrequentie ${TALK_LABELS[talkValue()]} · volgende DJ over ${nextAuto} nummer${nextAuto===1?'':'s'}.`)}
-  async function run(manual=false){
-    if(busy)return false;
-    const s=truth();
-    if(!s?.trackId||!s?.isPlaying){lastFailure='blocked-not-playing';lastTrigger={at:Date.now(),manual,result:lastFailure,trackId:s?.trackId||''};renderSchedule();return false}
-    if(!transitionReady()){lastFailure='handoff-unavailable';lastTrigger={at:Date.now(),manual,result:lastFailure,trackId:s.trackId};renderSchedule();status('DJ wacht · audiotransitie is nog niet beschikbaar.');return false}
-    busy=true;lastTrigger={at:Date.now(),manual,result:'starting',trackId:s.trackId};renderSchedule();
-    try{
-      status('DJ wordt voorbereid…');
-      const spoken=await window.JFMDJTransition.transition({manual});
-      if(spoken===true){
-        lastFailure='';lastTrigger={at:Date.now(),manual,result:'spoken',trackId:s.trackId};plan('break-complete');return true
-      }
-      lastFailure='handoff-failed';lastTrigger={at:Date.now(),manual,result:lastFailure,trackId:s.trackId};renderSchedule();return false
-    }catch(e){
-      lastFailure=String(e?.message||e||'handoff-error');lastTrigger={at:Date.now(),manual,result:'error',error:lastFailure,trackId:s.trackId};renderSchedule();status(`DJ wacht · ${lastFailure}`);return false
-    }finally{busy=false;renderSchedule()}
-  }
+  async function run(manual=false){if(busy)return false;const s=truth();if(!s?.trackId||!s?.isPlaying){lastFailure='blocked-not-playing';lastTrigger={at:Date.now(),manual,result:lastFailure,trackId:s?.trackId||''};renderSchedule();return false}if(!transitionReady()){lastFailure='handoff-unavailable';lastTrigger={at:Date.now(),manual,result:lastFailure,trackId:s.trackId};renderSchedule();status('DJ wacht · audiotransitie is nog niet beschikbaar.');return false}busy=true;lastTrigger={at:Date.now(),manual,result:'starting',trackId:s.trackId};renderSchedule();try{status('DJ wordt voorbereid…');const spoken=await window.JFMDJTransition.transition({manual});if(spoken===true){lastFailure='';lastTrigger={at:Date.now(),manual,result:'spoken',trackId:s.trackId};plan('break-complete');return true}lastFailure=String(window.JFMDJTransition?.lastFailure||'handoff-failed');lastTrigger={at:Date.now(),manual,result:lastFailure,trackId:s.trackId};renderSchedule();return false}catch(e){lastFailure=String(e?.message||e||'handoff-error');lastTrigger={at:Date.now(),manual,result:'error',error:lastFailure,trackId:s.trackId};renderSchedule();status(`DJ wacht · ${lastFailure}`);return false}finally{busy=false;renderSchedule()}}
   function schedulePendingRetry(delay=1600){if(!pendingAuto||busy||retryTimer)return;retryTimer=setTimeout(async()=>{retryTimer=null;if(!pendingAuto||busy)return;const s=truth();if(!s?.trackId||!s?.isPlaying){schedulePendingRetry(Math.min(5000,delay+800));return}await attemptPending('same-track-retry')},delay)}
   async function attemptPending(reason='track-transition'){if(!pendingAuto||busy)return false;pendingAttempts++;lastPlanReason=reason;renderSchedule();const ok=await run(false);if(ok)return true;status(`DJ blijft klaar · ${lastFailure||'overgang nog niet veilig'}.`);schedulePendingRetry(Math.min(5000,1200+pendingAttempts*550));return false}
   function markPending(reason='target-reached'){if(!pendingAuto){pendingAuto=true;pendingSince=Date.now();pendingAttempts=0;lastFailure='';lastPlanReason=reason;renderSchedule()}return pendingAuto}
   function arm(){const id=String(truth()?.trackId||'');if(!id)return;armedFrom=armedFrom===id?'':id;const b=$('djNow');if(b){b.dataset.queued=armedFrom?'1':'0';const strong=b.querySelector('b'),small=b.querySelector('span');if(strong)strong.textContent=armedFrom?'🎙️ DJ staat klaar':'🎙️ DJ nu';if(small)small.textContent=armedFrom?'Praat bij het volgende nummer':'Laat hem iets vertellen'}status(armedFrom?'DJ staat klaar voor het volgende nummer.':'DJ-opdracht geannuleerd.')}
   function ownButton(){const old=$('djNow');if(!old||old.dataset.mairDjOwner==='authoritative')return;const b=old.cloneNode(true);old.replaceWith(b);b.dataset.mairDjOwner='authoritative';b.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();arm()},true)}
-  async function onTrackChange(id){id=String(id||truth()?.trackId||'');if(!id||id===lastSeen)return;const previous=lastSeen;lastSeen=id;if(!previous){renderSchedule();return}
-    if(armedFrom&&id!==armedFrom){armedFrom='';ownButton();const b=$('djNow');if(b){b.dataset.queued='0';const strong=b.querySelector('b'),small=b.querySelector('span');if(strong)strong.textContent='🎙️ DJ nu';if(small)small.textContent='Laat hem iets vertellen'}await wait(180);await run(true);return}
-    if(pendingAuto){await wait(220);await attemptPending('next-track-retry');return}
-    autoCount++;renderSchedule();if(autoCount>=nextAuto){let skip=false;try{skip=!!skipNextTalk;if(skip)skipNextTalk=false}catch{}if(skip){plan('skip-next-talk');return}markPending('target-reached');lastTrigger={at:Date.now(),manual:false,result:'triggered',trackId:id,tracksSinceTalk:autoCount,target:nextAuto};renderSchedule();await wait(220);await attemptPending('target-transition')}}
-  window.djBreak=()=>run(false);
-  window.JFMDJAuthoritative={version:'v230-event-driven-single-owner',run,plan,replan:replanFromSetting,state:scheduleState,retry:()=>attemptPending('manual-retry'),get busy(){return busy}};
+  async function onTrackChange(id){id=String(id||truth()?.trackId||'');if(!id||id===lastSeen)return;const previous=lastSeen;lastSeen=id;if(!previous){renderSchedule();return}if(armedFrom&&id!==armedFrom){armedFrom='';ownButton();const b=$('djNow');if(b){b.dataset.queued='0';const strong=b.querySelector('b'),small=b.querySelector('span');if(strong)strong.textContent='🎙️ DJ nu';if(small)small.textContent='Laat hem iets vertellen'}await wait(180);await run(true);return}if(pendingAuto){await wait(220);await attemptPending('next-track-retry');return}autoCount++;renderSchedule();if(autoCount>=nextAuto){let skip=false;try{skip=!!skipNextTalk;if(skip)skipNextTalk=false}catch{}if(skip){plan('skip-next-talk');return}markPending('target-reached');lastTrigger={at:Date.now(),manual:false,result:'triggered',trackId:id,tracksSinceTalk:autoCount,target:nextAuto};renderSchedule();await wait(220);await attemptPending('target-transition')}}
+  window.djBreak=()=>run(false);window.JFMDJAuthoritative={version:'v230.1-event-driven-single-owner',run,plan,replan:replanFromSetting,state:scheduleState,retry:()=>attemptPending('manual-retry'),get busy(){return busy}};
   function bindFrequency(){const talk=$('talk');if(!talk||talk.dataset.mairDjFrequencyBound==='1')return;talk.dataset.mairDjFrequencyBound='1';talk.addEventListener('input',replanFromSetting);talk.addEventListener('change',replanFromSetting)}
   function boot(){ownButton();bindFrequency();const id=truth()?.trackId||'';if(id&&!lastSeen)lastSeen=id;renderSchedule()}
-  window.addEventListener('jfm:trackchange',e=>setTimeout(()=>onTrackChange(e.detail?.trackId).catch(()=>{}),80));
-  window.addEventListener('jfm:natural-next-ready',e=>setTimeout(()=>onTrackChange(e.detail?.newTrackId).catch(()=>{}),80));
-  window.addEventListener('jfm:playback-state',()=>{if(pendingAuto)schedulePendingRetry(1200)});
-  window.addEventListener('pageshow',()=>setTimeout(()=>{ownButton();bindFrequency();renderSchedule();if(pendingAuto)schedulePendingRetry(900)},120));
-  plan('boot');if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+  window.addEventListener('jfm:trackchange',e=>setTimeout(()=>onTrackChange(e.detail?.trackId).catch(()=>{}),80));window.addEventListener('jfm:natural-next-ready',e=>setTimeout(()=>onTrackChange(e.detail?.newTrackId).catch(()=>{}),80));window.addEventListener('jfm:playback-state',()=>{if(pendingAuto)schedulePendingRetry(1200)});window.addEventListener('pageshow',()=>setTimeout(()=>{ownButton();bindFrequency();renderSchedule();if(pendingAuto)schedulePendingRetry(900)},120));plan('boot');if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
