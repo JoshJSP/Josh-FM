@@ -5,8 +5,8 @@ import {execFileSync} from 'node:child_process';
 
 const source=fs.readFileSync(new URL('./app-smoke-check.mjs',import.meta.url),'utf8');
 const oldDj="check('DJ v36 marker',dj.includes('handoff-v36-mute-rewind'));";
-const newDj="check('DJ v36.2 marker',dj.includes('handoff-v36.2-mute-rewind-skip-safe'));check('DJ now survives manual skip',dj.includes('armed={fromId:id,requestedAt:Date.now()}')&&dj.includes('consumeArmedIfChanged')&&dj.includes('runBreak(null,true)'));";
-if(!source.includes(oldDj))throw new Error('Whole-app smoke DJ baseline changed; update the v36.2 adapter.');
+const newDj="check('DJ handoff transport-only marker',dj.includes('handoff-v37-transport-only')&&!dj.includes('consumeArmedIfChanged'));check('DJ manual scheduling single owner',read('dj-authoritative-v226.js').includes(\"dataset.mairDjOwner='authoritative'\")&&read('dj-authoritative-v226.js').includes('await run(true)')&&read('dj-authoritative-v226.js').includes(\"window.addEventListener('jfm:trackchange'\"));";
+if(!source.includes(oldDj))throw new Error('Whole-app smoke DJ baseline changed; update the DJ adapter.');
 let patched=source.replace(oldDj,newDj);
 patched=patched.replace("check('backup folder exists',exists('backups/README.md')&&fs.readdirSync(path.join(root,'backups')).some(x=>x!=='README.md'));","check('Git rollback policy active',!exists('backups')&&read('PRE_DEPLOY.md').includes('rollbackpunt')); ");
 patched=patched.replace("check('DJ no pause/resume',!dj.includes('/me/player/pause')&&!dj.includes(\"/me/player/play')\"));","check('DJ safe iOS handoff',dj.includes('pauseExpected(expectedUri)')&&dj.includes('resumeExpected(expectedUri)')&&dj.includes(\"iosFallback:'pause-speak-rewind-resume'\"));");
