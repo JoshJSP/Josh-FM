@@ -10,6 +10,7 @@
   const truth=()=>window.JFMPlaybackState||null;
   const transportIds=new Set(['start','play','next','prev']);
   const djOwnsTransport=()=>!!(window.JFMDJAuthoritative?.busy||window.JFMDJTransition?.busy||window.djBusy||truth()?.blocksRecovery?.());
+  const backgrounded=()=>document.visibilityState==='hidden'||document.body?.getAttribute('data-mair-background')==='1';
 
   function activateNow(){try{player()?.activateElement?.()}catch{}}
   async function ensurePlayer(){for(let i=0;i<70;i++){const p=player();if(p&&deviceId())return p;await wait(120)}throw Error('Josh FM-player is nog niet klaar. Koppel Spotify opnieuw of vernieuw de app.')}
@@ -75,6 +76,21 @@
     if(!s.is_playing){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,5)||s}
     ingest(s,source);truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;return s
   }
+  async function fastNaturalAdvance(endedId){
+    let s=await remote();
+    if(s?.item?.id&&s.item.id!==endedId){
+      if(!s.is_playing){const id=await freshDevice();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.item?.id!==endedId&&x.is_playing,4)||s}
+      ingest(s,'primary-natural-auto');return s
+    }
+    const fallbackUri=stationNeighbor(s,1);
+    if(fallbackUri){
+      const id=await freshDevice(),uris=stationContext(fallbackUri);
+      await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
+      s=await verify(x=>x.device?.id===id&&x.is_playing&&x.item?.uri===fallbackUri,6);
+      if(s){ingest(s,'primary-natural-fast');truth()?.setExpectedLive?.(true,'radio-live');return s}
+    }
+    return advance({record:false,source:'primary-natural-end'})
+  }
   async function skip(delta){
     activateNow();return withBusy(async()=>{
       try{
@@ -91,15 +107,13 @@
     const endedId=String(detail.trackId||'');if(!endedId||endGuardBusy||lastNaturalEnd===endedId||busy||djOwnsTransport())return false;
     endGuardBusy=true;lastNaturalEnd=endedId;
     try{
-      await wait(450);if(djOwnsTransport())return false;let s=await remote();
-      if(s?.item?.id&&s.item.id!==endedId){if(!s.is_playing){if(djOwnsTransport())return false;const id=await freshDevice();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.item?.id!==endedId&&x.is_playing,4)||s}ingest(s,'primary-natural-auto');recoveryFailures=0;recoveryCooldownUntil=0;try{window.dispatchEvent(new CustomEvent('jfm:natural-next-ready',{detail:{endedTrackId:endedId,newTrackId:s.item?.id||'',auto:true}}))}catch{};return true}
-      if(djOwnsTransport())return false;s=await advance({record:false,source:'primary-natural-end'});recoveries++;info('Josh FM gaat automatisch door.');
-      try{window.dispatchEvent(new CustomEvent('jfm:natural-next-ready',{detail:{endedTrackId:endedId,newTrackId:s?.item?.id||'',auto:false}}))}catch{};return true
-    }catch(e){return rememberError(e,'Automatisch doorgaan mislukt: ')}finally{endGuardBusy=false;setTimeout(()=>{if(lastNaturalEnd===endedId)lastNaturalEnd=''},2500)}
+      await wait(120);if(djOwnsTransport())return false;const s=await fastNaturalAdvance(endedId);if(!s)throw Error('Volgende track kon niet snel worden gestart.');recoveries++;recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM gaat automatisch door.');
+      try{window.dispatchEvent(new CustomEvent('jfm:natural-next-ready',{detail:{endedTrackId:endedId,newTrackId:s?.item?.id||'',auto:true,fast:true}}))}catch{};return true
+    }catch(e){return rememberError(e,'Automatisch doorgaan mislukt: ')}finally{endGuardBusy=false;setTimeout(()=>{if(lastNaturalEnd===endedId)lastNaturalEnd=''},1800)}
   }
 
   async function playUri(uri){activateNow();if(!uri)return resume();return withBusy(async()=>{try{const{id}=await ensureActive();await playContextDirect(uri,id,'primary-uri');recoveryFailures=0;recoveryCooldownUntil=0;return true}catch(e){return rememberError(e,'Track starten mislukt: ')}})}
-  async function recover(reason='watchdog'){if(Date.now()<recoveryCooldownUntil||busy||endGuardBusy||djOwnsTransport())return false;const t=truth()?.get?.();if(!t?.expectedLive)return false;if(truth()?.shouldRecover&&!truth().shouldRecover())return !!t.isPlaying;try{await freshDevice();if(djOwnsTransport())return false;const s=await remote();if(s?.is_playing){ingest(s,'primary-recovery-already');recoveryFailures=0;recoveryCooldownUntil=0;return true}if(djOwnsTransport())return false;const ok=await resume();if(ok){recoveryFailures=0;recoveryCooldownUntil=0;recoveries++;info('Spotify-verbinding hersteld.')}return ok}catch(e){recoveryFailures++;if(recoveryFailures>=3){recoveryCooldownUntil=Date.now()+30000;recoveryFailures=0;info('Spotify-herstel wacht 30 seconden na meerdere fouten.',true)}return rememberError(e,'Playback-herstel mislukt: ')}}
+  async function recover(reason='watchdog'){if(backgrounded())return false;if(Date.now()<recoveryCooldownUntil||busy||endGuardBusy||djOwnsTransport())return false;const t=truth()?.get?.();if(!t?.expectedLive)return false;if(truth()?.shouldRecover&&!truth().shouldRecover())return !!t.isPlaying;try{await freshDevice();if(djOwnsTransport())return false;const s=await remote();if(s?.is_playing){ingest(s,'primary-recovery-already');recoveryFailures=0;recoveryCooldownUntil=0;return true}if(djOwnsTransport())return false;const ok=await resume();if(ok){recoveryFailures=0;recoveryCooldownUntil=0;recoveries++;info('Spotify-verbinding hersteld.')}return ok}catch(e){recoveryFailures++;if(recoveryFailures>=3){recoveryCooldownUntil=Date.now()+30000;recoveryFailures=0;info('Spotify-herstel wacht 30 seconden na meerdere fouten.',true)}return rememberError(e,'Playback-herstel mislukt: ')}}
 
   function actionFor(id){return id==='start'?start:id==='play'?playPause:id==='next'?()=>skip(1):id==='prev'?()=>skip(-1):null}
   function bind(){if(bound||!player()||!deviceId())return false;bound=true;const own=(id,fn)=>{const old=$(id);if(!old)return;const b=old.cloneNode(true);old.replaceWith(b);b.disabled=false;b.dataset.jfmOwner='primary';b.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();activateNow();Promise.resolve(fn()).catch(()=>{})},true)};own('start',start);own('play',playPause);own('next',()=>skip(1));own('prev',()=>skip(-1));info('Josh FM-player klaar.');return true}
@@ -109,6 +123,6 @@
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
   window.addEventListener('pageshow',()=>setTimeout(()=>{bound=false;tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),450)});setInterval(()=>recover('watchdog'),12000);
 
-  window.JFMPlayback={primary:true,version:'primary-v8.1-start-responsive',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,playUri,recover,handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{failures,recoveries,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now())}}};
+  window.JFMPlayback={primary:true,version:'primary-v8.2-fast-natural-background-safe',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,playUri,recover,handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{failures,recoveries,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now())}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
 })();
