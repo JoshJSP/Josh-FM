@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 
 const source=fs.readFileSync(new URL('./app-smoke-check.mjs',import.meta.url),'utf8');
 const oldDj="check('DJ v36 marker',dj.includes('handoff-v36-mute-rewind'));";
-const newDj="check('DJ handoff transport-only marker',dj.includes('handoff-v37-transport-only')&&!dj.includes('consumeArmedIfChanged'));check('DJ manual scheduling single owner',read('dj-authoritative-v226.js').includes(\"dataset.mairDjOwner='authoritative'\")&&read('dj-authoritative-v226.js').includes('await run(true)')&&read('dj-authoritative-v226.js').includes(\"window.addEventListener('jfm:trackchange'\"));";
+const newDj="check('DJ handoff transport-only marker',dj.includes('handoff-v37.1-voice-guard')&&!dj.includes('consumeArmedIfChanged'));check('DJ manual scheduling single owner',read('dj-authoritative-v226.js').includes(\"dataset.mairDjOwner='authoritative'\")&&read('dj-authoritative-v226.js').includes('await run(true)')&&read('dj-authoritative-v226.js').includes(\"window.addEventListener('jfm:trackchange'\"));";
 if(!source.includes(oldDj))throw new Error('Whole-app smoke DJ baseline changed; update the DJ adapter.');
 let patched=source.replace(oldDj,newDj);
 patched=patched.replace("check('backup folder exists',exists('backups/README.md')&&fs.readdirSync(path.join(root,'backups')).some(x=>x!=='README.md'));","check('Git rollback policy active',!exists('backups')&&read('PRE_DEPLOY.md').includes('rollbackpunt')); ");
