@@ -17,6 +17,7 @@
     "category-purity": "node --check channel-click-fix.js && node --check music-intelligence-v3.js && node --check api/category-filter.js && node --check mair-category-purity.js && node --check mair-playback-category-guard.js && node --check mair-build-orchestrator.js && node scripts/category-purity-check.mjs",
     "mair-hardening": "node --check mair-ui-hardening.js && node --check mair-pwa-polish.js && node scripts/mair-hardening-check.mjs",
     "backend-cleanup": "node --check build7.js && node scripts/backend-cleanup-check.mjs",
-    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check && npm run category-purity && npm run mair-hardening && npm run backend-cleanup"
+    "dj-v2": "node --check mair-dj-v2.js && node --check mair-voice-check.js && node --check api/dj-writer.js && node scripts/dj-v2-regression.mjs",
+    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check && npm run category-purity && npm run mair-hardening && npm run backend-cleanup && npm run dj-v2"
   }
 }
