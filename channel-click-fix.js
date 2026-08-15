@@ -3,7 +3,7 @@
   let switching=false,lastTap=0,buildProtected=false,policyLoading=false;const wait=ms=>new Promise(r=>setTimeout(r,ms));
   const choice=()=>window.JFMMusicChoice,status=(text,bad=false)=>{const q=document.getElementById('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}};
   const policy=()=>window.MAIRStationPolicy;
-  const categoryActive=()=>{try{return !!window.MAIRCategorySearch?.active||!!JSON.parse(localStorage.getItem('mair_active_category_v2')||'null')?.id}catch{return false}};
+  const categoryActive=()=>{try{const source=JSON.parse(localStorage.getItem('mair_playback_source_v1')||'null');return source?.kind==='category'||!!window.MAIRCategorySearch?.active||!!JSON.parse(localStorage.getItem('mair_active_category_v2')||'null')?.id}catch{return false}};
   function ensurePolicy(){if(policy())return true;if(policyLoading||document.getElementById('mairStationPolicyJs'))return false;policyLoading=true;const s=document.createElement('script');s.id='mairStationPolicyJs';s.src='./mair-station-policy.js';s.dataset.mairStationPolicy='1';s.onload=()=>{policyLoading=false;own()};s.onerror=()=>{policyLoading=false;status('Stations konden niet worden geladen: categoriebeleid ontbreekt.',true)};document.head.appendChild(s);return false}
   const toTrack=t=>({id:t.id,uri:t.uri,name:t.name,artists:(t.artists||[]).map(a=>a.name),album:t.album?.name||'',release:t.album?.release_date||'',image:t.album?.images?.[1]?.url||t.album?.images?.[0]?.url||'',url:t.external_urls?.spotify||'',duration:t.duration_ms||0,popularity:Number(t.popularity||0)});
   const queries=id=>policy()?.queries?.(id)||[];
@@ -18,5 +18,5 @@
   function own(){if(!ensurePolicy())return false;const c=choice();if(!c)return false;c.chooseChannel=choose;c.rebuild=()=>choose(localStorage.getItem('jfm_music_channel_v1')||'mix');try{Object.defineProperty(c,'channel',{configurable:true,get:()=>localStorage.getItem('jfm_music_channel_v1')||'mix'})}catch{}c.hotfix='authoritative-strict-categories-policy-v9-source-owner';if(!categoryActive())paint(localStorage.getItem('jfm_music_channel_v1')||'mix');protectBuild();return true}
   document.addEventListener('click',e=>{const b=e.target?.closest?.('[data-jfm-channel]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const n=Date.now();if(n-lastTap<250)return;lastTap=n;choose(b.dataset.jfmChannel).catch(()=>{})},true);
   const boot=()=>own();boot();setTimeout(boot,300);setTimeout(boot,1200);window.addEventListener('pageshow',()=>setTimeout(boot,150));window.addEventListener('mair:runtime-ready',boot);
-  window.MAIRStationController={version:'mair-station-controller-v3.2-source-owner',select:choose,harden:own,buildPool,get switching(){return switching},get channel(){return localStorage.getItem('jfm_music_channel_v1')||'mix'}};window.JFMChannelTapGuard=window.MAIRStationController;
+  window.MAIRStationController={version:'mair-station-controller-v3.3-shared-source-owner',select:choose,harden:own,buildPool,get switching(){return switching},get channel(){return localStorage.getItem('jfm_music_channel_v1')||'mix'}};window.JFMChannelTapGuard=window.MAIRStationController;
 })();
