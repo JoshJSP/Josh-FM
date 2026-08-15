@@ -21,7 +21,7 @@ for(const file of hardeningFiles){
  if(!pwa.includes(file))throw Error('Hardening script wordt niet geladen: '+file);
  if(!sw.includes(`./${file}`))throw Error('Hardening script ontbreekt in PWA CORE-cache: '+file);
 }
-if(!/const CACHE='mair-v51-consolidated-20260815'/.test(sw))throw Error('PWA cacheversie klopt niet met de geconsolideerde release');
+if(!/const CACHE='mair-v52-central-voice-engine-20260815'/.test(sw))throw Error('PWA cacheversie klopt niet met de centrale Voice Engine release');
 if(!sw.includes("'./mair-easy-use-v1.js'"))throw Error('Easy-use DJ UI ontbreekt in PWA CORE-cache');
 const voices=[...tts.matchAll(/\b(josh|maya|max|noah):'([a-f0-9]{32})'/g)].map(m=>m[2]);if(voices.length<4||new Set(voices).size<4)throw Error('DJ-profielen hebben geen vier unieke standaardstemmen');
 console.log('MAIR hardening checks: OK');

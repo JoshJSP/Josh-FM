@@ -18,11 +18,11 @@ const checks=[
  ['dutch-filter',/strictSemanticFilter/.test(channels)&&/\/api\/category-filter/.test(channels)&&/minConfidence:.95/.test(policy)&&/hoofdzakelijk Nederlands/.test(classifier)&&!/nlArtists/.test(channels)],
  ['dj-v2-bootstrap',bootstrap.includes('progress-clock-v226.js')&&bootstrap.includes('mair-dj-v2.js')&&!bootstrap.includes('dj-authoritative-v226.js')],
  ['dj-groq-writer',writer.includes('GROQ_API_KEY')&&writer.includes('llama-3.3-70b-versatile')&&writer.includes('Nederlandse muziek-radio-DJ')],
- ['dj-prebuffers-before-pause',dj.indexOf("fetch('/api/tts'")<dj.indexOf('await pause(uri)')&&dj.includes("setPhase('READY'")],
+ ['dj-prebuffers-before-pause',dj.indexOf('window.prepareSpeech')<dj.indexOf('await pause(uri)')&&dj.includes("setPhase('READY'")],
  ['dj-rewind-resume',dj.includes('await seekStart(uri)')&&dj.includes('await resume(uri)')],
  ['dj-auto-scheduler',dj.includes('count++')&&dj.includes('remaining()')&&dj.includes('pendingAir=true')],
  ['dj-manual-next',dj.includes('manualFrom')&&dj.includes('armManual')&&dj.includes("dataset.mairDjOwner='v2'")],
- ['dj-real-audio-completion',dj.includes('audio.onended')&&dj.includes("speaking:true")&&dj.includes("speaking:false")],
+ ['dj-real-audio-completion',dj.includes('const ok=await window.speakText(pack.text,false)')&&dj.includes("speaking:true")&&dj.includes("speaking:false")&&!dj.includes('const audio=new Audio()')],
  ['legacy-handoff-retired',legacy.includes('legacy-shim-to-mair-dj-v2')&&!legacy.includes('/me/player/pause')],
  ['progress-local-clock',progress.includes('performance.now()')&&progress.includes('setInterval(tick,250)')&&progress.includes("$('elapsed')")]
 ];

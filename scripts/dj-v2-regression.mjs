@@ -5,13 +5,16 @@ ok(writer.includes('process.env.GROQ_API_KEY'),'Groq key must remain server-side
 ok(writer.includes('llama-3.3-70b-versatile'),'Groq DJ model missing');
 ok(writer.includes('Je schrijft uitsluitend de gesproken tekst voor een Nederlandse muziek-radio-DJ'),'Dutch DJ writer prompt missing');
 ok(dj.includes("phase:'IDLE'")&&dj.includes("'PLANNED'")&&dj.includes("'WRITING'")&&dj.includes("'GENERATING'")&&dj.includes("'READY'")&&dj.includes("'ON_AIR'")&&dj.includes("'FAILED'"),'DJ state machine incomplete');
-ok(dj.includes("fetch('/api/dj-writer'")&&dj.includes("fetch('/api/tts'"),'DJ must use separate writer and Fish render stages');
-ok(dj.indexOf("fetch('/api/tts'")<dj.indexOf("await pause(uri)"),'Voice must be generated before Spotify pause');
+ok(dj.includes("fetch('/api/dj-writer'")&&dj.includes('window.prepareSpeech')&&dj.includes('window.speakText'),'DJ must use writer + central Voice Engine stages');
+ok(dj.indexOf('window.prepareSpeech')<dj.indexOf('await pause(uri)'),'Voice must be prepared before Spotify pause');
 ok(dj.includes('pendingAir=true')&&dj.includes('if(pendingAir)'),'Failed/not-ready break must stay pending');
-ok(dj.includes('audio.onended')&&dj.includes("setPhase('ON_AIR'"),'DJ completion must depend on real audio playback');
+ok(dj.includes('const ok=await window.speakText(pack.text,false)')&&dj.includes("setPhase('ON_AIR'"),'DJ completion must depend on real central audio playback');
+ok(!dj.includes('const audio=new Audio()')&&!dj.includes('let audioUnlocked='),'DJ runtime must not own a second audio engine/unlock state');
+ok(dj.includes("window.JFMDJAudio?.unlock")&&dj.includes('const audioStatus=()=>window.JFMDJAudio?.status||{}'),'DJ unlock truth must come from central audio engine');
 ok(dj.includes("window.addEventListener('jfm:trackchange'")&&!dj.includes('setInterval('),'DJ scheduler should be event-driven, not Spotify polling');
 ok(dj.includes('await pause(uri)')&&dj.includes('await seekStart(uri)')&&dj.includes('await resume(uri)'),'Spotify handoff sequence incomplete');
 ok(dj.includes("new CustomEvent('mair:dj-speaking'")&&dj.includes('speaking:true')&&dj.includes('speaking:false'),'DJ LIVE signal missing');
+ok(dj.includes("step('DJ audio playback','pass'")&&dj.includes('echt afgespeeld via'),'Voice Check must verify real playback instead of only a boolean unlock flag');
 ok(easy.includes("e.detail?.speaking??e.detail?.active")&&easy.includes("detail.phase==='ON_AIR'")&&easy.includes("detail.pendingAir"),'DJ v2 UI must consume speaking and state-machine fields');
 ok(unlock.includes("['pointerdown','touchstart','touchend','mousedown','keydown','click']")&&unlock.includes('window.MAIRDJ?.unlock?.()')&&unlock.includes('window.JFMDJAudio?.unlock?.()'),'Unified iOS audio unlock bridge incomplete');
 ok(unlock.includes('if(inFlight)return inFlight')&&unlock.includes('if(complete())return Promise.resolve(true)'),'Unified audio unlock must be idempotent and non-reentrant');
@@ -23,5 +26,5 @@ ok(boot.includes("load('./mair-dj-v2.js'")&&boot.includes("load('./mair-audio-un
 ok(legacy.includes('legacy-shim-to-mair-dj-v2')&&!legacy.includes('/me/player/pause'),'Legacy handoff still owns playback');
 ok(voice.includes('Complete Voice Check')&&voice.includes('Groq schrijver')&&voice.includes('Spotify pauze/hervatten'),'Temporary full Voice Check missing');
 ok(voice.includes("dataset.temporaryRelease='voice-check-v1'"),'Voice Check temporary release marker missing');
-ok(sw.includes("'./mair-dj-v2.js'")&&sw.includes("'./mair-audio-unlock-v1.js'")&&sw.includes("'./mair-voice-check.js'")&&sw.includes("'./mair-diagnostics-hub.js'")&&sw.includes('mair-v51-consolidated-20260815'),'PWA cache missing consolidated DJ diagnostic assets');
+ok(sw.includes("'./mair-dj-v2.js'")&&sw.includes("'./mair-audio-unlock-v1.js'")&&sw.includes("'./mair-voice-check.js'")&&sw.includes("'./mair-diagnostics-hub.js'"),'PWA cache missing DJ diagnostic assets');
 if(fail.length){console.error('MAIR DJ v2 regression FAILED');for(const x of fail)console.error('-',x);process.exit(1)}console.log('MAIR DJ v2 regression OK');
