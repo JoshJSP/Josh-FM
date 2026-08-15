@@ -11,7 +11,7 @@ const brandRuntime=read('brand-runtime-v9.js');
 const apiVersion=read('api/version.js');
 
 const checks=[
-  ['MAIR v53 category/diagnostics cache active',sw.includes("mair-v53-category-diagnostics-cleanup-20260815")&&apiVersion.includes("mair-v53-category-diagnostics-cleanup-20260815")],
+  ['MAIR v54 category source cache active',sw.includes("mair-v54-category-source-owner-20260815")&&apiVersion.includes("mair-v54-category-source-owner-20260815")],
   ['all Product Beta runtime cached',['radio-core-health-v1.js','dj-quality-v2.js','music-intelligence-v3.js','personal-learning-v4.js','product-model-v6.js','product-ux-v5.js','beta-status.js','brand-config.js','brand-runtime-v9.js','channel-start-guard-v2b01.js','dj-handoff-bootstrap-v2b02.js','ios-transport-v2b02.js','mair-category-search.js','mair-category-purity.js','mair-ui-hardening.js','mair-playback-category-guard.js','mair-build-orchestrator.js','mair-dj-v2.js','mair-voice-check.js','mair-easy-use-v1.js'].every(x=>sw.includes(`./${x}`))],
   ['network requests have timeout',sw.includes('AbortController')&&sw.includes('fetchTimed')],
   ['PWA update checks recover on foreground',pwa.includes("visibilitychange")&&pwa.includes('checkForUpdate')&&pwa.includes('pageshow')],
