@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8'),fail=[];const ok=(x,m)=>{if(!x)fail.push(m)};
-const dj=read('mair-dj-v2.js'),writer=read('api/dj-writer.js'),voice=read('debug-tts.js'),engine=read('mair-voice-engine.js'),resume=read('dj-resume.js'),boot=read('dj-now-queue.js'),easy=read('mair-easy-use-v1.js');
-ok(dj.includes("v3.1-natural-transition-failsafe"),'DJ v3.1 runtime marker missing');
+const dj=read('mair-dj-v2.js'),writer=read('api/dj-writer.js'),voice=read('debug-tts.js'),engine=read('mair-voice-engine.js'),resume=read('dj-resume.js'),boot=read('dj-now-queue.js'),easy=read('mair-easy-use-v1.js'),primary=read('playback-primary.js');
+ok(dj.includes("v3.2-sdk-first-single-owner"),'DJ v3.2 runtime marker missing');
 ok(writer.includes('process.env.GROQ_API_KEY'),'Groq key must remain server-side');
-ok(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'ARMED'")&&dj.includes("'HANDOFF'")&&dj.includes("'SPEAKING'")&&dj.includes("'RESTORING'"),'DJ v3.1 state machine incomplete');
+ok(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'ARMED'")&&dj.includes("'HANDOFF'")&&dj.includes("'SPEAKING'")&&dj.includes("'RESTORING'"),'DJ v3.2 state machine incomplete');
 ok(dj.includes("fetch('/api/dj-writer'")&&dj.includes('window.prepareSpeech')&&dj.includes('window.speakText'),'DJ must use writer + prepared central voice route');
 ok(dj.indexOf('window.prepareSpeech')<dj.indexOf('await pauseMusic(uri)'),'Voice must be prepared before Spotify pause');
 ok(dj.includes("window.addEventListener('jfm:natural-next-ready'")&&dj.includes('async function naturalTransition'),'Natural transitions must be the only automatic DJ cadence trigger');
@@ -15,7 +15,10 @@ ok(resume.includes('__mairLegacyDJSchedulerDisabled=true')&&resume.includes('leg
 ok(dj.includes("truthApi()?.begin?.('dj-handoff'")&&dj.includes('endHandoff'),'DJ handoff must block recovery as one explicit operation');
 ok(dj.includes('if(paused&&uri){try{await restoreMusic(uri,{rewind:false})}catch{}}'),'Failed voice handoff must restore Spotify once without rewind/retry');
 ok(dj.includes("miss('break-missed',error)")&&!dj.includes('failed-break-dropped'),'Failed break must be dropped and replanned, never retried');
-ok(dj.includes('rewindCurrent(uri)')&&dj.includes("seek?position_ms=0&device_id="),'Successful radio handoff should restart the new song cleanly');
+ok(dj.includes('liveSnapshot()')&&dj.includes('snapshot()')&&dj.includes("api('/me/player/queue')"),'DJ must separate critical live snapshot from preparation queue lookup');
+ok(dj.includes('transport.djPause')&&dj.includes('transport.djResume')&&dj.includes('transport.djRewind'),'DJ must prefer SDK-first primary transport helpers');
+ok(primary.includes('player()?.activateElement')&&primary.includes('djPauseDirect')&&primary.includes('djResumeDirect')&&primary.includes('djRewindDirect'),'Primary playback must own SDK-first DJ transport');
+ok(primary.includes('primary-v8.3-dj-sdk-handoff'),'Primary SDK-first transport version missing');
 ok(!dj.includes('new Audio(')&&!dj.includes('AudioContext'),'DJ scheduler must not own an audio engine');
 ok(resume.includes('duplicateIOSBridge:false')&&!resume.includes('new Audio(')&&!resume.includes("s.src='./ios-dj-audio.js"),'Duplicate iOS voice bridge must remain disabled');
 ok(voice.includes('const mediaAudio=new Audio()')&&voice.includes('const AC=window.AudioContext||window.webkitAudioContext'),'Central Fish Audio engine missing');
@@ -23,4 +26,4 @@ ok(engine.includes("register('fish'")&&engine.includes('window.prepareSpeech=pre
 ok(boot.includes("load('./mair-dj-v2.js'")&&boot.includes("load('./mair-audio-unlock-v1.js'"),'DJ bootstrap missing runtime/unlock chain');
 ok(dj.includes("step('Spotify pause','pass'")&&dj.includes("step('DJ audio playback','pass'")&&dj.includes("step('Spotify resume','pass'"),'Voice Check must exercise a real pause/voice/resume handoff');
 ok(easy.includes("live=phase==='SPEAKING'")&&easy.includes("setDjLive(detail.phase==='SPEAKING'"),'DJ LIVE UI must only follow the speaking phase');
-if(fail.length){console.error('MAIR DJ v3.1 regression FAILED');for(const x of fail)console.error('-',x);process.exit(1)}console.log('MAIR DJ v3.1 regression OK');
+if(fail.length){console.error('MAIR DJ v3.2 regression FAILED');for(const x of fail)console.error('-',x);process.exit(1)}console.log('MAIR DJ v3.2 regression OK');
