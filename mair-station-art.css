@@ -5,6 +5,5 @@
 
 .mair-station-art{background:#111!important;isolation:isolate}
 .mair-station-art:before{inset:0!important;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;transform:none!important;opacity:1!important}
-.mair-station-art:not(.art-mix) .mair-art-word,.mair-station-art:not(.art-mix) .mair-art-wave{display:none!important}
-.mair-station-art.art-mix:before{background-image:none!important;background:radial-gradient(circle at 35% 25%,rgba(255,106,0,.35),transparent 32%),linear-gradient(145deg,#4d210b,#110a07)!important}
-.mair-station-art.art-mix .mair-art-word,.mair-station-art.art-mix .mair-art-wave{display:block!important}
+.mair-station-art .mair-art-word,.mair-station-art .mair-art-wave{display:none!important}
+.mair-station-art.art-mix:before{background-image:url('./assets/mair-mix.svg')!important;background-color:#110a07!important}
