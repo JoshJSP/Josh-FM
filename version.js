@@ -1,10 +1,20 @@
 // MAIR release metadata and cache/build reconciliation.
-window.JFM_RELEASE={version:'2.0.0-beta.3',displayVersion:'2b.0.3',build:'unknown',asset:'45',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
-window.JFM_ASSET_VERSION='45';
+window.JFM_RELEASE={version:'2.0.0-beta.4',displayVersion:'2b.0.4',build:'unknown',asset:'46',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
+window.JFM_ASSET_VERSION='46';
 (()=>{
   function addStyle(id,src){if(document.getElementById(id))return;const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=src;document.head.appendChild(l)}
   function addSyncScript(id,src){if(document.getElementById(id))return;const s=document.createElement('script');s.id=id;s.src=src;s.async=false;document.head.appendChild(s)}
-  function loadMairUI(){addStyle('mair-foundation-css','./mair-foundation.css');addStyle('mair-radio-home-css','./mair-radio-home.css');addStyle('mair-station-art-css','./mair-station-art.css?v=45');addSyncScript('mair-foundation-js','./mair-foundation.js');addSyncScript('mair-radio-home-js','./mair-radio-home.js')}
+  function loadMairUI(){
+    addStyle('mair-foundation-css','./mair-foundation.css');
+    addStyle('mair-radio-home-css','./mair-radio-home.css');
+    addStyle('mair-station-art-css','./mair-station-art.css?v=46');
+    addStyle('mair-station-art-1-css','./mair-station-art-1.css?v=46');
+    addStyle('mair-station-art-2-css','./mair-station-art-2.css?v=46');
+    addStyle('mair-station-art-3-css','./mair-station-art-3.css?v=46');
+    addStyle('mair-station-art-4-css','./mair-station-art-4.css?v=46');
+    addSyncScript('mair-foundation-js','./mair-foundation.js');
+    addSyncScript('mair-radio-home-js','./mair-radio-home.js')
+  }
   loadMairUI();
   function sanitizeSleepState(){try{const key='jfm_sleep_timer_v1',raw=localStorage.getItem(key);if(!raw)return;const x=JSON.parse(raw),expired=x?.mode==='time'&&Number(x?.at||0)<=Date.now(),unsafe=x?.mode==='after-track';if(expired||unsafe)localStorage.setItem(key,'null')}catch{try{localStorage.setItem('jfm_sleep_timer_v1','null')}catch{}}}
   sanitizeSleepState();
