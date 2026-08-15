@@ -54,7 +54,7 @@ expect(bootstrap.includes('mair-dj-v2.js')&&!bootstrap.includes('dj-authoritativ
 expect(handoff.includes('legacy-shim-to-mair-dj-v2')&&!handoff.includes('/me/player/pause'),'Legacy handoff bezit nog playbacklogica');
 expect(voiceCheck.includes('Complete Voice Check')&&voiceCheck.includes('Groq schrijver')&&voiceCheck.includes('Spotify pauze/hervatten'),'Tijdelijke complete Voice Check ontbreekt');
 expect(voiceCheck.includes("dataset.temporaryRelease='voice-check-v1'"),'Voice Check is niet als tijdelijk gemarkeerd');
-expect(sw.includes("const CACHE='mair-v50-dj-v2-voice-check-20260815'"),'service-worker cache is niet verhoogd voor DJ v2');
+expect(sw.includes("const CACHE='mair-v51-consolidated-20260815'"),'service-worker cache is niet verhoogd voor geconsolideerde release');
 expect(sw.includes("'./mair-dj-v2.js'")&&sw.includes("'./mair-voice-check.js'"),'service worker cachet DJ v2/Voice Check niet');
 expect(sw.includes("'./mair-category-search.js'")&&sw.includes("'./mair-category-search.css'"),'service worker cachet categoriezoeker niet');
 expect(sw.includes("'./mair-category-purity.js'")&&sw.includes("'./mair-ui-hardening.js'")&&sw.includes("'./mair-playback-category-guard.js'")&&sw.includes("'./mair-build-orchestrator.js'"),'service worker cachet de hardening runtime niet volledig');
