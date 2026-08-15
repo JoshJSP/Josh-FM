@@ -39,4 +39,4 @@ Voordat de update branch naar `main` wordt gemerged, wordt de huidige `main` com
 9. Station Health Self Test uitvoeren.
 10. Alleen na expliciete toestemming de update branch naar `main` mergen en Vercel-status controleren.
 
-Laatste handmatige productie-retrigger: category source-owner release, 2026-08-15.
+Laatste handmatige productie-retrigger: bundled v55 DJ/background/transition release, 2026-08-15.
