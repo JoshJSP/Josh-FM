@@ -1,28 +1,7 @@
 import fs from 'node:fs';
-
 const read=p=>fs.readFileSync(p,'utf8');
-const failures=[];
-const expect=(ok,msg)=>{if(!ok)failures.push(msg)};
-
-const live=read('live-ui.js');
-const suite=read('radio-suite.js');
-const pwa=read('pwa-platform.js');
-const voice=read('debug-tts.js');
-const voiceEngine=read('mair-voice-engine.js');
-const smartDj=read('smart-dj.js');
-const polish=read('mair-pwa-polish.js');
-const foundation=read('mair-foundation.js');
-const foundationCss=read('mair-foundation.css');
-const categorySearch=read('mair-category-search.js');
-const categorySearchCss=read('mair-category-search.css');
-const templateAssets=read('mair-template-assets.css');
-const manifest=read('manifest.webmanifest');
-const logo=read('mair-logo.svg');
-const health=read('station-health.js');
-const dj=read('dj-authoritative-v226.js');
-const handoff=read('dj-handoff-v34.js');
-const sw=read('sw.js');
-
+const failures=[];const expect=(ok,msg)=>{if(!ok)failures.push(msg)};
+const live=read('live-ui.js'),suite=read('radio-suite.js'),pwa=read('pwa-platform.js'),voice=read('debug-tts.js'),voiceEngine=read('mair-voice-engine.js'),smartDj=read('smart-dj.js'),polish=read('mair-pwa-polish.js'),foundation=read('mair-foundation.js'),foundationCss=read('mair-foundation.css'),categorySearch=read('mair-category-search.js'),categorySearchCss=read('mair-category-search.css'),templateAssets=read('mair-template-assets.css'),manifest=read('manifest.webmanifest'),logo=read('mair-logo.svg'),health=read('station-health.js'),dj=read('mair-dj-v2.js'),writer=read('api/dj-writer.js'),handoff=read('dj-handoff-v34.js'),voiceCheck=read('mair-voice-check.js'),sw=read('sw.js'),bootstrap=read('dj-now-queue.js');
 expect(!live.includes("live.id='jfmLiveMeta'"),'live-ui mag geen tweede live-metablok meer toevoegen');
 expect(!live.includes('Josh FM'),'live-ui bevat nog zichtbare Josh FM-branding');
 expect(!suite.includes('ensureShowPill'),'radio-suite mag geen legacy showMini-pill meer injecteren');
@@ -63,23 +42,22 @@ expect(!health.includes('Test Josh FM opnieuw'),'Self Test bevat nog oude Josh F
 expect(health.includes("btn.textContent='Test MAIR opnieuw'")&&health.includes("b.textContent='Test MAIR opnieuw'"),'Self Test gebruikt niet overal MAIR');
 expect(health.includes("name:brand(c.show.name)")&&health.includes("esc(brand(s.show?.name||'—'))"),'Self Test scrubt oude programmanaam niet');
 expect(dj.includes('TALK_RANGES=[[6,9],[3,5],[2,4],[1,3]]'),'DJ praatfrequentie-ranges zijn onverwacht gewijzigd');
-expect(dj.includes("talk.addEventListener('input',replanFromSetting)")&&dj.includes("talk.addEventListener('change',replanFromSetting)"),'Praatfrequentie moet de DJ-planning direct opnieuw berekenen');
-expect(dj.includes('DJ over ${s.remaining} nummer'),'UI toont niet hoeveel nummers er nog tot de volgende DJ zijn');
-expect(dj.includes("window.JFMDJTransition?.lastFailure")&&handoff.includes("lastFailure=String(e?.message||e||'DJ-handoff mislukt.')"),'DJ scheduler mist diagnose voor mislukte breaks');
-expect(dj.includes('pendingAuto')&&dj.includes("attemptPending('next-track-retry')")&&dj.includes('schedulePendingRetry'),'Mislukte DJ-break moet pending blijven en automatisch opnieuw proberen');
-expect(dj.includes('DJ klaar voor volgende overgang'),'UI moet tonen dat een break klaarstaat maar nog niet hoorbaar is');
-expect(handoff.includes("const voiceReady=()=>typeof window.speakText==='function'")&&handoff.includes("throw Error('Stemruntime is nog niet beschikbaar.')"),'DJ mag een ontbrekende voice runtime niet als hoorbare break tellen');
-expect(!handoff.includes('window.speakText?.'),'DJ delivery mag optional chaining niet als stil succes behandelen');
-expect(dj.includes("version:'v230.1-event-driven-single-owner'")&&handoff.includes("version:'handoff-v37.1-voice-guard'"),'Nieuwe DJ single-owner voice-runtime guard ontbreekt');
-expect(sw.includes("const CACHE='mair-v49-hardening-cache-20260814'"),'service-worker cache is niet verhoogd voor hardening-update');
+expect(dj.includes("phase:'IDLE'")&&dj.includes("'PLANNED'")&&dj.includes("'WRITING'")&&dj.includes("'GENERATING'")&&dj.includes("'READY'")&&dj.includes("'ON_AIR'")&&dj.includes("'FAILED'"),'Nieuwe DJ state machine is incompleet');
+expect(writer.includes('process.env.GROQ_API_KEY')&&writer.includes('llama-3.3-70b-versatile'),'Groq DJ Writer ontbreekt of key is niet server-side');
+expect(writer.includes('Nederlandse muziek-radio-DJ'),'Groq DJ Writer is niet strikt Nederlands');
+expect(dj.indexOf("fetch('/api/tts'")<dj.indexOf('await pause(uri)'),'DJ-audio moet vóór Spotify-pauze gegenereerd zijn');
+expect(dj.includes('audio.onended')&&dj.includes("speaking:true")&&dj.includes("speaking:false"),'Hoorbare DJ-completion/DJ LIVE-signalen ontbreken');
+expect(dj.includes('pendingAir=true')&&dj.includes('if(pendingAir)'),'Mislukte of niet-klare DJ-break moet pending blijven');
+expect(dj.includes("window.addEventListener('jfm:trackchange'")&&!dj.includes('setInterval('),'DJ scheduler moet event-driven zijn');
+expect(dj.includes('await pause(uri)')&&dj.includes('await seekStart(uri)')&&dj.includes('await resume(uri)'),'DJ Spotify handoff is incompleet');
+expect(bootstrap.includes('mair-dj-v2.js')&&!bootstrap.includes('dj-authoritative-v226.js'),'Legacy DJ scheduler wordt nog geboot');
+expect(handoff.includes('legacy-shim-to-mair-dj-v2')&&!handoff.includes('/me/player/pause'),'Legacy handoff bezit nog playbacklogica');
+expect(voiceCheck.includes('Complete Voice Check')&&voiceCheck.includes('Groq schrijver')&&voiceCheck.includes('Spotify pauze/hervatten'),'Tijdelijke complete Voice Check ontbreekt');
+expect(voiceCheck.includes("dataset.temporaryRelease='voice-check-v1'"),'Voice Check is niet als tijdelijk gemarkeerd');
+expect(sw.includes("const CACHE='mair-v50-dj-v2-voice-check-20260815'"),'service-worker cache is niet verhoogd voor DJ v2');
+expect(sw.includes("'./mair-dj-v2.js'")&&sw.includes("'./mair-voice-check.js'"),'service worker cachet DJ v2/Voice Check niet');
 expect(sw.includes("'./mair-category-search.js'")&&sw.includes("'./mair-category-search.css'"),'service worker cachet categoriezoeker niet');
 expect(sw.includes("'./mair-category-purity.js'")&&sw.includes("'./mair-ui-hardening.js'")&&sw.includes("'./mair-playback-category-guard.js'")&&sw.includes("'./mair-build-orchestrator.js'"),'service worker cachet de hardening runtime niet volledig');
 expect(sw.includes("'./mair-template-assets.css'")&&sw.includes("'./assets/mair-hits.svg'")&&sw.includes("'./assets/mair-mix.svg'"),'service worker cachet de nieuwe MAIR-artwork niet');
 expect(sw.includes("k.startsWith('josh-fm-')"),'service worker moet oude Josh FM caches opruimen');
-
-if(failures.length){
-  console.error('\nMAIR regression gate FAILED');
-  for(const f of failures)console.error(`- ${f}`);
-  process.exit(1);
-}
-console.log('MAIR regression gate OK');
+if(failures.length){console.error('\nMAIR regression gate FAILED');for(const f of failures)console.error(`- ${f}`);process.exit(1)}console.log('MAIR regression gate OK');
