@@ -1,4 +1,4 @@
-// MAIR runtime bootstrap — progress + rebuilt DJ v2 + temporary Voice Check.
+// MAIR runtime bootstrap — progress + rebuilt DJ v2 + unified audio unlock + diagnostics.
 (()=>{
   const load=(src,id)=>new Promise(resolve=>{
     if(document.getElementById(id))return resolve(true);
@@ -9,9 +9,11 @@
     await load('./brand-runtime-v9.js','jfm-brand-runtime-v9');
     await load('./progress-clock-v226.js','jfm-progress-v226');
     await load('./mair-dj-v2.js','mair-dj-v2');
+    await load('./mair-audio-unlock-v1.js','mair-audio-unlock-v1');
     await load('./mair-voice-check.js','mair-voice-check-v1');
+    await load('./mair-diagnostics-hub.js','mair-diagnostics-hub-v1');
     setTimeout(()=>load('./beta-status.js','jfm-beta-status-v8'),2600);
   }
   boot();
-  window.JFMV226Bootstrap={version:'mair-dj-v2-bootstrap',get ready(){return !!(window.MAIRDJ&&window.JFMProgressClock)}};
+  window.JFMV226Bootstrap={version:'mair-dj-v2-audio-diagnostics-bootstrap',get ready(){return !!(window.MAIRDJ&&window.JFMProgressClock&&window.MAIRAudioUnlock)}};
 })();
