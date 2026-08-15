@@ -31,8 +31,8 @@ expect(foundation.includes('purgeLegacyNowNextLater'),'NU/STRAKS/LATER legacy gu
 expect(categorySearch.includes("placeholder=\"Zoek stations, genres en moods\""),'categoriezoeker heeft geen zoekveld');
 expect(categorySearch.includes("group:'Genre'")&&categorySearch.includes("group:'Mood'")&&categorySearch.includes("group:'Moment'")&&categorySearch.includes("group:'Decennium'"),'categoriezoeker mist een hoofdgroep');
 for(const id of ['pop','dance','rnb','hiphop','rock','nl','indie','feelgood','chill','energy','focus','party','morning','drive','evening','latenight','90s','00s','10s','20s'])expect(categorySearch.includes(`id:'${id}'`),`categorie ontbreekt: ${id}`);
-expect(categorySearch.includes('mair_category_search_v1'),'gekozen categorie wordt niet onthouden');
-expect(categorySearch.includes("window.JFMMusicChoice?.chooseChannel")&&categorySearch.includes("window.MAIRFoundation?.chooseMode"),'categorie start geen MAIR radioset');
+expect(categorySearch.includes('mair_category_search_v1')&&categorySearch.includes('mair_active_category_v2'),'gekozen categorie wordt niet duurzaam onthouden');
+expect(categorySearch.includes('categoryTracks')&&categorySearch.includes('setQueue(items)')&&categorySearch.includes('JFMPlayback.playUri')&&categorySearch.includes('MAIRPlaybackContext')&&categorySearch.includes('restoreActive')&&categorySearch.includes('installOwnershipHooks'),'categorie start of bewaart geen eigen MAIR radioset');
 expect(categorySearchCss.includes('.mair-category-searchbox')&&categorySearchCss.includes('.mair-category-chip')&&categorySearchCss.includes('.mair-category-result'),'categoriezoeker styling is incompleet');
 for(const asset of ['mair-hits.svg','mair-throwback.svg','mair-chill.svg','mair-party.svg','mair-discovery.svg','mair-mix.svg'])expect(templateAssets.includes(`./assets/${asset}`),`template artwork ontbreekt: ${asset}`);
 expect(templateAssets.includes('.top{display:flex!important'),'MAIR-header wordt niet expliciet hersteld op Stations/Voor jou');
@@ -54,7 +54,7 @@ expect(bootstrap.includes('mair-dj-v2.js')&&!bootstrap.includes('dj-authoritativ
 expect(handoff.includes('legacy-shim-to-mair-dj-v2')&&!handoff.includes('/me/player/pause'),'Legacy handoff bezit nog playbacklogica');
 expect(voiceCheck.includes('Complete Voice Check')&&voiceCheck.includes('Groq schrijver')&&voiceCheck.includes('Spotify pauze/hervatten'),'Tijdelijke complete Voice Check ontbreekt');
 expect(voiceCheck.includes("dataset.temporaryRelease='voice-check-v1'"),'Voice Check is niet als tijdelijk gemarkeerd');
-expect(sw.includes("const CACHE='mair-v52-central-voice-engine-20260815'"),'service-worker cache is niet verhoogd voor centrale Voice Engine release');
+expect(sw.includes("const CACHE='mair-v53-category-diagnostics-cleanup-20260815'"),'service-worker cache is niet verhoogd voor categorie/diagnose release');
 expect(sw.includes("'./mair-dj-v2.js'")&&sw.includes("'./mair-voice-check.js'"),'service worker cachet DJ v2/Voice Check niet');
 expect(sw.includes("'./mair-category-search.js'")&&sw.includes("'./mair-category-search.css'"),'service worker cachet categoriezoeker niet');
 expect(sw.includes("'./mair-category-purity.js'")&&sw.includes("'./mair-ui-hardening.js'")&&sw.includes("'./mair-playback-category-guard.js'")&&sw.includes("'./mair-build-orchestrator.js'"),'service worker cachet de hardening runtime niet volledig');
