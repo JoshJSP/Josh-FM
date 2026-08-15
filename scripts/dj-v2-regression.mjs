@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8'),fail=[];const ok=(x,m)=>{if(!x)fail.push(m)};
-const dj=read('mair-dj-v2.js'),writer=read('api/dj-writer.js'),boot=read('dj-now-queue.js'),voice=read('mair-voice-check.js'),sw=read('sw.js'),legacy=read('dj-handoff-v34.js');
+const dj=read('mair-dj-v2.js'),writer=read('api/dj-writer.js'),boot=read('dj-now-queue.js'),voice=read('mair-voice-check.js'),unlock=read('mair-audio-unlock-v1.js'),diag=read('mair-diagnostics-hub.js'),sw=read('sw.js'),legacy=read('dj-handoff-v34.js');
 ok(writer.includes('process.env.GROQ_API_KEY'),'Groq key must remain server-side');
 ok(writer.includes('llama-3.3-70b-versatile'),'Groq DJ model missing');
 ok(writer.includes('Je schrijft uitsluitend de gesproken tekst voor een Nederlandse muziek-radio-DJ'),'Dutch DJ writer prompt missing');
@@ -12,9 +12,12 @@ ok(dj.includes('audio.onended')&&dj.includes("setPhase('ON_AIR'"),'DJ completion
 ok(dj.includes("window.addEventListener('jfm:trackchange'")&&!dj.includes('setInterval('),'DJ scheduler should be event-driven, not Spotify polling');
 ok(dj.includes('await pause(uri)')&&dj.includes('await seekStart(uri)')&&dj.includes('await resume(uri)'),'Spotify handoff sequence incomplete');
 ok(dj.includes("new CustomEvent('mair:dj-speaking'")&&dj.includes('speaking:true')&&dj.includes('speaking:false'),'DJ LIVE signal missing');
-ok(boot.includes("load('./mair-dj-v2.js'")&&boot.includes("load('./mair-voice-check.js'")&&!boot.includes("load('./dj-authoritative-v226.js'"),'Bootstrap still loads legacy scheduler');
+ok(unlock.includes("['pointerdown','touchstart','touchend','mousedown','keydown','click']")&&unlock.includes('window.MAIRDJ?.unlock?.()')&&unlock.includes('window.JFMDJAudio?.unlock?.()'),'Unified iOS audio unlock bridge incomplete');
+ok(voice.includes('Promise.allSettled(primes)')&&voice.includes('window.MAIRAudioUnlock?.prime?.()'),'Voice Check must prime audio before asynchronous API calls');
+ok(diag.includes("moveCard('mairVoiceCheckCard'")&&diag.includes("moveCard('jfmHealthCard'")&&diag.includes('moveSelfTest()')&&diag.includes('moveVoiceTest()'),'All test tools must be grouped under Diagnose');
+ok(boot.includes("load('./mair-dj-v2.js'")&&boot.includes("load('./mair-audio-unlock-v1.js'")&&boot.includes("load('./mair-voice-check.js'")&&boot.includes("load('./mair-diagnostics-hub.js'")&&!boot.includes("load('./dj-authoritative-v226.js'"),'Bootstrap missing rebuilt DJ/audio/diagnostics chain');
 ok(legacy.includes('legacy-shim-to-mair-dj-v2')&&!legacy.includes('/me/player/pause'),'Legacy handoff still owns playback');
 ok(voice.includes('Complete Voice Check')&&voice.includes('Groq schrijver')&&voice.includes('Spotify pauze/hervatten'),'Temporary full Voice Check missing');
 ok(voice.includes("dataset.temporaryRelease='voice-check-v1'"),'Voice Check temporary release marker missing');
-ok(sw.includes("'./mair-dj-v2.js'")&&sw.includes("'./mair-voice-check.js'")&&sw.includes('mair-v50-dj-v2-voice-check-20260815'),'PWA cache missing DJ v2 assets');
+ok(sw.includes("'./mair-dj-v2.js'")&&sw.includes("'./mair-audio-unlock-v1.js'")&&sw.includes("'./mair-voice-check.js'")&&sw.includes("'./mair-diagnostics-hub.js'")&&sw.includes('mair-v50-dj-v2-voice-check-20260815'),'PWA cache missing DJ v2 diagnostic assets');
 if(fail.length){console.error('MAIR DJ v2 regression FAILED');for(const x of fail)console.error('-',x);process.exit(1)}console.log('MAIR DJ v2 regression OK');
