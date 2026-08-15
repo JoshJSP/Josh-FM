@@ -15,6 +15,7 @@ ok(dj.includes("new CustomEvent('mair:dj-speaking'")&&dj.includes('speaking:true
 ok(unlock.includes("['pointerdown','touchstart','touchend','mousedown','keydown','click']")&&unlock.includes('window.MAIRDJ?.unlock?.()')&&unlock.includes('window.JFMDJAudio?.unlock?.()'),'Unified iOS audio unlock bridge incomplete');
 ok(voice.includes('Promise.allSettled(primes)')&&voice.includes('window.MAIRAudioUnlock?.prime?.()'),'Voice Check must prime audio before asynchronous API calls');
 ok(diag.includes("moveCard('mairVoiceCheckCard'")&&diag.includes("moveCard('jfmHealthCard'")&&diag.includes('moveSelfTest()')&&diag.includes('moveVoiceTest()'),'All test tools must be grouped under Diagnose');
+ok(diag.includes('pane.lastElementChild!==version')&&diag.includes('requestAnimationFrame')&&!/if\(pane&&version\)pane\.appendChild\(version\)/.test(diag),'Diagnostics hub must not self-trigger an infinite MutationObserver DOM loop');
 ok(boot.includes("load('./mair-dj-v2.js'")&&boot.includes("load('./mair-audio-unlock-v1.js'")&&boot.includes("load('./mair-voice-check.js'")&&boot.includes("load('./mair-diagnostics-hub.js'")&&!boot.includes("load('./dj-authoritative-v226.js'"),'Bootstrap missing rebuilt DJ/audio/diagnostics chain');
 ok(legacy.includes('legacy-shim-to-mair-dj-v2')&&!legacy.includes('/me/player/pause'),'Legacy handoff still owns playback');
 ok(voice.includes('Complete Voice Check')&&voice.includes('Groq schrijver')&&voice.includes('Spotify pauze/hervatten'),'Temporary full Voice Check missing');
