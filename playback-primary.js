@@ -24,6 +24,8 @@
   async function transfer(id,play){await api('/me/player',{method:'PUT',body:{device_ids:[id],play:!!play}});await wait(220);return remote()}
   async function ensureActive({preserve=true}={}){const p=await ensurePlayer(),id=await freshDevice();let s=await remote();if(s?.device?.id!==id)s=await transfer(id,preserve&&!!s?.is_playing);return{p,id,state:s}}
   async function verify(predicate,tries=10){for(let i=0;i<tries;i++){await wait(140+i*45);const s=await remote();if(s&&predicate(s))return s}return null}
+  async function verifySdk(predicate,tries=8){const p=player();if(!p)return null;for(let i=0;i<tries;i++){try{const s=await p.getCurrentState();if(s&&predicate(s))return s}catch{}await wait(45+i*25)}return null}
+  const sdkUri=s=>String(s?.track_window?.current_track?.uri||'');
   function setBusy(on){busy=!!on;['play','next','prev'].forEach(id=>{const b=$(id);if(b)b.disabled=busy});const s=$('start');if(s)s.disabled=false}
   async function withBusy(fn){if(busy)return false;setBusy(true);try{return await fn()}finally{setBusy(false)}}
   function ingest(s,source='primary'){if(!s)return;const confirmed=String(s?.device?.id||'').trim();if(confirmed&&localStorage.getItem(DEVICE_KEY)!==confirmed)localStorage.setItem(DEVICE_KEY,confirmed);try{playback=s;renderPlayback(s)}catch{};try{truth()?.ingest?.(s,source)}catch{}}
@@ -64,6 +66,33 @@
   async function playPause(){activateNow();return withBusy(async()=>{try{const s=await remote();return s?.is_playing?pauseDirect():resumeDirect()}catch(e){return rememberError(e,'Play/pauze mislukt: ')}})}
   async function pause(){return withBusy(async()=>{try{return await pauseDirect()}catch(e){return rememberError(e,'Pauzeren mislukt: ')}})}
   async function resume(){return withBusy(async()=>{try{return await resumeDirect()}catch(e){return rememberError(e,'Hervatten mislukt: ')}})}
+
+  // DJ-only transport uses the local Web Playback SDK first. This keeps the critical
+  // handoff short and ordered; device-qualified Web API calls remain the fallback.
+  async function djPauseDirect(expectedUri=''){
+    const p=await ensurePlayer(),id=deviceId();if(!id)throw Error('Spotify-device is niet beschikbaar.');
+    const t=truth()?.get?.();if(expectedUri&&t?.uri&&t.uri!==expectedUri)throw Error('DJ-pauze hoort niet meer bij de huidige track.');
+    let local=false;try{await p.pause();local=!!(await verifySdk(s=>s.paused&&(!expectedUri||sdkUri(s)===expectedUri),8))}catch{}
+    let s=await verify(x=>x.device?.id===id&&!x.is_playing&&(!expectedUri||x.item?.uri===expectedUri),3);
+    if(!local&&!s){await api('/me/player/pause?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&!x.is_playing&&(!expectedUri||x.item?.uri===expectedUri),6)}
+    if(!local&&!s)throw Error('Spotify bevestigde DJ-pauze niet.');if(s)ingest(s,'primary-dj-pause');truth()?.setExpectedLive?.(true,'dj-handoff');return true
+  }
+  async function djResumeDirect(expectedUri=''){
+    const p=await ensurePlayer(),id=deviceId();if(!id)throw Error('Spotify-device is niet beschikbaar.');
+    const t=truth()?.get?.();if(expectedUri&&t?.uri&&t.uri!==expectedUri)throw Error('DJ-resume hoort niet meer bij de huidige track.');
+    let local=false;try{await p.resume();local=!!(await verifySdk(s=>!s.paused&&(!expectedUri||sdkUri(s)===expectedUri),8))}catch{}
+    let s=await verify(x=>x.device?.id===id&&x.is_playing&&(!expectedUri||x.item?.uri===expectedUri),3);
+    if(!local&&!s){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing&&(!expectedUri||x.item?.uri===expectedUri),6)}
+    if(!local&&!s)throw Error('Spotify bevestigde DJ-resume niet.');if(s)ingest(s,'primary-dj-resume');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;return true
+  }
+  async function djRewindDirect(expectedUri=''){
+    const p=await ensurePlayer(),id=deviceId();if(!id)throw Error('Spotify-device is niet beschikbaar.');
+    let local=false;try{await p.seek(0);local=!!(await verifySdk(s=>(!expectedUri||sdkUri(s)===expectedUri)&&Number(s.position||0)<1400,8))}catch{}
+    if(!local){await api('/me/player/seek?position_ms=0&device_id='+encodeURIComponent(id),{method:'PUT'});const s=await verify(x=>(!expectedUri||x.item?.uri===expectedUri)&&Number(x.progress_ms||0)<1800,5);if(!s)throw Error('Spotify bevestigde DJ-rewind niet.')}return true
+  }
+  async function djPause(uri=''){return withBusy(async()=>{try{return await djPauseDirect(uri)}catch(e){lastError=String(e?.message||e);return false}})}
+  async function djResume(uri=''){return withBusy(async()=>{try{return await djResumeDirect(uri)}catch(e){lastError=String(e?.message||e);return false}})}
+  async function djRewind(uri=''){return withBusy(async()=>{try{return await djRewindDirect(uri)}catch(e){lastError=String(e?.message||e);return false}})}
 
   async function advance({record=false,source='primary-next'}={}){
     const{id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');if(record)try{recordSkip(before)}catch{};
@@ -123,6 +152,6 @@
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
   window.addEventListener('pageshow',()=>setTimeout(()=>{bound=false;tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),450)});setInterval(()=>recover('watchdog'),12000);
 
-  window.JFMPlayback={primary:true,version:'primary-v8.2-fast-natural-background-safe',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,playUri,recover,handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{failures,recoveries,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now())}}};
+  window.JFMPlayback={primary:true,version:'primary-v8.3-dj-sdk-handoff',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{failures,recoveries,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now())}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
 })();
