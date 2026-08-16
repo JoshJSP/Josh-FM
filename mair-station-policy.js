@@ -4,8 +4,8 @@
 const year=()=>new Date().getFullYear();
 const stations={
   mix:{label:'MY MAIR',kind:'personal'},
-  hits:{label:'MAIR HITS',kind:'station',minTracks:5,queries:()=>['chart hits','viral hits','pop hits','dance hits'],hard:t=>releaseYear(t)>=year()-3},
-  top40:{label:'MAIR TOP 40',kind:'station',minTracks:5,queries:()=>['top 40 hits','chart hits','viral hits','pop hits'],hard:t=>releaseYear(t)>=year()-2},
+  hits:{label:'MAIR HITS',kind:'station',chartSource:'nl-hits',minTracks:5,queries:()=>['Nederland hit muziek','Nederland chart hits','Qmusic hits','Dutch radio hits'],hard:t=>releaseYear(t)>=year()-3},
+  top40:{label:'MAIR TOP 40',kind:'station',chartSource:'nl-top40',minTracks:5,queries:()=>['Nederlandse Top 40','Qmusic Top 40','Dutch Top 40','Nederland chart'],hard:t=>releaseYear(t)>=year()-2},
   new:{label:'MAIR DISCOVERY',kind:'station',minTracks:5,queries:()=>[`year:${year()} genre:pop`,`year:${year()} genre:dance`,`year:${year()} indie pop`,`year:${year()} new music`],hard:t=>releaseYear(t)===year()},
   throwback:{label:'MAIR THROWBACK',kind:'station',minTracks:5,queries:()=>['year:1980-1999 hits','year:2000-2016 hits','classic pop hits','classic rock hits'],hard:t=>releaseYear(t)>0&&releaseYear(t)<=2016},
   '00s':{label:'MAIR 00s',kind:'station',minTracks:5,queries:()=>['year:2000-2009 pop','year:2000-2009 dance','year:2000-2009 rock','2000s hits'],hard:t=>releaseYear(t)>=2000&&releaseYear(t)<=2009},
@@ -23,5 +23,5 @@ function needsSemantic(id){return !!get(id).semantic}
 function confidence(id){return Number(get(id).minConfidence||.90)}
 function minTracks(id){return Number(get(id).minTracks||5)}
 function label(id){return get(id).label}
-window.MAIRStationPolicy={version:'mair-station-policy-v1.3-spotify-2026',stations,get,queries,hardFilter,needsSemantic,confidence,minTracks,label,releaseYear};
+window.MAIRStationPolicy={version:'mair-station-policy-v1.4-nl-charts',stations,get,queries,hardFilter,needsSemantic,confidence,minTracks,label,releaseYear};
 })();
