@@ -15,7 +15,7 @@ const checks=[
  ['discovery-v5',/playback-first-discovery-v5/.test(discovery)],
  ['discovery-retry',/awaitCooldown/.test(discovery)&&/setTimeout\(\(\)=>buildSet\(\)/.test(discovery)],
  ['max-five-searches',/MAX_SEARCHES=5/.test(discovery)],
- ['authoritative-categories',/MAIRStationController/.test(channels)&&/mair-station-controller-v4/.test(channels)&&/MAIRStationPolicy/.test(channels)&&/authoritative-stations-v16-nl-editorial/.test(channels)],
+ ['authoritative-categories',/MAIRStationController/.test(channels)&&/mair-station-controller-v4(?:\.\d+)?/.test(channels)&&/MAIRStationPolicy/.test(channels)&&/authoritative-stations-v\d+-nl-editorial/.test(channels)],
  ['popular-category-pools',/buildPool/.test(channels)&&/limit=10&q=/.test(channels)&&!/limit=25&q=/.test(channels)&&!/popularity/.test(policy)],
  ['dutch-filter',/semanticQualityFilter/.test(channels)&&/\/api\/category-filter/.test(channels)&&/policy\(\)\?\.confidence\?\.\(id\)/.test(channels)&&/minConfidence:.95/.test(policy)&&/language:'nl'/.test(policy)&&/hoofdzakelijk Nederlands/.test(classifier)&&!/nlArtists/.test(channels)],
  ['dj-v3-bootstrap',bootstrap.includes('progress-clock-v226.js')&&bootstrap.includes('mair-dj-v2.js')&&!bootstrap.includes('dj-authoritative-v226.js')],

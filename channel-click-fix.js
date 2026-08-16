@@ -3,7 +3,7 @@
   'use strict';
   let switching=false,lastTap=0,buildProtected=false,policyLoading=false;
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
-  const POOL_CACHE='mair_station_pool_cache_v4_nl_charts',CACHE_TTL=12*60*60*1000;
+  const POOL_CACHE='mair_station_pool_cache_v5_nl_editorial_strict',CACHE_TTL=12*60*60*1000,NL_EDITORIAL_SOURCE='spotify-editorial-je-moerstaal';
   const choice=()=>window.JFMMusicChoice,status=(text,bad=false)=>{const q=document.getElementById('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}};
   const policy=()=>window.MAIRStationPolicy;
   const stationIdFromButton=b=>String(b?.dataset?.jfmChannel||b?.dataset?.mairStation||'');
@@ -15,8 +15,8 @@
   const queries=id=>policy()?.queries?.(id)||[];
   const dedupe=list=>{const s=new Set();return(list||[]).filter(t=>t?.id&&t?.uri&&!s.has(t.id)&&(s.add(t.id),true))};
   function readPools(){try{return JSON.parse(localStorage.getItem(POOL_CACHE)||'{}')}catch{return{}}}
-  function cachedPool(id){const x=readPools()?.[id];return x?.at&&Date.now()-Number(x.at)<CACHE_TTL&&Array.isArray(x.items)?dedupe(x.items):[]}
-  function savePool(id,items){if(!id||!items?.length)return;try{const all=readPools();all[id]={at:Date.now(),items:dedupe(items).slice(0,50)};localStorage.setItem(POOL_CACHE,JSON.stringify(all))}catch{}}
+  function cachedPool(id){const x=readPools()?.[id];if(id==='nl'&&x?.source!==NL_EDITORIAL_SOURCE)return[];return x?.at&&Date.now()-Number(x.at)<CACHE_TTL&&Array.isArray(x.items)?dedupe(x.items):[]}
+  function savePool(id,items,source='station-pool'){if(!id||!items?.length)return;if(id==='nl'&&source!==NL_EDITORIAL_SOURCE)return;try{const all=readPools();all[id]={at:Date.now(),source,items:dedupe(items).slice(0,50)};localStorage.setItem(POOL_CACHE,JSON.stringify(all))}catch{}}
   async function search(q){const d=await api('/search?type=track&limit=10&q='+encodeURIComponent(q));return(d?.tracks?.items||[]).filter(t=>t?.id&&t?.uri).map(toTrack)}
   async function dutchChartPool(id){
     if(!['hits','top40','nl'].includes(id))return null;
@@ -33,8 +33,19 @@
   async function buildPool(id){
     if(!ensurePolicy())throw Error('Stations worden nog geladen.');
     let raw=[],searchErrors=[];
-    if(['hits','top40','nl'].includes(id)){
-      try{const chart=await dutchChartPool(id);if(chart?.tracks?.length){savePool(id,chart.tracks);return chart}}catch(e){searchErrors.push('Nederlandse playlist: '+String(e?.message||e))}
+    if(id==='nl'){
+      try{
+        const editorial=await dutchChartPool('nl');
+        if(editorial?.tracks?.length){savePool('nl',editorial.tracks,NL_EDITORIAL_SOURCE);return editorial}
+      }catch(e){
+        const cached=cachedPool('nl');
+        if(cached.length)return{tracks:cached,verified:false,fallback:true,source:'Spotify · Je Moerstaal (cache)'};
+        throw Error('Je Moerstaal kon tijdelijk niet worden geladen. MAIR speelt geen andere Nederlandstalige selectie als vervanging.');
+      }
+      throw Error('Je Moerstaal leverde tijdelijk geen tracks.');
+    }
+    if(['hits','top40'].includes(id)){
+      try{const chart=await dutchChartPool(id);if(chart?.tracks?.length){savePool(id,chart.tracks,'nl-chart');return chart}}catch(e){searchErrors.push('Nederlandse playlist: '+String(e?.message||e))}
     }
     for(const q of queries(id)){
       try{raw.push(...await search(q))}catch(e){const msg=String(e?.message||e);searchErrors.push(msg);if(/cooldown|rate limit|429|wacht/i.test(msg)){const ms=Math.max(0,Number(window.JFMSpotifyGuard?.state?.cooldownUntil||0)-Date.now());if(ms&&ms<65000){await wait(ms+180);try{raw.push(...await search(q))}catch(retryErr){searchErrors.push(String(retryErr?.message||retryErr))}}}}
@@ -52,7 +63,7 @@
     if(out.length<minimum&&filtered.length){out=filtered;fallback=true}
     if(!out.length){const cached=cachedPool(id);if(cached.length)return{tracks:cached,verified:false,fallback:true,source:'cache'}}
     out=diversify(out).slice(0,id==='top40'?40:50);
-    if(out.length)savePool(id,out);
+    if(out.length)savePool(id,out,'spotify-search-fallback');
     return{tracks:out,verified:quality.verified&&!fallback,fallback,source:'spotify-search-fallback'};
   }
   function paint(id,loading=false){const c=choice()?.channels?.[id],label=stationLabel(id);document.querySelectorAll('[data-jfm-channel],[data-mair-station]').forEach(b=>{const on=stationIdFromButton(b)===id;b.classList.toggle('active',on);b.classList.toggle('loading',on&&loading);b.setAttribute('aria-pressed',on?'true':'false');if(b.matches('[data-mair-station]'))b.setAttribute('aria-busy',on&&loading?'true':'false')});const d=document.getElementById('channelDescription');if(d&&c)d.textContent=loading?`${label} wordt geladen…`:c.desc;const m=document.getElementById('channelMini');if(m)m.textContent=label;document.body.dataset.musicChannel=id;if(c)window.JFMMusicChannelContext={id,...c};if(!loading)showActiveStation(id,label);try{window.dispatchEvent(new CustomEvent('mair:channelchange',{detail:{id,label,loading}}))}catch{}}
@@ -82,8 +93,8 @@
     }finally{switching=false}
   }
   function protectBuild(){if(buildProtected||typeof window.buildSet!=='function')return;const old=window.buildSet;window.buildSet=buildSet=async function(...args){const active=localStorage.getItem('jfm_music_channel_v1')||'mix';if(active!=='mix'&&Array.isArray(queue)&&queue.length)return queue;return old.apply(this,args)};buildProtected=true}
-  function own(){if(!ensurePolicy())return false;const c=choice();if(!c)return false;c.chooseChannel=choose;c.rebuild=()=>choose(localStorage.getItem('jfm_music_channel_v1')||'mix');try{Object.defineProperty(c,'channel',{configurable:true,get:()=>localStorage.getItem('jfm_music_channel_v1')||'mix'})}catch{}c.hotfix='authoritative-stations-v16-nl-editorial';paint(localStorage.getItem('jfm_music_channel_v1')||'mix');protectBuild();return true}
+  function own(){if(!ensurePolicy())return false;const c=choice();if(!c)return false;c.chooseChannel=choose;c.rebuild=()=>choose(localStorage.getItem('jfm_music_channel_v1')||'mix');try{Object.defineProperty(c,'channel',{configurable:true,get:()=>localStorage.getItem('jfm_music_channel_v1')||'mix'})}catch{}c.hotfix='authoritative-stations-v17-nl-editorial-strict';paint(localStorage.getItem('jfm_music_channel_v1')||'mix');protectBuild();return true}
   document.addEventListener('click',async e=>{const b=e.target?.closest?.('[data-jfm-channel],[data-mair-station]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const n=Date.now();if(n-lastTap<250)return;lastTap=n;const id=stationIdFromButton(b);if(!id)return;await choose(id).catch(()=>false)},true);
   const boot=()=>own();boot();setTimeout(boot,300);setTimeout(boot,1200);window.addEventListener('pageshow',()=>setTimeout(boot,150));window.addEventListener('mair:runtime-ready',boot);window.addEventListener('mair:foundation-ready',()=>paint(localStorage.getItem('jfm_music_channel_v1')||'mix',false));
-  window.MAIRStationController={version:'mair-station-controller-v4.0-nl-editorial',select:choose,harden:own,buildPool,get switching(){return switching},get channel(){return localStorage.getItem('jfm_music_channel_v1')||'mix'}};window.JFMChannelTapGuard=window.MAIRStationController;
+  window.MAIRStationController={version:'mair-station-controller-v4.1-nl-editorial-strict',select:choose,harden:own,buildPool,get switching(){return switching},get channel(){return localStorage.getItem('jfm_music_channel_v1')||'mix'}};window.JFMChannelTapGuard=window.MAIRStationController;
 })();
