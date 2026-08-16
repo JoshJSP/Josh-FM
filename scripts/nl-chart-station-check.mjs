@@ -9,10 +9,13 @@ ok(endpoint.includes("__NEXT_DATA__")&&endpoint.includes('trackList'),'Dutch pla
 ok(endpoint.includes("station==='top40'")&&endpoint.includes('.slice(0,40)'),'Top 40 must be capped at exactly the chart-size of 40');
 ok(endpoint.includes("station==='nl'")&&endpoint.includes("source:'Spotify · Je Moerstaal'"),'Nederlandstalig endpoint must explicitly serve Je Moerstaal');
 ok(endpoint.includes('chartSources.length-1')&&endpoint.includes('hitsMix'),'Hits must reward tracks appearing across multiple Dutch chart sources');
-ok(controller.includes("/api/nl-charts?station=")&&controller.indexOf('dutchChartPool(id)')<controller.indexOf('for(const q of queries(id))'),'Dutch playlist feed must be attempted before generic Spotify search');
-ok(controller.includes("['hits','top40','nl'].includes(id)"),'Nederlandstalig must share the authoritative Dutch playlist path');
-ok(controller.includes("mair_station_pool_cache_v4_nl_charts"),'old generic station pools must not be reused');
-ok(controller.includes("source:'spotify-search-fallback'")&&controller.includes("['hits','top40'].includes(id)"),'generic Spotify search must remain a safe fallback');
+ok(controller.includes("/api/nl-charts?station=")&&controller.includes("if(id==='nl')"),'Nederlandstalig must use the authoritative Dutch playlist path');
+ok(controller.includes("mair_station_pool_cache_v5_nl_editorial_strict"),'Nederlandstalig strict mode must invalidate older mixed station pools');
+ok(controller.includes("NL_EDITORIAL_SOURCE='spotify-editorial-je-moerstaal'")&&controller.includes("if(id==='nl'&&x?.source!==NL_EDITORIAL_SOURCE)return[]"),'Nederlandstalig cache must only accept Je Moerstaal snapshots');
+ok(controller.includes("MAIR speelt geen andere Nederlandstalige selectie als vervanging"),'Nederlandstalig must fail closed when Je Moerstaal and its trusted cache are unavailable');
+const nlBlock=controller.slice(controller.indexOf("if(id==='nl'){"),controller.indexOf("if(['hits','top40'].includes(id))"));
+ok(nlBlock.includes("dutchChartPool('nl')")&&!nlBlock.includes('for(const q of queries(id))')&&!nlBlock.includes('search(q)'),'Nederlandstalig must never fall through to generic Spotify Search');
+ok(controller.includes("source:'spotify-search-fallback'")&&controller.includes("['hits','top40'].includes(id)"),'generic Spotify search may remain a fallback for Hits and Top 40 only');
 ok(policy.includes("chartSource:'nl-hits'")&&policy.includes("chartSource:'nl-top40'")&&policy.includes("chartSource:'spotify-je-moerstaal'"),'station policy must explicitly identify all Dutch editorial/chart ownership');
 ok(!policy.includes("nl:{label:'MAIR NEDERLANDSTALIG',kind:'station',semantic:true,language:'nl',minConfidence:.95,minTracks:5,queries:()=>['genre:dutch'"),'Nederlandstalig must not return to genre:dutch as its main station definition');
 if(fail.length){console.error('Dutch chart station regression FAILED');for(const x of fail)console.error('- '+x);process.exit(1)}
