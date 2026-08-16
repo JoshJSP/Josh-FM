@@ -17,7 +17,7 @@ ok('tap routes through canonical selector',tap.includes('c.chooseChannel=choose'
 ok('station switch is serialized and rollback-safe',tap.includes('if(!c||switching)return false')&&tap.includes('switching=true')&&tap.includes('queue=previousQueue')&&tap.includes('localStorage.setItem(\'jfm_music_channel_v1\',previousId)'));
 ok('active non-mix station protects its queue from background rebuilds',tap.includes('function protectBuild()')&&tap.includes("if(active!=='mix'&&Array.isArray(queue)&&queue.length)return queue"));
 ok('lifecycle reasserts owner without permanent polling',tap.includes("addEventListener('pageshow'")&&tap.includes("addEventListener('mair:runtime-ready'")&&tap.includes('setTimeout(boot,300)')&&!tap.includes('setInterval(boot'));
-ok('popular category pool uses multiple bounded searches',tap.includes('buildPool')&&tap.includes("limit=25&q=")&&tap.includes('queries(id)'));
+ok('popular category pool uses multiple Spotify-2026-bounded searches',tap.includes('buildPool')&&tap.includes("limit=10&q=")&&tap.includes('queries(id)')&&!tap.includes("limit=25&q="));
 ok('Nederlandstalig is semantic fail-closed, not artist-whitelisted',policy.includes("nl:{label:'MAIR NEDERLANDSTALIG'")&&policy.includes("language:'nl'")&&policy.includes('minConfidence:.95')&&tap.includes('/api/category-filter')&&!tap.includes('nlArtists')&&!policy.includes('nlArtists')&&classifier.includes('hoofdzakelijk Nederlands'));
 ok('primary playback remains transport owner',primary.includes("dataset.jfmOwner='primary'")&&primary.includes("JFMPlaybackPrimary='playback-primary'"));
 if(fail.length){console.error('Channel tap regression FAIL:',fail.join(', '));process.exit(1)}
