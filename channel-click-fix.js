@@ -19,12 +19,12 @@
   function savePool(id,items){if(!id||!items?.length)return;try{const all=readPools();all[id]={at:Date.now(),items:dedupe(items).slice(0,50)};localStorage.setItem(POOL_CACHE,JSON.stringify(all))}catch{}}
   async function search(q){const d=await api('/search?type=track&limit=10&q='+encodeURIComponent(q));return(d?.tracks?.items||[]).filter(t=>t?.id&&t?.uri).map(toTrack)}
   async function dutchChartPool(id){
-    if(!['hits','top40'].includes(id))return null;
+    if(!['hits','top40','nl'].includes(id))return null;
     const r=await fetch('/api/nl-charts?station='+encodeURIComponent(id),{cache:'no-store'}),d=await r.json().catch(()=>({}));
-    if(!r.ok)throw Error(String(d?.detail||d?.error||`Nederlandse hitlijst HTTP ${r.status}`));
+    if(!r.ok)throw Error(String(d?.detail||d?.error||`Nederlandse playlist HTTP ${r.status}`));
     const tracks=dedupe((Array.isArray(d?.items)?d.items:[]).map(chartTrack));
-    if(tracks.length<(policy()?.minTracks?.(id)||5))throw Error('Nederlandse hitlijst leverde tijdelijk te weinig Spotify-tracks.');
-    return{tracks,verified:true,fallback:false,source:String(d?.source||'Nederlandse hitlijsten')};
+    if(tracks.length<(policy()?.minTracks?.(id)||5))throw Error('Nederlandse playlist leverde tijdelijk te weinig Spotify-tracks.');
+    return{tracks,verified:true,fallback:false,source:String(d?.source||'Nederlandse Spotify-playlist')};
   }
   async function semanticQualityFilter(id,list){if(!policy()?.needsSemantic?.(id))return{list,verified:true};const min=policy()?.confidence?.(id)||.90;try{const r=await fetch('/api/category-filter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:id,minConfidence:min,tracks:list.slice(0,40)})});if(!r.ok)return{list,verified:false};const d=await r.json(),accepted=new Set((Array.isArray(d?.accepted)?d.accepted:[]).filter(x=>Number(x?.confidence)>=min).map(x=>String(x.id))),filtered=list.filter(t=>accepted.has(String(t.id))),minimum=policy()?.minTracks?.(id)||5;return filtered.length>=minimum?{list:filtered,verified:true}:{list,verified:false}}catch{return{list,verified:false}}}
   function hardFilter(id,list){return policy()?.hardFilter?.(id,list)||(list||[])}
@@ -33,8 +33,8 @@
   async function buildPool(id){
     if(!ensurePolicy())throw Error('Stations worden nog geladen.');
     let raw=[],searchErrors=[];
-    if(['hits','top40'].includes(id)){
-      try{const chart=await dutchChartPool(id);if(chart?.tracks?.length){savePool(id,chart.tracks);return chart}}catch(e){searchErrors.push('Nederlandse hitlijst: '+String(e?.message||e))}
+    if(['hits','top40','nl'].includes(id)){
+      try{const chart=await dutchChartPool(id);if(chart?.tracks?.length){savePool(id,chart.tracks);return chart}}catch(e){searchErrors.push('Nederlandse playlist: '+String(e?.message||e))}
     }
     for(const q of queries(id)){
       try{raw.push(...await search(q))}catch(e){const msg=String(e?.message||e);searchErrors.push(msg);if(/cooldown|rate limit|429|wacht/i.test(msg)){const ms=Math.max(0,Number(window.JFMSpotifyGuard?.state?.cooldownUntil||0)-Date.now());if(ms&&ms<65000){await wait(ms+180);try{raw.push(...await search(q))}catch(retryErr){searchErrors.push(String(retryErr?.message||retryErr))}}}}
@@ -62,7 +62,7 @@
     switching=true;const previousId=localStorage.getItem('jfm_music_channel_v1')||'mix',previousQueue=Array.isArray(queue)?[...queue]:[];
     window.MAIRCategorySearch?.clearActive?.();try{localStorage.removeItem('mair_active_category_v2');localStorage.setItem('mair_playback_source_v1',JSON.stringify({kind:'station',id,at:Date.now()}))}catch{};paint(id,true);
     try{
-      status(['hits','top40'].includes(id)?`${stationLabel(id)} laadt de Nederlandse hitlijsten…`:`${stationLabel(id)} zoekt muziek op Spotify…`);
+      status(['hits','top40','nl'].includes(id)?`${stationLabel(id)} laadt de Nederlandse Spotify-selectie…`:`${stationLabel(id)} zoekt muziek op Spotify…`);
       let list,verified=true,fallback=false,source='';
       if(id==='mix'){const r=await buildSet();list=Array.isArray(r)&&r.length?r:(Array.isArray(queue)?queue:[])}
       else{const built=await buildPool(id);list=built.tracks;verified=built.verified;fallback=built.fallback;source=built.source||''}
@@ -82,8 +82,8 @@
     }finally{switching=false}
   }
   function protectBuild(){if(buildProtected||typeof window.buildSet!=='function')return;const old=window.buildSet;window.buildSet=buildSet=async function(...args){const active=localStorage.getItem('jfm_music_channel_v1')||'mix';if(active!=='mix'&&Array.isArray(queue)&&queue.length)return queue;return old.apply(this,args)};buildProtected=true}
-  function own(){if(!ensurePolicy())return false;const c=choice();if(!c)return false;c.chooseChannel=choose;c.rebuild=()=>choose(localStorage.getItem('jfm_music_channel_v1')||'mix');try{Object.defineProperty(c,'channel',{configurable:true,get:()=>localStorage.getItem('jfm_music_channel_v1')||'mix'})}catch{}c.hotfix='authoritative-stations-v15-nl-charts';paint(localStorage.getItem('jfm_music_channel_v1')||'mix');protectBuild();return true}
+  function own(){if(!ensurePolicy())return false;const c=choice();if(!c)return false;c.chooseChannel=choose;c.rebuild=()=>choose(localStorage.getItem('jfm_music_channel_v1')||'mix');try{Object.defineProperty(c,'channel',{configurable:true,get:()=>localStorage.getItem('jfm_music_channel_v1')||'mix'})}catch{}c.hotfix='authoritative-stations-v16-nl-editorial';paint(localStorage.getItem('jfm_music_channel_v1')||'mix');protectBuild();return true}
   document.addEventListener('click',async e=>{const b=e.target?.closest?.('[data-jfm-channel],[data-mair-station]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const n=Date.now();if(n-lastTap<250)return;lastTap=n;const id=stationIdFromButton(b);if(!id)return;await choose(id).catch(()=>false)},true);
   const boot=()=>own();boot();setTimeout(boot,300);setTimeout(boot,1200);window.addEventListener('pageshow',()=>setTimeout(boot,150));window.addEventListener('mair:runtime-ready',boot);window.addEventListener('mair:foundation-ready',()=>paint(localStorage.getItem('jfm_music_channel_v1')||'mix',false));
-  window.MAIRStationController={version:'mair-station-controller-v3.9-nl-charts',select:choose,harden:own,buildPool,get switching(){return switching},get channel(){return localStorage.getItem('jfm_music_channel_v1')||'mix'}};window.JFMChannelTapGuard=window.MAIRStationController;
+  window.MAIRStationController={version:'mair-station-controller-v4.0-nl-editorial',select:choose,harden:own,buildPool,get switching(){return switching},get channel(){return localStorage.getItem('jfm_music_channel_v1')||'mix'}};window.JFMChannelTapGuard=window.MAIRStationController;
 })();
