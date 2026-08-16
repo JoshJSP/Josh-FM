@@ -12,6 +12,7 @@
     "hotfix-check": "node scripts/hotfix-release-check.mjs",
     "personal-source-sync": "node --check mair-personal-source-sync.js && node scripts/personal-source-sync-check.mjs",
     "spotify-2026-stations": "node --check channel-click-fix.js && node --check mair-station-policy.js && node scripts/spotify-2026-station-check.mjs",
+    "nl-chart-stations": "node --check api/nl-charts.js && node scripts/nl-chart-station-check.mjs",
     "mair-regression-check": "node scripts/mair-regression-check.mjs",
     "mair-ui-contract": "node scripts/mair-ui-contract-check.mjs",
     "build-checks": "node scripts/build1-radio-core-check-v2.mjs && node scripts/build2-check.mjs && node scripts/build3-check.mjs && node scripts/build4-check.mjs && node scripts/build5-check.mjs && node scripts/build6-check.mjs && node scripts/build9-check.mjs",
@@ -21,6 +22,6 @@
     "backend-cleanup": "node --check build7.js && node scripts/backend-cleanup-check.mjs",
     "dj-v2": "node --check mair-dj-v2.js && node --check mair-voice-check.js && node --check api/dj-writer.js && node scripts/dj-v2-regression.mjs",
     "dj-behavior": "node scripts/dj-v3-behavior-check.mjs",
-    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run personal-source-sync && npm run spotify-2026-stations && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check && npm run category-purity && npm run mair-hardening && npm run backend-cleanup && npm run dj-v2 && npm run dj-behavior"
+    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run personal-source-sync && npm run spotify-2026-stations && npm run nl-chart-stations && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check && npm run category-purity && npm run mair-hardening && npm run backend-cleanup && npm run dj-v2 && npm run dj-behavior"
   }
 }
