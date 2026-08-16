@@ -1,5 +1,5 @@
 // MAIR release metadata and cache/build reconciliation.
-window.JFM_RELEASE={version:'2.0.0-beta.5',displayVersion:'2b.0.5',build:'unknown',asset:'47',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
+window.JFM_RELEASE={version:'2.0.0-beta.6',displayVersion:'2b.0.6',build:'unknown',asset:'47',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
 window.JFM_ASSET_VERSION='47';
 (()=>{
   function addStyle(id,src){if(document.getElementById(id))return;const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=src;document.head.appendChild(l)}
