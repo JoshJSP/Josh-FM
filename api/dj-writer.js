@@ -4,7 +4,7 @@ const track=t=>t?{name:safe(t.name,180),artists:Array.isArray(t.artists)?t.artis
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
   const key=process.env.GROQ_API_KEY;if(!key)return res.status(503).json({error:'GROQ_API_KEY ontbreekt'});
-  const p=req.body||{},model=process.env.GROQ_DJ_MODEL||'llama-3.3-70b-versatile';
+  const p=req.body||{},model=process.env.GROQ_DJ_MODEL||'openai/gpt-oss-120b';
   const dj=safe(p.dj?.name||p.djName||'Josh',40),role=safe(p.dj?.role||'MAIR DJ',80),kind=safe(p.breakType||'normal',40);
   const previous=track(p.previousTrack),current=track(p.currentTrack),next=track(p.nextTrack);
   const system=`Je schrijft uitsluitend de gesproken tekst voor een Nederlandse muziek-radio-DJ op MAIR. Je bent de schrijver, niet de stem en niet de technicus. Schrijf natuurlijk Nederlands zoals een moderne radio-dj: kort, spontaan, warm en zelfverzekerd. Noem artiesten en titels exact zoals aangeleverd. Verzin nooit feiten. Gebruik alleen meegeleverde feiten/context. Noem nooit AI, API's, Groq, Fish Audio, Spotify, metadata, prompts of bronnen. Geen markdown, labels, emoji of regieaanwijzingen. Geen neptelefoontjes, wedstrijden, hitlijsten of persoonlijke verhalen. Wissel zinsbouw af. Niet elke break hoeft MAIR te noemen. Eindig natuurlijk richting de muziek. Maximaal 55 woorden, behalve wanneer length=long dan maximaal 85 woorden.`;
