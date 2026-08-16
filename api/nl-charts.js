@@ -1,7 +1,8 @@
 const PLAYLISTS={
   top40:{id:'5lH9NjOeJvctAO92ZrKQNB',label:'Qmusic Top 40',weight:1},
   airplay:{id:'7a5Qk0YvgHSdk6Ot3Yc7qS',label:'Airplay Top 40',weight:.86},
-  streaming:{id:'1U0P7X7JJe1e7wcTrCkQIj',label:'Streaming Top 40',weight:.86}
+  streaming:{id:'1U0P7X7JJe1e7wcTrCkQIj',label:'Streaming Top 40',weight:.86},
+  nl:{id:'37i9dQZF1DWUX3x84bv557',label:'Je Moerstaal',weight:1}
 };
 const TTL=10*60*1000,cache=new Map();
 function text(v){return typeof v==='string'?v.trim():''}
@@ -56,11 +57,15 @@ function hitsMix(sources){
 }
 export default async function handler(req,res){
   if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
-  const station=String(req.query?.station||'').toLowerCase();if(!['hits','top40'].includes(station))return res.status(400).json({error:'station must be hits or top40'});
+  const station=String(req.query?.station||'').toLowerCase();if(!['hits','top40','nl'].includes(station))return res.status(400).json({error:'station must be hits, top40 or nl'});
   try{
     if(station==='top40'){
       const items=(await fetchPlaylist('top40')).slice(0,40);
       res.setHeader('Cache-Control','public, s-maxage=900, stale-while-revalidate=3600');return res.status(200).json({station,source:'Nederlandse Top 40',playlist:PLAYLISTS.top40.id,items,updatedAt:new Date().toISOString()});
+    }
+    if(station==='nl'){
+      const items=radioDiversity(await fetchPlaylist('nl'),50);
+      res.setHeader('Cache-Control','public, s-maxage=900, stale-while-revalidate=3600');return res.status(200).json({station,source:'Spotify · Je Moerstaal',playlist:PLAYLISTS.nl.id,items,updatedAt:new Date().toISOString()});
     }
     const settled=await Promise.allSettled(['top40','airplay','streaming'].map(async key=>[key,await fetchPlaylist(key)])),sources={},errors=[];
     for(const result of settled){if(result.status==='fulfilled'){const[key,items]=result.value;sources[key]=items}else errors.push(String(result.reason?.message||result.reason))}
