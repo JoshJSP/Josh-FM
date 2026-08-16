@@ -10,7 +10,7 @@ ok(runtime.includes("source.addEventListener('change'")&&runtime.includes("queue
 ok(runtime.includes("rebuild.addEventListener('click'")&&runtime.includes('stopImmediatePropagation'),'personal rebuild must bypass the legacy wrapped rebuild handler');
 ok(runtime.includes("active==='mix'?buildPersonal():inherited(...args)"),'generic buildSet must use the personal builder for MY MAIR only');
 ok(runtime.includes("[data-mair-station=\"mix\"]")&&runtime.includes("activatePersonal('my-mair-tap')"),'MY MAIR station taps must enter personal-source mode before station routing');
-ok(runtime.includes("api('/me/player/recently-played?limit=50')")&&runtime.includes("api('/me/tracks?limit=50&offset=${off}')")&&runtime.includes("api(`/playlists/${id}/items?limit=50&offset=${off}`)"),'personal builder must support recent, saved and playlist sources');
+ok(runtime.includes('/me/player/recently-played?limit=50')&&runtime.includes('/me/tracks?limit=50&offset=${off}')&&runtime.includes('/playlists/${id}/items?limit=50&offset=${off}'),'personal builder must support recent, saved and playlist sources');
 ok(polish.includes("mairPersonalSourceSyncJs")&&polish.includes("./mair-personal-source-sync.js?v=1"),'PWA polish must load the personal source runtime');
 if(fail.length){console.error('Personal source sync FAILED');for(const x of fail)console.error('- '+x);process.exit(1)}
 console.log('Personal source sync regression OK');
