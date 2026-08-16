@@ -18,7 +18,7 @@ ok(foundation.includes("data-mair-tab=\"settings\""),'onderste navigatie mist In
 ok(foundation.includes("<span>Instellingen</span>"),'onderste navigatie bevat nog Engelse Settings-label');
 ok(foundation.includes("e.target.closest('.mair-nav-btn')"),'MAIR navigatie gebruikt geen gedelegeerde klikhandler');
 ok(!foundation.includes('mair-daily-hero'),'legacy Voor jou hero staat nog in foundation');
-ok(easy.includes('mair-personal-in-stations')&&easy.includes('DAILY MIX'),'persoonlijke mixes zijn niet naar Stations verplaatst');
+ok(easy.includes('removeForYou')&&easy.includes("document.querySelector('[data-mair-tab=\"for-you\"]')?.remove()")&&easy.includes('.mair-personal-in-stations'),'legacy Voor jou/persoonlijke mix UI wordt niet volledig verwijderd');
 ok(foundation.includes("showBase('radio')")&&foundation.includes("dataset.mairTab==='requests'"),'Verzoeken moet als sheet boven Radio openen zonder tabs te combineren');
 ok(foundation.includes('purgeLegacyNowNextLater'),'legacy NU/STRAKS/LATER scrub ontbreekt');
 ok(!foundation.includes('mair-visual-sprite.svg'),'MAIR UI mag niet meer afhankelijk zijn van de defecte SVG-sprite');
@@ -31,7 +31,7 @@ ok(voiceEngine.includes("'mair:dj-speaking'")&&easy.includes("'mair:dj-speaking'
 ok(easy.includes("'mair:dj-schedule'")&&easy.includes('mairDjScheduleStatus'),'DJ countdown is niet aan de authoritative scheduler gekoppeld');
 ok(!voice.includes('preventDefault('),'TTS mag clicks niet preventDefaulten');
 ok(!voice.includes('stopPropagation('),'TTS mag click-events niet stoppen');
-ok(radio.includes('MutationObserver'),'radio-home moet queue/mode live kunnen verversen');
+ok(radio.includes("window.addEventListener('mair:channelchange',syncMode)")&&radio.includes("window.addEventListener('jfm:trackchange'")&&radio.includes('window.MAIRRadioHome={')&&radio.includes('refresh'),'radio-home moet station/track events volgen en handmatig kunnen verversen');
 ok(radioCss.includes('.mair-now-v2 .mair-live-strip{display:none!important}'),'oude live/queue tekst mag niet over now-playing heen staan');
 ok(radioCss.includes('overflow-wrap:normal!important')&&radioCss.includes('word-break:normal!important'),'tracktitel mag niet agressief afbreken');
 ok(radioCss.includes('.mair-radio-actions-v2{display:none!important}'),'oude dashboard-acties moeten uit template-radio verdwijnen');
