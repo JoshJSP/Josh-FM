@@ -5,7 +5,7 @@
   if(window.__jfmStabilityCoreInstalled)return;window.__jfmStabilityCoreInstalled=true;
   const $=id=>document.getElementById(id);
   const PKCE_V='jfm_pkce_verifier_v2',PKCE_S='jfm_pkce_state_v2',STREAM='jfm_streaming_ready_v2',DEVICE='jfm_spotify_device_id';
-  let player=null,deviceId='',initPromise=null,lastEndSignal='',reconnectPromise=null;
+  let player=null,deviceId='',initPromise=null,lastEndSignal='',reconnectPromise=null,playbackErrorTimer=null;
   function message(text,bad=false){const el=$('queueInfo');if(el){el.textContent=text;el.style.color=bad?'#ffb4b4':''}}
   function setStatus(ok,text){const s=$('status');if(s){s.classList.toggle('on',ok);s.classList.toggle('off',!ok);s.textContent=text||(ok?'gekoppeld':'offline')}}
   function enable(ok){['start','play','prev','next','djNow','skipTalk','searchBtn','rebuild'].forEach(id=>{const e=$(id);if(e)e.disabled=!ok})}
@@ -28,12 +28,12 @@
         player.addListener('authentication_error',()=>{rememberDevice('');localStorage.removeItem(STREAM);message('Spotify moet één keer opnieuw gekoppeld worden voor afspelen in Josh FM.',true);enable(false);if($('connect'))$('connect').disabled=false});
         player.addListener('account_error',()=>message('Spotify Premium is nodig om muziek in Josh FM af te spelen.',true));
         player.addListener('autoplay_failed',()=>message('iPhone blokkeerde autoplay. Tik nogmaals op Start Josh FM.',true));
-        player.addListener('playback_error',({message:m})=>message('Spotify-afspeelfout: '+m,true));
+        player.addListener('playback_error',({message:m})=>{clearTimeout(playbackErrorTimer);playbackErrorTimer=setTimeout(()=>{playbackErrorTimer=null;const state=window.JFMPlaybackState?.get?.();if(state?.isPlaying&&Date.now()-Number(state.updatedAt||0)<4000){message('MAIR speelt.');return}message('Spotify-afspeelfout: '+m,true)},700)});
         player.addListener('player_state_changed',state=>{
           if(!state)return;const t=state.track_window?.current_track;
           if(!t){try{window.JFMPlaybackState?.ingest?.({item:null,is_playing:false,progress_ms:0,device:{id:deviceId,name:'Josh FM'}},'sdk-empty')}catch{};return}
           const fake={item:{id:t.id,uri:t.uri,name:t.name,duration_ms:t.duration_ms,artists:(t.artists||[]).map(a=>({name:a.name})),album:{name:t.album?.name||'',images:t.album?.images||[]},external_urls:{spotify:t.id?`https://open.spotify.com/track/${t.id}`:''}},progress_ms:state.position,is_playing:!state.paused,device:{id:deviceId,name:'Josh FM'}};
-          playback=fake;try{renderPlayback(fake)}catch{};try{window.JFMPlaybackState?.ingest?.(fake,'sdk')}catch{};
+          playback=fake;try{renderPlayback(fake)}catch{};try{window.JFMPlaybackState?.ingest?.(fake,'sdk')}catch{};if(!state.paused&&playbackErrorTimer){clearTimeout(playbackErrorTimer);playbackErrorTimer=null;message('MAIR speelt.')}
           const duration=Number(t.duration_ms||0),position=Number(state.position||0),nearEnd=duration>0&&position>=Math.max(0,duration-1300);
           if(state.paused&&nearEnd){const sig=`${t.id}:${Math.floor(duration/1000)}`;if(lastEndSignal!==sig){lastEndSignal=sig;try{window.dispatchEvent(new CustomEvent('jfm:natural-track-end',{detail:{trackId:t.id,uri:t.uri,durationMs:duration,positionMs:position}}))}catch{}}}
           else if(!state.paused)lastEndSignal=''

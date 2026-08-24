@@ -74,6 +74,7 @@ function testIosTransportDelegatesToPrimary(){
   return Promise.all([context.JFMIOSV2B02.toggle(),context.JFMIOSV2B02.pause(),context.JFMIOSV2B02.resume()]).then(()=>assert.deepEqual(calls.map(x=>x[0]),['playPause','pause','resume']));
 }
 
-const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive],['iOS transport delegates to primary',testIosTransportDelegatesToPrimary]];
+function testTransientSdkErrorsHeal(){const source=read('stability-core.js');assert.ok(source.includes('playbackErrorTimer')&&source.includes("message('MAIR speelt.')"),'a transient SDK playback error must clear after confirmed playing state');assert.ok(source.includes('state?.isPlaying')&&source.includes('state.updatedAt'),'delayed playback errors must consult recent central playback truth')}
+const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive],['iOS transport delegates to primary',testIosTransportDelegatesToPrimary],['transient SDK errors heal after confirmed playback',testTransientSdkErrorsHeal]];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(error){console.error('FAIL',name,'—',error?.stack||error);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`Playback package 1: ${passed}/${tests.length} PASS`);
