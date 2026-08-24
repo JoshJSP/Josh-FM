@@ -1,7 +1,7 @@
 // MAIR release/update diagnostics — diagnostics only; station playback has one owner.
 (()=>{
   'use strict';
-  const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms)),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let repairing=false,lastRepair='';
 
   function removeLegacyUpdateBanner(){
@@ -22,18 +22,21 @@
 
   function playbackText(){try{const s=window.JFMPlayback?.state||window.JFMPlaybackState?.get?.();if(!s)return'Onbekend';return s.isPlaying||s.is_playing?'Speelt':'Gepauzeerd'}catch{return'Onbekend'}}
   function rows(){
-    const r=window.JFM_RELEASE||{},device=localStorage.getItem('jfm_spotify_device_id')||'geen',health=window.JFMPlayback?.health||{},queue=window.JFMQueue?.state?.()||{},upcoming=window.JFMSpotifyUpcomingTruth;
+    const r=window.JFM_RELEASE||{},device=localStorage.getItem('jfm_spotify_device_id')||'geen',health=window.JFMPlayback?.health||{},queue=window.JFMQueue?.state?.()||{},upcoming=window.JFMSpotifyUpcomingTruth,dj=window.JFMDJAuthoritative?.diagnostics?.()||window.MAIRDJ?.diagnostics?.()||{},audio=window.JFMDJAudio?.status||{},current=window.playback?.item||null,next=window.__jfmSpotifyUpcomingTruth?.items?.[0]||null,lastTrack=window.JFMRadioCoreHealth?.events?.().find?.(e=>e.type==='trackchange');
     return [
       ['Versie','v'+(r.version||'?')],['Server build',r.build||'onbekend'],['Assetversie',String(r.asset||window.JFM_ASSET_VERSION||'?')],
       ['App-cache',r.localCache||'geen actieve cache'],['Server-cache',r.serverCache||'onbekend'],['Update',r.updateAvailable?'Beschikbaar':'Actueel'],
       ['Spotify-device',device?device.slice(0,12)+(device.length>12?'…':''):'geen'],['Playback',playbackText()],
-      ['Playback-fouten',String(health.failures??0)],['Herstelacties',String(health.recoveries??0)],['Queue-bron',queue.station?`${queue.station} · ${queue.source||'onbekend'}`:'niet geladen'],['Queue-revisie',String(queue.revision??'—')],['Spotify-queue sync',upcoming?.lastOk?`${Math.max(0,Math.round((Date.now()-upcoming.lastOk)/1000))} sec geleden`:'nog niet'],['Laatste herstel',lastRepair||'nog niet']
+      ['Huidige track',current?`${current.name||'Onbekend'} · ${(current.artists||[]).map(a=>a?.name||a).join(', ')||'onbekende artiest'}`:'geen'],['Volgende track',next?`${next.name||'Onbekend'} · ${(next.artists||[]).map(a=>a?.name||a).join(', ')||'onbekende artiest'}`:'nog niet bekend'],
+      ['Laatste trackevent',lastTrack?`${lastTrack.trackId||'onbekend'} · ${lastTrack.source||'onbekende bron'} · ${Math.max(0,Math.round((Date.now()-lastTrack.at)/1000))} sec geleden`:'nog niet'],
+      ['Playback-fouten',String(health.failures??0)],['Herstelacties',String(health.recoveries??0)],['Herstel-backoff',health.recoveryCooldownMs?`${Math.ceil(health.recoveryCooldownMs/1000)} sec`:'geen'],['Queue-bron',queue.station?`${queue.station} · ${queue.source||'onbekend'}`:'niet geladen'],['Queue-revisie',String(queue.revision??'—')],['Spotify-queue sync',upcoming?.lastOk?`${Math.max(0,Math.round((Date.now()-upcoming.lastOk)/1000))} sec geleden`:'nog niet'],
+      ['DJ-fase',dj.phase?`${dj.phase} · ${dj.reason||'geen reden'}`:'niet geladen'],['DJ volgende beslissing',Number.isFinite(dj.remaining)?`over ${dj.remaining} nummer${dj.remaining===1?'':'s'}`:'onbekend'],['DJ-writer',dj.writer?`${dj.writer.provider||'onbekend'} · ${dj.writer.model||'geen model'}${dj.writer.error?' · fallback na fout':''}`:'nog niet gebruikt'],['DJ-stem',audio.voiceTitle||audio.voiceId||dj.voice?.voiceId||'nog niet bevestigd'],['TTS-status',audio.error?`fout · ${audio.error}`:audio.cacheSize?`${audio.cacheSize} break(s) voorbereid`:audio.lastPlaybackAt?`laatst afgespeeld ${Math.max(0,Math.round((Date.now()-audio.lastPlaybackAt)/1000))} sec geleden`:'nog niet gebruikt'],['TTS-route',audio.playbackMode||'nog niet gebruikt'],['Laatste DJ-fout',dj.error||dj.lastMissReason||'geen'],['Laatste herstel',lastRepair||'nog niet']
     ];
   }
   function render(){
     ensureUi();
     const diag=$('jfmDiagnostics');if(diag){diag.style.display='';diag.removeAttribute('aria-hidden')}
-    const host=$('diagRows');if(host)host.innerHTML=rows().map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #222831"><span>${k}</span><b style="color:#d7dde6;text-align:right;overflow-wrap:anywhere">${v}</b></div>`).join('');
+    const host=$('diagRows');if(host)host.innerHTML=rows().map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #222831"><span>${esc(k)}</span><b style="color:#d7dde6;text-align:right;overflow-wrap:anywhere">${esc(v)}</b></div>`).join('');
     window.MAIRDiagnosticsHub?.sync?.();
   }
   async function refresh(){

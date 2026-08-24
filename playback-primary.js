@@ -26,6 +26,7 @@
   async function ensureActive({preserve=true}={}){const p=await ensurePlayer(),id=await freshDevice();let s=await remote();if(s?.device?.id!==id)s=await transfer(id,preserve&&!!s?.is_playing);return{p,id,state:s}}
   async function verify(predicate,tries=10){for(let i=0;i<tries;i++){await wait(140+i*45);const s=await remote();if(s&&predicate(s))return s}return null}
   async function verifySdk(predicate,tries=8){const p=player();if(!p)return null;for(let i=0;i<tries;i++){try{const s=await p.getCurrentState();if(s&&predicate(s))return s}catch{}await wait(45+i*25)}return null}
+  async function nudgeSdkPlayback(){if(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,4))return true;try{await player()?.resume?.()}catch{}return!!(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,6))}
   const sdkUri=s=>String(s?.track_window?.current_track?.uri||'');
   async function observedPlaying(){
     try{const sdk=await player()?.getCurrentState?.();if(sdk?.track_window?.current_track)return!sdk.paused}catch{}
@@ -45,7 +46,7 @@
     const uris=stationContext(uri);if(!uris.length)throw Error('De track staat niet meer in de Josh FM-radioset.');
     await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&uris.includes(x.item?.uri),10);if(!s)throw Error('Spotify bevestigde geen afspeelbare track uit de radioset.');
-    ingest(s,source);truth()?.setExpectedLive?.(true,'play-track');return s
+    await nudgeSdkPlayback();ingest(s,source);truth()?.setExpectedLive?.(true,'play-track');return s
   }
   async function startDirect(){
     const id=await freshDevice();let before=await remote();
@@ -54,7 +55,7 @@
     const uris=(queue||[]).slice(0,30).map(x=>x?.uri).filter(Boolean);if(!uris.length)throw Error('Geen afspeelbare nummers in de radioset.');
     if($('jingles')?.checked&&typeof speakText==='function'){info('Josh FM-jingle…');await speakText('Josh FM. Your music, your radio show.',true).catch(()=>false)}
     info('Muziek wordt gestart…');await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
-    const s=await verify(x=>x.device?.id===id&&x.is_playing&&!!x.item?.id);if(!s)throw Error('Spotify bevestigde het starten niet.');
+    const s=await verify(x=>x.device?.id===id&&x.is_playing&&!!x.item?.id);if(!s)throw Error('Spotify bevestigde het starten niet.');await nudgeSdkPlayback();
     try{session=[];lastTrackId=null;renderHistory();scheduleTalk();startPolling()}catch{};ingest(s,'primary-start');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;info(`Josh FM is live · ${queue.length} tracks klaar.`);return true
   }
   async function start(){
@@ -142,7 +143,7 @@
     if(fallbackUri){
       const id=await freshDevice(),uris=stationContext(fallbackUri);
       await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
-      s=await verify(x=>x.device?.id===id&&x.is_playing&&x.item?.uri===fallbackUri,6);
+      s=await verify(x=>x.device?.id===id&&x.is_playing&&uris.includes(x.item?.uri),6);
       if(s){ingest(s,'primary-natural-fast');truth()?.setExpectedLive?.(true,'radio-live');return s}
     }
     return advance({record:false,source:'primary-natural-end'})

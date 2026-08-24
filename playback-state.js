@@ -8,7 +8,9 @@
     isPlaying:false,deviceId:'',deviceName:'',expectedLive:false,intent:'idle',
     operation:null,lastGoodAt:0,lastError:'',lastTransitionAt:0
   });
-  let state={...empty(),...load()};
+  // A page reload always disconnects the browser player. Preserve intent and
+  // metadata for recovery/UX, but never trust a persisted playing operation.
+  let state={...empty(),...load(),isPlaying:false,operation:null};
   let operationSeq=0;
 
   function load(){try{return JSON.parse(sessionStorage.getItem(KEY)||'{}')}catch{return{}}}
