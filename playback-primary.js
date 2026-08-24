@@ -152,7 +152,7 @@
       try{
         if(delta>0){await advance({record:true,source:'primary-next'});info('Josh FM speelt.');return true}
         const{p,id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');const fallbackUri=stationNeighbor(state,-1);let position=Number(state?.progress_ms||0);if(!position)try{position=Number((await p.getCurrentState())?.position||0)}catch{}
-        await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'});if(position>3000){await wait(120);await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'})}let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,8);
+        await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'});if(position>3000){await wait(180);try{await p.previousTrack()}catch{await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'})}}let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,8);
         if(!s){try{await player()?.previousTrack?.()}catch{};s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,5)}
         if(!s&&fallbackUri)s=await playContextDirect(fallbackUri,id,'primary-prev-fallback');if(!s)throw Error('Spotify bevestigde vorige niet.');if(!s.is_playing){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,6)||s}ingest(s,'primary-prev');truth()?.setExpectedLive?.(true,'previous');recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM speelt.');return true
       }catch(e){return rememberError(e,(delta>0?'Volgende':'Vorige')+' mislukt: ')}
