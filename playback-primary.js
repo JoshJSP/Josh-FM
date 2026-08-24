@@ -44,7 +44,7 @@
   async function playContextDirect(uri,id,source='primary-uri'){
     const uris=stationContext(uri);if(!uris.length)throw Error('De track staat niet meer in de Josh FM-radioset.');
     await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
-    const s=await verify(x=>x.device?.id===id&&x.is_playing&&x.item?.uri===uri,10);if(!s)throw Error('Spotify bevestigde de track niet.');
+    const s=await verify(x=>x.device?.id===id&&x.is_playing&&uris.includes(x.item?.uri),10);if(!s)throw Error('Spotify bevestigde geen afspeelbare track uit de radioset.');
     ingest(s,source);truth()?.setExpectedLive?.(true,'play-track');return s
   }
   async function startDirect(){
