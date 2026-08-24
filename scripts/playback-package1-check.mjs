@@ -62,6 +62,15 @@ function testRuntimeReadyIsNotRecursive(){
   assert.equal(readyEvents,1,'runtime-ready must not synchronously re-emit itself through channelchange');assert.equal(channelEvents,1);
 }
 
-const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive]];
+function testIosTransportDelegatesToPrimary(){
+  const source=read('ios-transport-v2b02.js');
+  assert.ok(!source.includes("addEventListener('click'"),'iOS shim must not intercept the play button');
+  assert.ok(!source.includes("window.api('/me/player"),'iOS shim must not own Spotify Web API transport');
+  const calls=[];const context={window:null,Promise,JFMPlayback:{primary:true,playPause:(...args)=>{calls.push(['playPause',...args]);return true},pause:()=>{calls.push(['pause']);return true},resume:()=>{calls.push(['resume']);return true},health:{busy:false}}};context.window=context;
+  vm.createContext(context);vm.runInContext(source,context,{filename:'ios-transport-v2b02.js'});
+  return Promise.all([context.JFMIOSV2B02.toggle(),context.JFMIOSV2B02.pause(),context.JFMIOSV2B02.resume()]).then(()=>assert.deepEqual(calls.map(x=>x[0]),['playPause','pause','resume']));
+}
+
+const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive],['iOS transport delegates to primary',testIosTransportDelegatesToPrimary]];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(error){console.error('FAIL',name,'—',error?.stack||error);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`Playback package 1: ${passed}/${tests.length} PASS`);
