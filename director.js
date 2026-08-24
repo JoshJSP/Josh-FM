@@ -26,7 +26,6 @@ async function syncSpotifyUpcoming(force=false){if(window.JFMSpotifyUpcomingTrut
 function renderNext(){paintNext();if(!window.JFMSpotifyUpcomingTruth)syncSpotifyUpcoming(false).catch(()=>{})}
 window.jfmRenderNext=renderNext;
 const oldBuild=buildSet;buildSet=window.buildSet=async function(){const list=await oldBuild();try{window.JFMRotation?.annotateAll?.(queue||list||[])}catch{}queue=direct(queue||list||[]);invalidateUpcoming('radioset-rebuild');renderNext();return queue};
-$('searchResults')?.addEventListener('click',e=>{const btn=e.target.closest?.('.result');if(!btn)return;const uri=btn.dataset.uri;if(!uri)return;const m=memory(),id=uri.split(':').pop();m.requests[uri]=(m.requests[uri]||0)+1;if(id)m.requests[id]=(m.requests[id]||0)+1;save(m)},true);
 function hideLegacyRadioMode(){const modeTitle=[...document.querySelectorAll('#tab-radio h3')].find(x=>x.textContent.trim()==='Radiomodus');const card=modeTitle?.closest('.card');if(card)card.style.display='none';const mini=$('modeMini');if(mini)mini.style.display='none'}
 let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(id&&id!==seen){seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);invalidateUpcoming('trackchange')}hideLegacyRadioMode();renderNext()},3000);
 window.addEventListener('jfm:trackchange',()=>{invalidateUpcoming('trackchange-event');paintNext();if(!window.JFMSpotifyUpcomingTruth)syncSpotifyUpcoming(true).catch(()=>{})});
