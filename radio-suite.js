@@ -1,6 +1,6 @@
 // MAIR Radio Suite — memory, stats, hour markers, DJ feedback learning and controller boot.
 (()=>{
- const $=id=>document.getElementById(id),K='jfm_radio_suite',DK='jfm_dj_feedback',BUILD=String(window.JFM_ASSET_VERSION||'39');
+ const $=id=>document.getElementById(id),K='jfm_radio_suite',DK='jfm_dj_feedback',BUILD=String(window.JFM_ASSET_VERSION||'48');
  const load=()=>{try{return JSON.parse(localStorage.getItem(K)||'{}')}catch{return{}}},save=s=>{try{localStorage.setItem(K,JSON.stringify(s))}catch{}};
  const loadDj=()=>{try{return JSON.parse(localStorage.getItem(DK)||'{"up":0,"down":0,"liked":[],"disliked":[]}')}catch{return{up:0,down:0,liked:[],disliked:[]}}},saveDj=d=>{try{localStorage.setItem(DK,JSON.stringify(d))}catch{}};
  let s={minutes:0,tracks:0,discoveries:0,requests:0,likes:0,dislikes:0,lastIds:[],lastArtists:[],startedAt:0,...load()};

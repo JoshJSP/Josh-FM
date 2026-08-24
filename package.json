@@ -22,6 +22,7 @@
     "backend-cleanup": "node --check build7.js && node scripts/backend-cleanup-check.mjs",
     "dj-v2": "node --check mair-dj-v2.js && node --check mair-voice-check.js && node --check api/dj-writer.js && node scripts/dj-v2-regression.mjs",
     "dj-behavior": "node scripts/dj-v3-behavior-check.mjs",
-    "predeploy": "npm run predeploy:static && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run personal-source-sync && npm run spotify-2026-stations && npm run nl-chart-stations && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check && npm run category-purity && npm run mair-hardening && npm run backend-cleanup && npm run dj-v2 && npm run dj-behavior"
+    "playback-package1": "node scripts/playback-package1-check.mjs",
+    "predeploy": "npm run predeploy:static && npm run playback-package1 && npm run smoke && npm run channel-tap && npm run hotfix-check && npm run personal-source-sync && npm run spotify-2026-stations && npm run nl-chart-stations && npm run mair-regression-check && npm run mair-ui-contract && npm run build-checks && npm run stabilization-check && npm run category-purity && npm run mair-hardening && npm run backend-cleanup && npm run dj-v2 && npm run dj-behavior"
   }
 }

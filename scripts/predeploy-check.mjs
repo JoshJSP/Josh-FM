@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 const root=process.cwd(),fail=[],pass=[];const read=p=>fs.readFileSync(path.join(root,p),'utf8'),exists=p=>fs.existsSync(path.join(root,p));const ok=(n,c,d='')=>(c?pass:fail).push(`${n}${d?` — ${d}`:''}`);
-function walk(dir='.') {const out=[];for(const e of fs.readdirSync(path.join(root,dir),{withFileTypes:true})){if(['.git','node_modules','.vercel','backups'].includes(e.name))continue;const rel=path.join(dir,e.name).replace(/^\.\//,'');if(e.isDirectory())out.push(...walk(rel));else out.push(rel)}return out}
+function walk(dir='.') {const out=[];for(const e of fs.readdirSync(path.join(root,dir),{withFileTypes:true})){if(['.git','node_modules','.vercel','backups'].includes(e.name))continue;const rel=path.join(dir,e.name).replace(/^\.\//,'').split(path.sep).join('/');if(e.isDirectory())out.push(...walk(rel));else out.push(rel)}return out}
 const files=walk(),js=files.filter(f=>f.endsWith('.js')||f.endsWith('.mjs'));for(const f of js){try{execFileSync(process.execPath,['--check',path.join(root,f)],{stdio:'pipe'});pass.push(`syntax ${f}`)}catch(e){fail.push(`syntax ${f} — ${String(e.stderr||e.message).trim()}`)}}
 const runtimeJs=js.filter(f=>!f.startsWith('scripts/')&&!f.startsWith('tests/')&&!f.startsWith('.github/')),allJs=runtimeJs.map(f=>[f,read(f)]),players=allJs.filter(([,s])=>s.includes('new Spotify.Player'));
 ok('backup policy exists',exists('backups/README.md')&&read('PRE_DEPLOY.md').includes('backup'));ok('at least one production backup exists',exists('backups')&&fs.readdirSync(path.join(root,'backups')).some(x=>x!=='README.md'));
