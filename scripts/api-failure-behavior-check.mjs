@@ -63,5 +63,13 @@ try{
   globalThis.fetch=async()=>{const error=new Error('aborted');error.name='AbortError';throw error};
   res=await call(writer,{method:'POST',body:{}});assert.equal(res.statusCode,504);assert.equal(res.body.error,'Groq timeout');assert.equal(res.body.attempts.length,3);
 
+  globalThis.fetch=async()=>({ok:true,status:200,json:async()=>({choices:[{message:{content:'Korte Nederlandse radiotekst voor de limiettest.'}}]})});
+  for(let i=0;i<20;i++){res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.20'},body:{}});assert.equal(res.statusCode,200)}
+  res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.20'},body:{}});assert.equal(res.statusCode,429);assert.equal(res.body.error,'rate_limited');assert.ok(Number(res.headers['Retry-After'])>=1);
+
+  globalThis.fetch=async()=>fishResponse(Buffer.from([0x49,0x44,0x33,1]));
+  for(let i=0;i<20;i++){res=await call(tts,{method:'POST',headers:{'x-forwarded-for':'198.51.100.21'},body:{text:'Limiettest.'}});assert.equal(res.statusCode,200)}
+  res=await call(tts,{method:'POST',headers:{'x-forwarded-for':'198.51.100.21'},body:{text:'Limiettest.'}});assert.equal(res.statusCode,429);assert.equal(res.body.error,'rate_limited');assert.ok(Number(res.headers['Retry-After'])>=1);
+
   console.log('MAIR API failure behavior: PASS');
 }finally{globalThis.fetch=originalFetch;restoreEnv()}

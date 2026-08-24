@@ -36,6 +36,7 @@ ok(radio.includes("window.addEventListener('mair:channelchange',syncMode)")&&rad
 ok(radioCss.includes('.mair-now-v2 .mair-live-strip{display:none!important}'),'oude live/queue tekst mag niet over now-playing heen staan');
 ok(radioCss.includes('overflow-wrap:normal!important')&&radioCss.includes('word-break:normal!important'),'tracktitel mag niet agressief afbreken');
 ok(releaseFixCss.includes('.mair-radio-actions-v2')&&releaseFixCss.includes('display: grid !important')&&releaseFixCss.includes('min-height: 52px !important'),'DJ nu en break overslaan moeten als compacte touchbediening zichtbaar blijven');
+ok(releaseFixCss.includes('.mair-now-v2 .circle')&&releaseFixCss.includes('width: 44px !important')&&releaseFixCss.includes('.switch:focus-within'),'mobiele transportknoppen en switches moeten toegankelijk bedienbaar blijven');
 ok(radioCss.includes('.mair-up-next-v2{display:none!important}'),'oude dashboard-queue moet uit template-radio verdwijnen');
 
 if(failures.length){console.error('MAIR UI contract FAILED');for(const x of failures)console.error('- '+x);process.exit(1)}

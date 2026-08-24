@@ -2,8 +2,11 @@ async function timedFetch(url,opt={},ms=12000){const c=new AbortController(),tim
 const safe=(v,n=1200)=>String(v??'').slice(0,n);
 const track=t=>t?{name:safe(t.name,180),artists:Array.isArray(t.artists)?t.artists.map(x=>typeof x==='string'?x:x?.name).filter(Boolean).slice(0,4):[],release:safe(t.release||t.album?.release_date,20),request:!!t.request}:null;
 const DEFAULT_MODELS=['openai/gpt-oss-120b','openai/gpt-oss-20b'];
+const RATE=new Map();
+function rateLimit(req,res){const windowMs=60000,limit=20,ip=String(req.headers?.['x-forwarded-for']||req.headers?.['x-real-ip']||'unknown').split(',')[0].trim().slice(0,80),now=Date.now(),fresh=(RATE.get(ip)||[]).filter(at=>now-at<windowMs);if(fresh.length>=limit){const retry=Math.max(1,Math.ceil((windowMs-(now-fresh[0]))/1000));res.setHeader('Retry-After',String(retry));res.status(429).json({error:'rate_limited',detail:`Probeer het over ${retry} seconden opnieuw.`,provider:'groq'});return false}fresh.push(now);RATE.set(ip,fresh);if(RATE.size>512)for(const[k,hits]of RATE)if(!hits.some(at=>now-at<windowMs))RATE.delete(k);return true}
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  if(!rateLimit(req,res))return;
   const key=process.env.GROQ_API_KEY;if(!key)return res.status(503).json({error:'GROQ_API_KEY ontbreekt'});
   const p=req.body||{},explicit=safe(process.env.GROQ_DJ_MODEL||'',120),models=[...new Set([explicit,...DEFAULT_MODELS].filter(Boolean))].slice(0,3);
   const dj=safe(p.dj?.name||p.djName||'Josh',40),role=safe(p.dj?.role||'MAIR DJ',80),kind=safe(p.breakType||'normal',40);

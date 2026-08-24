@@ -33,3 +33,32 @@
     min-height: 54px !important;
   }
 }
+
+/* iPhone-sized transport targets and keyboard-visible switches. */
+.mair-now-v2 .circle {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+.mair-now-v2 .circle.play {
+  width: 54px !important;
+  height: 54px !important;
+}
+
+.switch {
+  position: relative;
+}
+
+.switch input[type="checkbox"] {
+  display: block !important;
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.switch:focus-within {
+  outline: 2px solid #ff6a00;
+  outline-offset: 2px;
+}

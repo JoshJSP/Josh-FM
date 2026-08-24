@@ -13,6 +13,7 @@ ok(!dj.includes('schedulePendingRetry')&&!dj.includes('retryTimer')&&!dj.include
 ok(dj.includes('lastNaturalSig')&&dj.includes('if(sig===lastNaturalSig)return false'),'Duplicate natural-transition guard missing');
 ok(dj.includes('writerRequest(body,timeoutMs=18000)')&&dj.includes("provider:'local-fallback'")&&dj.includes('usableDutch'),'DJ writer must time out and degrade to safe Dutch copy');
 ok(writer.includes("DEFAULT_MODELS=['openai/gpt-oss-120b','openai/gpt-oss-20b']")&&writer.includes('for(const model of models)')&&writer.includes('attempts.push'),'DJ writer must survive a retired or unavailable Groq model');
+ok(writer.includes('rateLimit(req,res)')&&ttsApi.includes('rateLimit(req,res)')&&writer.includes("error:'rate_limited'")&&ttsApi.includes("error:'rate_limited'"),'Costly DJ/TTS routes must have a best-effort per-IP rate limit');
 ok(dj.includes('pack.nextHintId&&currentId!==String(pack.nextHintId)'),'Stale next-track DJ copy must be dropped before Spotify is paused');
 ok(dj.includes('pack.voiceProfileId')&&dj.includes('DJ-profiel wijzigde na het voorbereiden van de stem'),'A prepared break must never air through a changed DJ voice');
 ok(dj.includes("window.djBreak=(track=null,manual=false)=>manual?Promise.resolve(armManual()):Promise.resolve(false)"),'Legacy automatic scheduler is not neutralized');
