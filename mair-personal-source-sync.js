@@ -9,10 +9,11 @@ function activatePersonal(reason='personal-source'){
   try{window.MAIRStations?.sync?.();window.MAIRRadioHome?.refresh?.();window.MAIREasyUse?.sync?.()}catch{}
   return true;
 }
-async function buildPersonal(){
-  activatePersonal('personal-source-rebuild');
+async function buildPersonal(options={}){
+  const shouldActivate=options.activate!==false,shouldCommit=options.commit!==false,announce=options.announce!==false;
+  if(shouldActivate)activatePersonal('personal-source-rebuild');
   saveSettings();
-  const info=$('queueInfo');if(info){info.style.color='';info.textContent='Persoonlijke radioset wordt gemaakt…'}
+  const info=$('queueInfo');if(info&&announce){info.style.color='';info.textContent='Persoonlijke radioset wordt gemaakt…'}
   const src=$('source')?.value||'top';let tracks=[];
   if(src==='top'){
     for(const range of ['short_term','medium_term','long_term']){const d=await api(`/me/top/tracks?limit=40&time_range=${range}`);tracks.push(...(d.items||[]))}
@@ -25,12 +26,13 @@ async function buildPersonal(){
   }
   tracks=[...new Map(tracks.filter(Boolean).map(t=>[t.id,t])).values()];
   if(settings.mode==='throwback'){const old=tracks.filter(t=>Number((t.album?.release_date||'9999').slice(0,4))<=2016);if(old.length>=8)tracks=old}
-  const skips=skipMap();tracks.sort((a,b)=>(skips[a.id]||0)-(skips[b.id]||0)+(Math.random()-.5)*2);queue=tracks.slice(0,50).map(trackObj);
-  if(!queue.length)throw Error('Ik kon geen tracks voor deze persoonlijke radioset vinden.');
+  const skips=skipMap();tracks.sort((a,b)=>(skips[a.id]||0)-(skips[b.id]||0)+(Math.random()-.5)*2);let result=tracks.slice(0,50).map(trackObj);
+  if(!result.length)throw Error('Ik kon geen tracks voor deze persoonlijke radioset vinden.');
+  if(shouldCommit)result=window.JFMQueue?.commit?.(result,{source:'personal',station:'mix',reason:'personal-source-rebuild'})||(queue=result);
   try{window.__jfmStationQueueSig='';window.jfmRenderNext?.();window.JFMProgramDirector?.render?.()}catch{}
-  if(info)info.textContent=`${queue.length} tracks klaar · MY MAIR.`;
-  try{window.dispatchEvent(new CustomEvent('mair:station-selected',{detail:{id:'mix',label:'MY MAIR',count:queue.length,verified:true,started:false,reason:'personal-source'}}))}catch{}
-  return queue;
+  if(info&&announce)info.textContent=`${result.length} tracks klaar · MY MAIR.`;
+  if(announce)try{window.dispatchEvent(new CustomEvent('mair:station-selected',{detail:{id:'mix',label:'MY MAIR',count:result.length,verified:true,started:false,reason:'personal-source'}}))}catch{}
+  return result;
 }
 function install(){
   const source=$('source'),rebuild=$('rebuild');

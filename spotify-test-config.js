@@ -1,6 +1,6 @@
 // Josh FM — editable Spotify Client ID + shared Spotify API guard.
 (()=>{
-  const TEST_KEY='jfm_test_spotify_client_id',CLIENT_KEY='jfm_client_id',DEFAULT_CLIENT_ID='d505870719c6439d9ea3c53108330fe1',ASSET=String(window.JFM_ASSET_VERSION||'39');
+  const TEST_KEY='jfm_test_spotify_client_id',CLIENT_KEY='jfm_client_id',DEFAULT_CLIENT_ID='d505870719c6439d9ea3c53108330fe1',ASSET=String(window.JFM_ASSET_VERSION||'48');
   const asset=src=>`${src}${src.includes('?')?'&':'?'}v=${encodeURIComponent(ASSET)}`;
   const input=document.getElementById('clientId');if(!input)return;const label=input.closest('label');
   function selected(){return String(input.value||localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID).trim()}
@@ -23,9 +23,8 @@
     }
   }catch(e){console.warn('Spotify guard kon niet laden',e)}
   function loadScriptOnce(selector,src,datasetKey,onerror){if(document.querySelector(selector))return;const s=document.createElement('script');s.src=asset(src);s.async=false;s.dataset[datasetKey]='1';s.onerror=onerror;document.body.appendChild(s)}
-  function loadPrimaryController(){loadScriptOnce('script[data-jfm-playback-primary]','./playback-primary.js','jfmPlaybackPrimary',()=>{const q=document.getElementById('queueInfo');if(q)q.textContent='Centrale Josh FM-player kon niet worden geladen. Vernieuw de app.'})}
   function loadApiBudget(){if(window.JFMSpotifyApiBudget)return;loadScriptOnce('script[data-jfm-api-budget]','./spotify-api-budget.js','jfmApiBudget',()=>console.warn('Josh FM: Spotify API budget kon niet laden'))}
   function loadDJHandoff(){if(document.querySelector('script[data-jfm-dj-handoff]')||window.JFMDJHandoff)return;if(!window.JFMDJTransition){setTimeout(loadDJHandoff,120);return}loadScriptOnce('script[data-jfm-dj-handoff]','./dj-handoff-v34.js','jfmDjHandoff',()=>{const q=document.getElementById('queueInfo');if(q)q.textContent='DJ-overgang kon niet veilig worden geladen. Vernieuw de app.'})}
-  sync();loadPrimaryController();loadApiBudget();loadDJHandoff();setTimeout(sync,250);setTimeout(sync,1200);window.addEventListener('pageshow',()=>{sync();loadPrimaryController();loadApiBudget();loadDJHandoff()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadPrimaryController();loadApiBudget();loadDJHandoff()}});
+  sync();loadApiBudget();loadDJHandoff();setTimeout(sync,250);setTimeout(sync,1200);window.addEventListener('pageshow',()=>{sync();loadApiBudget();loadDJHandoff()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadApiBudget();loadDJHandoff()}});
   window.JFMSpotifyTestConfig={version:'spotify-test-v13-central-assets',assetVersion:ASSET,defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
 })();
