@@ -13,7 +13,7 @@ const primary=read('playback-primary.js');
 const background=read('mair-background-guard.js');
 
 const checks=[
-  ['MAIR v82 accessible controls cache active',sw.includes("mair-v82-accessible-controls-20260824")&&apiVersion.includes("mair-v82-accessible-controls-20260824")],
+  ['MAIR v83 Dutch fallback cleanup cache active',sw.includes("mair-v83-dutch-fallback-cleanup-20260824")&&apiVersion.includes("mair-v83-dutch-fallback-cleanup-20260824")],
   ['all Product Beta runtime cached',['radio-core-health-v1.js','dj-quality-v2.js','music-intelligence-v3.js','personal-learning-v4.js','product-model-v6.js','product-ux-v5.js','beta-status.js','brand-config.js','brand-runtime-v9.js','channel-start-guard-v2b01.js','dj-handoff-bootstrap-v2b02.js','ios-transport-v2b02.js','mair-category-search.js','mair-station-policy.js','channel-click-fix.js','mair-ui-hardening.js','mair-runtime-core.js','mair-dj-v2.js','mair-dj-schedule-sync.js','mair-voice-engine.js','mair-voice-check.js','mair-background-guard.js','mair-easy-use-v1.js'].every(x=>sw.includes(`./${x}`))],
   ['network requests have timeout',sw.includes('AbortController')&&sw.includes('fetchTimed')],
   ['PWA update checks recover on foreground',pwa.includes("visibilitychange")&&pwa.includes('checkForUpdate')&&pwa.includes('pageshow')],

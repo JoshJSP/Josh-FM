@@ -2,7 +2,7 @@ import fs from 'node:fs';
 const exists=p=>fs.existsSync(new URL('../'+p,import.meta.url));
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const fail=msg=>{throw new Error(msg)};
-for(const p of ['.build-trigger-v2b-20260813-2229','.vercel-preview-trigger-20260812.txt','.vercel-redeploy','backups','assets/mair-visual-sprite.svg'])if(exists(p))fail(`Obsolete repository artifact bestaat nog: ${p}`);
+for(const p of ['.build-trigger-v2b-20260813-2229','.vercel-preview-trigger-20260812.txt','.vercel-redeploy','backups','assets/mair-visual-sprite.svg','api/assistant.js','api/dj.js','api/jingle.js','kokoro-controller.js','kokoro-worker.js','dj-language-force.js'])if(exists(p))fail(`Obsolete repository artifact bestaat nog: ${p}`);
 const build7=read('build7.js');
 if(/b7ForYou|b7DjCard/.test(build7))fail('Build7 injecteert nog dubbele Voor jou/DJ UI');
 if(!build7.includes('window.MAIRRuntimePrefs'))fail('Runtime preferences hebben geen MAIR eigenaar');

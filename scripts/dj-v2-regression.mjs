@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8'),fail=[];const ok=(x,m)=>{if(!x)fail.push(m)};
 const dj=read('mair-dj-v2.js'),writer=read('api/dj-writer.js'),voice=read('debug-tts.js'),engine=read('mair-voice-engine.js'),resume=read('dj-resume.js'),boot=read('dj-now-queue.js'),easy=read('mair-easy-use-v1.js'),primary=read('playback-primary.js'),spotifyConfig=read('spotify-test-config.js'),integration=read('integration-guards.js'),runtime=read('runtime-modes.js'),health=read('station-health.js'),diagnostics=read('release-diagnostics.js');
-const discovery=read('discovery.js'),channel=read('channel-click-fix.js'),purity=read('mair-category-purity.js'),ttsApi=read('api/tts.js');
+const discovery=read('discovery.js'),channel=read('channel-click-fix.js'),purity=read('mair-category-purity.js'),ttsApi=read('api/tts.js'),discoverApi=read('api/discover.js'),categoryApi=read('api/category-filter.js');
 ok(dj.includes("v3.2-sdk-first-single-owner"),'DJ v3.2 runtime marker missing');
 ok(writer.includes('process.env.GROQ_API_KEY'),'Groq key must remain server-side');
 ok(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'ARMED'")&&dj.includes("'HANDOFF'")&&dj.includes("'SPEAKING'")&&dj.includes("'RESTORING'"),'DJ v3.2 state machine incomplete');
@@ -14,6 +14,7 @@ ok(dj.includes('lastNaturalSig')&&dj.includes('if(sig===lastNaturalSig)return fa
 ok(dj.includes('writerRequest(body,timeoutMs=18000)')&&dj.includes("provider:'local-fallback'")&&dj.includes('usableDutch'),'DJ writer must time out and degrade to safe Dutch copy');
 ok(writer.includes("DEFAULT_MODELS=['openai/gpt-oss-120b','openai/gpt-oss-20b']")&&writer.includes('for(const model of models)')&&writer.includes('attempts.push'),'DJ writer must survive a retired or unavailable Groq model');
 ok(writer.includes('rateLimit(req,res)')&&ttsApi.includes('rateLimit(req,res)')&&writer.includes("error:'rate_limited'")&&ttsApi.includes("error:'rate_limited'"),'Costly DJ/TTS routes must have a best-effort per-IP rate limit');
+ok(discoverApi.includes('rateLimit(req,res)')&&categoryApi.includes('rateLimit(req,res)'),'Costly discovery/classifier routes must have a best-effort per-IP rate limit');
 ok(dj.includes('pack.nextHintId&&currentId!==String(pack.nextHintId)'),'Stale next-track DJ copy must be dropped before Spotify is paused');
 ok(dj.includes('pack.voiceProfileId')&&dj.includes('DJ-profiel wijzigde na het voorbereiden van de stem'),'A prepared break must never air through a changed DJ voice');
 ok(dj.includes("window.djBreak=(track=null,manual=false)=>manual?Promise.resolve(armManual()):Promise.resolve(false)"),'Legacy automatic scheduler is not neutralized');

@@ -1,4 +1,6 @@
 async function timedFetch(url,opt={},ms=12000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{...opt,signal:c.signal})}finally{clearTimeout(timer)}}
+const RATE=new Map();
+function rateLimit(req,res){const windowMs=60000,limit=20,ip=String(req.headers?.['x-forwarded-for']||req.headers?.['x-real-ip']||'unknown').split(',')[0].trim().slice(0,80),now=Date.now(),fresh=(RATE.get(ip)||[]).filter(at=>now-at<windowMs);if(fresh.length>=limit){const retry=Math.max(1,Math.ceil((windowMs-(now-fresh[0]))/1000));res.setHeader('Retry-After',String(retry));res.status(429).json({error:'rate_limited',detail:`Probeer het over ${retry} seconden opnieuw.`});return false}fresh.push(now);RATE.set(ip,fresh);if(RATE.size>512)for(const[k,hits]of RATE)if(!hits.some(at=>now-at<windowMs))RATE.delete(k);return true}
 
 const RULES={
   nl:'Accepteer alleen als de gezongen tekst echt hoofdzakelijk Nederlands is: als strenge richtlijn minstens ongeveer 90% van de hoorbare songtekst Nederlands, inclusief het grootste deel van refrein en coupletten. Een paar Nederlandse woorden, een Nederlandstalige intro, een tweetalig nummer met veel Engels, of een Nederlandse/Vlaamse artiest met een Engelstalig nummer is NIET genoeg. Instrumentale tracks, volledig Engelstalige tracks en ieder twijfelgeval afwijzen.',
@@ -10,6 +12,7 @@ const MIN_CONFIDENCE={nl:.95,party:.90,chill:.90,summer:.90};
 
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  if(!rateLimit(req,res))return;
   const key=process.env.OPENAI_API_KEY;if(!key)return res.status(503).json({error:'missing_openai_key'});
   const channel=String(req.body?.channel||'');
   if(!RULES[channel])return res.status(400).json({error:'unsupported_channel'});
