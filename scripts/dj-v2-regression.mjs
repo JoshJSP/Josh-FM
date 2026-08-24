@@ -39,4 +39,5 @@ ok(diagnostics.includes("['Huidige track'")&&diagnostics.includes("['Volgende tr
 ok(health.includes('currentTrack:')&&health.includes('nextTrack:')&&health.includes('dj:djState'),'Machine-readable station health must expose current/next/DJ state');
 ok(discovery.includes("boundedFetch('/api/discover'")&&channel.includes("boundedFetch('/api/nl-charts")&&purity.includes("boundedFetch('/api/category-filter'"),'Optional enrichment must be bounded so station building cannot hang');
 ok(ttsApi.includes('normalizeProfile')&&ttsApi.includes("Object.hasOwn(DJ_ENV,id)?id:'josh'"),'TTS API must normalize unknown profiles to the actual Josh fallback voice');
+ok(ttsApi.includes('NON_DUTCH_VOICES')&&ttsApi.includes("languages.includes('nl')")&&ttsApi.includes('dutchReady'),'TTS API must reject the known English Max voice and diagnose Dutch readiness');
 if(fail.length){console.error('MAIR DJ v3.2 regression FAILED');for(const x of fail)console.error('-',x);process.exit(1)}console.log('MAIR DJ v3.2 regression OK');
