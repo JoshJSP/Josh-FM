@@ -22,12 +22,12 @@
 
   function playbackText(){try{const s=window.JFMPlayback?.state||window.JFMPlaybackState?.get?.();if(!s)return'Onbekend';return s.isPlaying||s.is_playing?'Speelt':'Gepauzeerd'}catch{return'Onbekend'}}
   function rows(){
-    const r=window.JFM_RELEASE||{},device=localStorage.getItem('jfm_spotify_device_id')||'geen',health=window.JFMPlayback?.health||{};
+    const r=window.JFM_RELEASE||{},device=localStorage.getItem('jfm_spotify_device_id')||'geen',health=window.JFMPlayback?.health||{},queue=window.JFMQueue?.state?.()||{},upcoming=window.JFMSpotifyUpcomingTruth;
     return [
       ['Versie','v'+(r.version||'?')],['Server build',r.build||'onbekend'],['Assetversie',String(r.asset||window.JFM_ASSET_VERSION||'?')],
       ['App-cache',r.localCache||'geen actieve cache'],['Server-cache',r.serverCache||'onbekend'],['Update',r.updateAvailable?'Beschikbaar':'Actueel'],
       ['Spotify-device',device?device.slice(0,12)+(device.length>12?'…':''):'geen'],['Playback',playbackText()],
-      ['Playback-fouten',String(health.failures??0)],['Herstelacties',String(health.recoveries??0)],['Laatste herstel',lastRepair||'nog niet']
+      ['Playback-fouten',String(health.failures??0)],['Herstelacties',String(health.recoveries??0)],['Queue-bron',queue.station?`${queue.station} · ${queue.source||'onbekend'}`:'niet geladen'],['Queue-revisie',String(queue.revision??'—')],['Spotify-queue sync',upcoming?.lastOk?`${Math.max(0,Math.round((Date.now()-upcoming.lastOk)/1000))} sec geleden`:'nog niet'],['Laatste herstel',lastRepair||'nog niet']
     ];
   }
   function render(){

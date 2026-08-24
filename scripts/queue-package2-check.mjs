@@ -1,0 +1,39 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const uri=n=>'spotify:track:'+String(n).padStart(22,'0');
+const track=(n,artist='Artist '+n)=>({id:String(n).padStart(22,'0'),uri:uri(n),name:'Track '+n,artists:[artist]});
+class FakeCustomEvent{constructor(type,init={}){this.type=type;this.detail=init.detail}}
+function storage(seed={}){const data=new Map(Object.entries(seed));return{getItem:k=>data.has(k)?data.get(k):null,setItem:(k,v)=>data.set(k,String(v)),removeItem:k=>data.delete(k)}}
+function makeContext({api,queue=[]}={}){
+  const listeners=new Map(),context={window:null,queue,api:api||(async()=>({})),localStorage:storage({jfm_music_channel_v1:'hits',jfm_spotify_device_id:'device-1'}),CustomEvent:FakeCustomEvent,Date,Math,Promise,console};
+  Object.assign(context,{addEventListener:(type,fn)=>{const a=listeners.get(type)||[];a.push(fn);listeners.set(type,a)},dispatchEvent:e=>{for(const fn of listeners.get(e.type)||[])fn(e);return true}});context.window=context;vm.createContext(context);vm.runInContext(read('queue-core.js'),context,{filename:'queue-core.js'});return context
+}
+async function testNormalizeCommit(){
+  const c=makeContext(),bad={id:'bad',uri:'https://open.spotify.com/track/bad',artists:['X']};
+  const result=c.JFMQueue.commit([track(1,'A'),track(2,'A'),track(3,'B'),track(1,'A'),bad,track(4,'C')],{source:'test',station:'hits',reason:'unit'});
+  assert.deepEqual(Array.from(result,t=>t.id),[track(1).id,track(3).id,track(4).id,track(2).id]);assert.equal(new Set(result.map(t=>t.uri)).size,result.length);assert.equal(c.JFMQueue.state().revision,1);assert.equal(c.JFMQueue.state().source,'test')
+}
+async function testSerializedBuildsAndStationOwner(){
+  const c=makeContext();let active=0,max=0,calls=0;
+  const jobs=[1,2,3].map(n=>c.JFMQueue.build('b'+n,async()=>{active++;max=Math.max(max,active);await sleep(5);active--;return[track(n)]}));await Promise.all(jobs);assert.equal(max,1,'queue builds may never overlap');
+  c.buildSet=async()=>{throw Error('protected legacy buildSet was used')};c.MAIRStationController={buildPool:async id=>{calls++;assert.equal(id,'hits');return{tracks:[track(10),track(11)]}}};
+  const generated=await c.JFMQueue.buildActive('rotation');assert.equal(calls,1);assert.equal(generated.length,2)
+}
+async function testExactRequestInsertion(){
+  const q=[track(1,'A'),track(2,'B'),track(3,'C')],request=track(9,'D'),calls=[];let remote={item:{id:q[0].id,uri:q[0].uri},device:{id:'device-1'},is_playing:true,progress_ms:42123};
+  const api=async(path,opt={})=>{calls.push({path,opt});if(path==='/me/player')return structuredClone(remote);if(path.startsWith('/me/player/play?')){assert.equal(opt.body.position_ms,42123);assert.deepEqual(Array.from(opt.body.uris.slice(0,4)),[q[0].uri,request.uri,q[1].uri,q[2].uri]);return null}if(path==='/me/player/queue')return{currently_playing:remote.item,queue:[request,q[1],q[2]]};throw Error('Unexpected '+path)};
+  const c=makeContext({api,queue:q});assert.equal(await c.JFMQueue.programNext(request),true);assert.equal(calls.filter(x=>x.path.startsWith('/me/player/play?')).length,1);remote.is_playing=false;await assert.rejects(()=>c.JFMQueue.programNext(track(8)),/gepauzeerd/);assert.equal(calls.filter(x=>x.path.startsWith('/me/player/play?')).length,1)
+}
+async function testLongSessionInvariant(){
+  const c=makeContext();let authored=[];for(let round=0;round<12;round++){const block=[];for(let i=0;i<15;i++)block.push(track(round*15+i+1,'Artist '+((round*15+i)%7)));authored=c.JFMQueue.commit([...authored.slice(-8),...block],{source:'continuity',station:'hits',reason:'simulation'});assert.ok(authored.length>=15);assert.equal(new Set(authored.map(t=>t.uri)).size,authored.length);for(let i=1;i<authored.length;i++)assert.notEqual(authored[i-1].artists[0],authored[i].artists[0])}assert.equal(c.JFMQueue.state().revision,12)
+}
+function testStaticContracts(){
+  const suite=read('radio-suite.js'),station=read('station-queue.js'),requests=read('request-manager.js'),director=read('director.js'),truth=read('spotify-upcoming-truth.js'),sw=read('sw.js');
+  assert.ok(suite.indexOf("'./queue-core.js'")<suite.indexOf("'./request-manager.js'"));assert.ok(suite.includes("'./spotify-upcoming-truth.js'"));assert.ok(station.includes("JFMQueue.buildActive('continuity-")&&station.includes('MAIR programmeert vooruit'));assert.ok(!station.includes('appended.has(track.id)||remote.has'));assert.ok(requests.includes('JFMQueue.programNext')&&!requests.includes("/me/player/queue?uri="));assert.ok(director.includes('if(window.JFMSpotifyUpcomingTruth)')&&director.includes('function renderNext(){paintNext();if(!window.JFMSpotifyUpcomingTruth)'));assert.ok(truth.includes('v2-single-authoritative-owner'));assert.ok(sw.includes('mair-v68-queue-single-truth-20260824')&&sw.includes("CORE.push('./queue-core.js','./spotify-upcoming-truth.js')"))
+}
+const tests=[testNormalizeCommit,testSerializedBuildsAndStationOwner,testExactRequestInsertion,testLongSessionInvariant,testStaticContracts];let passed=0;
+for(const test of tests){try{await test();passed++;console.log('PASS',test.name)}catch(error){console.error('FAIL',test.name,'—',error?.stack||error);process.exitCode=1}}
+if(process.exitCode)process.exit(1);console.log(`Queue package 2: ${passed}/${tests.length} PASS`);

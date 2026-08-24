@@ -38,5 +38,6 @@
   window.addEventListener('jfm:requests-change',()=>setTimeout(()=>sync(true),100));
   window.addEventListener('pageshow',()=>setTimeout(()=>sync(true),150));
   setInterval(()=>sync(false),1600);
-  window.JFMSpotifyUpcomingTruth={version:'v1-authoritative-only',sync,get items(){return[...lastItems]},get current(){return lastCurrent}};
+  const upcoming=()=>[...lastItems];window.jfmUpcoming=upcoming;
+  window.JFMSpotifyUpcomingTruth={version:'v2-single-authoritative-owner',sync,upcoming,get items(){return[...lastItems]},get current(){return lastCurrent},get lastOk(){return lastOk},get syncing(){return syncing}};
 })();

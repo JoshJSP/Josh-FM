@@ -78,7 +78,7 @@
       if(id==='mix'){const r=await buildSet();list=Array.isArray(r)&&r.length?r:(Array.isArray(queue)?queue:[])}
       else{const built=await buildPool(id);list=built.tracks;verified=built.verified;fallback=built.fallback;source=built.source||''}
       if(!list?.length)throw Error(`${stationLabel(id)} kreeg tijdelijk geen bruikbare tracks van Spotify.`);
-      queue=dedupe(list).slice(0,id==='top40'?40:50);
+      const prepared=dedupe(list).slice(0,id==='top40'?40:50);queue=window.JFMQueue?.commit?.(prepared,{source:id==='mix'?'personal':'station',station:id,reason:'station-switch'})||prepared;
       localStorage.setItem('jfm_music_channel_v1',id);
       try{window.__jfmStationQueueSig='';window.JFMProgramDirector?.invalidateUpcoming?.('station-switch');window.jfmRenderNext?.();window.JFMProgramDirector?.render?.()}catch{}
       paint(id,false);showActiveStation(id,stationLabel(id));
