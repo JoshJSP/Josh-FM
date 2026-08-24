@@ -1,3 +1,64 @@
 .mair-request-sheet {
   z-index: 1300;
 }
+
+/* Keep the two useful radio actions reachable in the compact/mobile-first home. */
+.mair-radio-actions-v2 {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  margin: 9px 0 0 !important;
+}
+
+.mair-radio-actions-v2 .quick {
+  min-height: 52px !important;
+  padding: 10px 12px !important;
+  border-radius: 12px !important;
+  background: #101010 !important;
+  border-color: #222 !important;
+}
+
+.mair-radio-actions-v2 .quick b {
+  font-size: 10px !important;
+}
+
+.mair-radio-actions-v2 .quick span {
+  margin-top: 2px !important;
+  font-size: 8px !important;
+  line-height: 1.3 !important;
+}
+
+@media (max-width: 420px) {
+  .mair-radio-actions-v2 .quick {
+    min-height: 54px !important;
+  }
+}
+
+/* iPhone-sized transport targets and keyboard-visible switches. */
+.mair-now-v2 .circle {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+.mair-now-v2 .circle.play {
+  width: 54px !important;
+  height: 54px !important;
+}
+
+.switch {
+  position: relative;
+}
+
+.switch input[type="checkbox"] {
+  display: block !important;
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.switch:focus-within {
+  outline: 2px solid #ff6a00;
+  outline-offset: 2px;
+}

@@ -24,7 +24,6 @@
   }catch(e){console.warn('Spotify guard kon niet laden',e)}
   function loadScriptOnce(selector,src,datasetKey,onerror){if(document.querySelector(selector))return;const s=document.createElement('script');s.src=asset(src);s.async=false;s.dataset[datasetKey]='1';s.onerror=onerror;document.body.appendChild(s)}
   function loadApiBudget(){if(window.JFMSpotifyApiBudget)return;loadScriptOnce('script[data-jfm-api-budget]','./spotify-api-budget.js','jfmApiBudget',()=>console.warn('Josh FM: Spotify API budget kon niet laden'))}
-  function loadDJHandoff(){if(document.querySelector('script[data-jfm-dj-handoff]')||window.JFMDJHandoff)return;if(!window.JFMDJTransition){setTimeout(loadDJHandoff,120);return}loadScriptOnce('script[data-jfm-dj-handoff]','./dj-handoff-v34.js','jfmDjHandoff',()=>{const q=document.getElementById('queueInfo');if(q)q.textContent='DJ-overgang kon niet veilig worden geladen. Vernieuw de app.'})}
-  sync();loadApiBudget();loadDJHandoff();setTimeout(sync,250);setTimeout(sync,1200);window.addEventListener('pageshow',()=>{sync();loadApiBudget();loadDJHandoff()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadApiBudget();loadDJHandoff()}});
+  sync();loadApiBudget();setTimeout(sync,250);setTimeout(sync,1200);window.addEventListener('pageshow',()=>{sync();loadApiBudget()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadApiBudget()}});
   window.JFMSpotifyTestConfig={version:'spotify-test-v13-central-assets',assetVersion:ASSET,defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
 })();

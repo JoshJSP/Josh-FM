@@ -9,7 +9,7 @@ if(/\.mair-station-card\.loading\{[^}]*pointer-events\s*:\s*none/.test(pwa))thro
 if(!ui.includes("setTimeout(()=>{b.classList.remove('loading');sync()},4000)"))throw Error('Station loading-state moet snel herstellen naar de werkelijk actieve categorie');
 for(const id of ['nl','party','chill','summer'])if(!policy.includes(`${id}:{label:`)&&!policy.includes(`'${id}':{label:`))throw Error('Station policy ontbreekt: '+id);
 if(!policy.includes("language:'nl'")||!policy.includes('minConfidence:.95'))throw Error('Nederlandstalig policy moet streng semantisch blijven');
-if(!controller.includes('semanticQualityFilter')||!controller.includes("fetch('/api/category-filter'")||!controller.includes('policy()?.confidence?.(id)'))throw Error('Semantische stationkwaliteitscontrole ontbreekt');
+if(!controller.includes('semanticQualityFilter')||!controller.includes("boundedFetch('/api/category-filter'")||!controller.includes('policy()?.confidence?.(id)'))throw Error('Semantische stationkwaliteitscontrole ontbreekt');
 if(!controller.includes('if(!c||switching)return false')||!controller.includes('queue=previousQueue'))throw Error('Stationwissel moet race- en rollback-safe blijven');
 if(!controller.includes("if(active!=='mix'&&Array.isArray(queue)&&queue.length)return queue"))throw Error('Actief station moet beschermd zijn tegen achtergrond rebuilds');
 const runtimeAssets=['mair-station-policy.js','mair-ui-hardening.js','mair-user-controls.js','mair-dj-visuals.js','mair-runtime-core.js'];
@@ -18,7 +18,7 @@ for(const file of runtimeAssets){
  if(!sw.includes(`./${file}`))throw Error('Actuele MAIR runtime asset ontbreekt in PWA CORE-cache: '+file);
 }
 if(!sw.includes("'./channel-click-fix.js'"))throw Error('Autoritatieve stationcontroller ontbreekt in PWA CORE-cache');
-if(!/const CACHE='mair-v75-live-status-heal-20260824'/.test(sw))throw Error('PWA cacheversie klopt niet met pakket 2');
+if(!/const CACHE='mair-v84-dj-schedule-observability-20260824'/.test(sw))throw Error('PWA cacheversie klopt niet met de DJ scheduler-diagnose');
 if(!sw.includes("'./mair-background-guard.js'"))throw Error('Background guard ontbreekt in PWA CORE-cache');
 if(!background.includes("recover?.('foreground-return')")||!primary.includes('if(backgrounded())return false'))throw Error('Foreground-only background recovery guard ontbreekt');
 if(!dj.includes('ensureVoiceReady')||dj.indexOf('await ensureVoiceReady()')>dj.indexOf('await pauseMusic(uri)'))throw Error('DJ voice-ready gate moet vóór Spotify-pauze staan');

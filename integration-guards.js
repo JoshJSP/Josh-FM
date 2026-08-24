@@ -62,7 +62,7 @@
   }
 
   function sanity(){
-    const checks={playback:!!window.JFMPlayback,truth:!!window.JFMPlaybackState,queue:!!window.JFMStationQueue,clock:!!window.JFMStationClock,rotation:!!window.JFMRotation,requests:!!window.JFMRequests,fish:!!window.JFMDJAudioGuard,pwa:!!window.JFMPWA,runtime:!!window.JFMRuntimeModes,top40:!!window.JFMTop40,health:!!window.JFMStationHealth,djHandoff:!!window.JFMDJHandoff};
+    const checks={playback:!!window.JFMPlayback,truth:!!window.JFMPlaybackState,queue:!!window.JFMStationQueue,clock:!!window.JFMStationClock,rotation:!!window.JFMRotation,requests:!!window.JFMRequests,fish:!!window.JFMDJAudioGuard,pwa:!!window.JFMPWA,runtime:!!window.JFMRuntimeModes,top40:!!window.JFMTop40,health:!!window.JFMStationHealth,dj:!!(window.JFMDJAuthoritative||window.MAIRDJ)};
     const missing=Object.entries(checks).filter(([,ok])=>!ok).map(([k])=>k);if(missing.length)trace('missing-controllers',{missing});else trace('contracts-ok');return{checks,missing}
   }
 
