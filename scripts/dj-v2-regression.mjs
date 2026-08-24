@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8'),fail=[];const ok=(x,m)=>{if(!x)fail.push(m)};
 const dj=read('mair-dj-v2.js'),writer=read('api/dj-writer.js'),voice=read('debug-tts.js'),engine=read('mair-voice-engine.js'),resume=read('dj-resume.js'),boot=read('dj-now-queue.js'),easy=read('mair-easy-use-v1.js'),primary=read('playback-primary.js'),spotifyConfig=read('spotify-test-config.js'),integration=read('integration-guards.js'),runtime=read('runtime-modes.js'),health=read('station-health.js'),diagnostics=read('release-diagnostics.js');
+const discovery=read('discovery.js'),channel=read('channel-click-fix.js'),purity=read('mair-category-purity.js'),ttsApi=read('api/tts.js');
 ok(dj.includes("v3.2-sdk-first-single-owner"),'DJ v3.2 runtime marker missing');
 ok(writer.includes('process.env.GROQ_API_KEY'),'Groq key must remain server-side');
 ok(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'ARMED'")&&dj.includes("'HANDOFF'")&&dj.includes("'SPEAKING'")&&dj.includes("'RESTORING'"),'DJ v3.2 state machine incomplete');
@@ -35,4 +36,6 @@ ok(!spotifyConfig.includes('loadDJHandoff')&&!spotifyConfig.includes('./dj-hando
 ok(integration.includes('window.JFMDJAuthoritative||window.MAIRDJ')&&runtime.includes('window.JFMDJAuthoritative?.busy||window.MAIRDJ?.busy')&&health.includes('window.JFMDJAuthoritative||window.MAIRDJ'),'Diagnostics and car UI must use the authoritative DJ controller');
 ok(diagnostics.includes("['Huidige track'")&&diagnostics.includes("['Volgende track'")&&diagnostics.includes("['DJ-fase'")&&diagnostics.includes("['TTS-status'")&&diagnostics.includes('esc(v)'),'Diagnostics must expose playback/DJ/TTS context and HTML-escape runtime metadata');
 ok(health.includes('currentTrack:')&&health.includes('nextTrack:')&&health.includes('dj:djState'),'Machine-readable station health must expose current/next/DJ state');
+ok(discovery.includes("boundedFetch('/api/discover'")&&channel.includes("boundedFetch('/api/nl-charts")&&purity.includes("boundedFetch('/api/category-filter'"),'Optional enrichment must be bounded so station building cannot hang');
+ok(ttsApi.includes('normalizeProfile')&&ttsApi.includes("Object.hasOwn(DJ_ENV,id)?id:'josh'"),'TTS API must normalize unknown profiles to the actual Josh fallback voice');
 if(fail.length){console.error('MAIR DJ v3.2 regression FAILED');for(const x of fail)console.error('-',x);process.exit(1)}console.log('MAIR DJ v3.2 regression OK');

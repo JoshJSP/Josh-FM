@@ -3,6 +3,7 @@
   'use strict';
   let switching=false,lastTap=0,buildProtected=false,policyLoading=false;
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  async function boundedFetch(url,opt={},ms=10000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{...opt,signal:c.signal})}finally{clearTimeout(timer)}}
   const POOL_CACHE='mair_station_pool_cache_v5_nl_editorial_strict',CACHE_TTL=12*60*60*1000,NL_EDITORIAL_SOURCE='spotify-editorial-je-moerstaal';
   const choice=()=>window.JFMMusicChoice,status=(text,bad=false)=>{const q=document.getElementById('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}};
   const policy=()=>window.MAIRStationPolicy;
@@ -20,13 +21,13 @@
   async function search(q){const d=await api('/search?type=track&limit=10&q='+encodeURIComponent(q));return(d?.tracks?.items||[]).filter(t=>t?.id&&t?.uri).map(toTrack)}
   async function dutchChartPool(id){
     if(!['hits','top40','nl'].includes(id))return null;
-    const r=await fetch('/api/nl-charts?station='+encodeURIComponent(id),{cache:'no-store'}),d=await r.json().catch(()=>({}));
+    const r=await boundedFetch('/api/nl-charts?station='+encodeURIComponent(id),{cache:'no-store'}),d=await r.json().catch(()=>({}));
     if(!r.ok)throw Error(String(d?.detail||d?.error||`Nederlandse playlist HTTP ${r.status}`));
     const tracks=dedupe((Array.isArray(d?.items)?d.items:[]).map(chartTrack));
     if(tracks.length<(policy()?.minTracks?.(id)||5))throw Error('Nederlandse playlist leverde tijdelijk te weinig Spotify-tracks.');
     return{tracks,verified:true,fallback:false,source:String(d?.source||'Nederlandse Spotify-playlist')};
   }
-  async function semanticQualityFilter(id,list){if(!policy()?.needsSemantic?.(id))return{list,verified:true};const min=policy()?.confidence?.(id)||.90;try{const r=await fetch('/api/category-filter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:id,minConfidence:min,tracks:list.slice(0,40)})});if(!r.ok)return{list,verified:false};const d=await r.json(),accepted=new Set((Array.isArray(d?.accepted)?d.accepted:[]).filter(x=>Number(x?.confidence)>=min).map(x=>String(x.id))),filtered=list.filter(t=>accepted.has(String(t.id))),minimum=policy()?.minTracks?.(id)||5;return filtered.length>=minimum?{list:filtered,verified:true}:{list,verified:false}}catch{return{list,verified:false}}}
+  async function semanticQualityFilter(id,list){if(!policy()?.needsSemantic?.(id))return{list,verified:true};const min=policy()?.confidence?.(id)||.90;try{const r=await boundedFetch('/api/category-filter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:id,minConfidence:min,tracks:list.slice(0,40)})});if(!r.ok)return{list,verified:false};const d=await r.json(),accepted=new Set((Array.isArray(d?.accepted)?d.accepted:[]).filter(x=>Number(x?.confidence)>=min).map(x=>String(x.id))),filtered=list.filter(t=>accepted.has(String(t.id))),minimum=policy()?.minTracks?.(id)||5;return filtered.length>=minimum?{list:filtered,verified:true}:{list,verified:false}}catch{return{list,verified:false}}}
   function hardFilter(id,list){return policy()?.hardFilter?.(id,list)||(list||[])}
   function relaxedFilter(id,list){const now=new Date().getFullYear(),yr=t=>Number(String(t?.release||'').slice(0,4))||0;if(id==='hits')return list.filter(t=>yr(t)>=now-4);if(id==='top40')return list.filter(t=>yr(t)>=now-3);if(id==='new')return list.filter(t=>yr(t)===now);if(id==='throwback')return list.filter(t=>yr(t)>0&&yr(t)<=2016);if(id==='00s')return list.filter(t=>yr(t)>=2000&&yr(t)<=2009);if(id==='10s')return list.filter(t=>yr(t)>=2010&&yr(t)<=2019);return list}
   function diversify(out){const pool=dedupe(out),artists=new Map(),clean=[];for(const t of pool){const a=String(t.artists?.[0]||'').toLowerCase(),n=artists.get(a)||0;if(a&&n>=3)continue;if(a)artists.set(a,n+1);clean.push(t)}return clean}

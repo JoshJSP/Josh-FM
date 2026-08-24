@@ -34,7 +34,7 @@ expect(categorySearch.includes('mair-category-search-v3-station-only'),'categori
 expect(categorySearch.includes("ALIASES={pop:'hits'")&&categorySearch.includes("dance:'party'")&&categorySearch.includes("chill:'chill'")&&categorySearch.includes("'00s':'00s'")&&categorySearch.includes("'10s':'10s'"),'categoriealiases routeren niet naar MAIR-stations');
 expect(categorySearch.includes('selectStation')&&categorySearch.includes('MAIRStationController')&&categorySearch.includes('clearActive'),'categoriebridge routeert niet via de autoritatieve stationcontroller');
 expect(categorySearch.includes("categories:[]")&&categorySearch.includes('restore:async()=>false')&&categorySearch.includes('maintain:async()=>false'),'legacy losse categorie-runtime is niet volledig uitgeschakeld');
-expect(stationController.includes('MAIRStationController')&&stationController.includes('semanticQualityFilter')&&stationController.includes("fetch('/api/category-filter'"),'autoritatieve stationcontroller mist semantische kwaliteitscontrole');
+expect(stationController.includes('MAIRStationController')&&stationController.includes('semanticQualityFilter')&&stationController.includes("boundedFetch('/api/category-filter'"),'autoritatieve stationcontroller mist begrensde semantische kwaliteitscontrole');
 expect(stationController.includes('if(!c||switching)return false')&&stationController.includes('queue=previousQueue'),'stationwissel is niet race- en rollback-safe');
 expect(stationController.includes("if(active!=='mix'&&Array.isArray(queue)&&queue.length)return queue"),'actief station wordt niet tegen achtergrond-rebuild beschermd');
 expect(stationPolicy.includes("nl:{label:'MAIR NEDERLANDSTALIG'")&&stationPolicy.includes("language:'nl'")&&stationPolicy.includes('minConfidence:.95'),'Nederlandstalig-station is niet streng genoeg');
@@ -69,7 +69,7 @@ expect(bootstrap.includes('mair-dj-v2.js')&&bootstrap.includes('mair-background-
 expect(handoff.includes('legacy-shim-to-mair-dj-v2')&&!handoff.includes('/me/player/pause'),'Legacy handoff bezit nog playbacklogica');
 expect(voiceCheck.includes('Complete Voice Check')&&voiceCheck.includes('Groq schrijver')&&voiceCheck.includes('Spotify pauze/hervatten'),'Tijdelijke complete Voice Check ontbreekt');
 expect(voiceCheck.includes("dataset.temporaryRelease='voice-check-v1'"),'Voice Check is niet als tijdelijk gemarkeerd');
-expect(sw.includes("const CACHE='mair-v78-recovery-diagnostics-20260824'"),'service-worker cache is niet MAIR v78');
+expect(sw.includes("const CACHE='mair-v79-bounded-services-20260824'"),'service-worker cache is niet MAIR v79');
 for(const asset of ['./mair-dj-v2.js','./mair-voice-check.js','./mair-background-guard.js','./mair-category-search.js','./mair-station-policy.js','./channel-click-fix.js','./mair-ui-hardening.js','./mair-runtime-core.js','./mair-voice-engine.js','./mair-easy-use-v1.js'])expect(sw.includes(`'${asset}'`),`service worker cachet actuele runtime niet: ${asset}`);
 for(const asset of ['mair-hits.webp','mair-top40.webp','mair-discovery.webp','mair-nederlandstalig.webp','mair-party.webp','mair-chill.webp','mair-summer.webp','mair-throwback.webp','mair-00s.webp','mair-10s.webp'])expect(sw.includes(`'./assets/stations/${asset}'`),`service worker cachet stationcover niet: ${asset}`);
 expect(sw.includes("k.startsWith('josh-fm-')")&&sw.includes("k.startsWith('mair-')"),'service worker moet oude Josh FM/MAIR caches opruimen');
