@@ -10,6 +10,9 @@ ok(dj.includes("window.addEventListener('jfm:natural-next-ready'")&&dj.includes(
 ok(dj.includes("window.addEventListener('jfm:trackchange'")&&dj.includes('manual-or-unexpected-track-change'),'Generic track changes may only invalidate stale DJ state');
 ok(!dj.includes('schedulePendingRetry')&&!dj.includes('retryTimer')&&!dj.includes('retryAfter'),'DJ must never retry a failed handoff on the same track');
 ok(dj.includes('lastNaturalSig')&&dj.includes('if(sig===lastNaturalSig)return false'),'Duplicate natural-transition guard missing');
+ok(dj.includes('writerRequest(body,timeoutMs=14000)')&&dj.includes("provider:'local-fallback'")&&dj.includes('usableDutch'),'DJ writer must time out and degrade to safe Dutch copy');
+ok(dj.includes('pack.nextHintId&&currentId!==String(pack.nextHintId)'),'Stale next-track DJ copy must be dropped before Spotify is paused');
+ok(dj.includes('pack.voiceProfileId')&&dj.includes('DJ-profiel wijzigde na het voorbereiden van de stem'),'A prepared break must never air through a changed DJ voice');
 ok(dj.includes("window.djBreak=(track=null,manual=false)=>manual?Promise.resolve(armManual()):Promise.resolve(false)"),'Legacy automatic scheduler is not neutralized');
 ok(resume.includes('__mairLegacyDJSchedulerDisabled=true')&&resume.includes('legacyAutomaticBreaks:false'),'Early legacy scheduler guard missing');
 ok(dj.includes("truthApi()?.begin?.('dj-handoff'")&&dj.includes('endHandoff'),'DJ handoff must block recovery as one explicit operation');
@@ -23,6 +26,8 @@ ok(!dj.includes('new Audio(')&&!dj.includes('AudioContext'),'DJ scheduler must n
 ok(resume.includes('duplicateIOSBridge:false')&&!resume.includes('new Audio(')&&!resume.includes("s.src='./ios-dj-audio.js"),'Duplicate iOS voice bridge must remain disabled');
 ok(voice.includes('const mediaAudio=new Audio()')&&voice.includes('const AC=window.AudioContext||window.webkitAudioContext'),'Central Fish Audio engine missing');
 ok(engine.includes("register('fish'")&&engine.includes('window.prepareSpeech=prepare')&&engine.includes('window.speakText=speak'),'Voice provider adapter missing');
+ok(engine.includes('if(speaking)')&&engine.includes('overlapDrops')&&engine.includes('CACHE_TTL'),'Voice engine must reject overlap and bound prepared-state lifetime');
+ok(voice.includes('SPEECH_CACHE_TTL')&&voice.includes('SPEECH_CACHE_MAX')&&voice.includes('Web Audio bleef hangen'),'Fish audio cache and Web Audio playback must be bounded');
 ok(boot.includes("load('./mair-dj-v2.js'")&&boot.includes("load('./mair-audio-unlock-v1.js'"),'DJ bootstrap missing runtime/unlock chain');
 ok(dj.includes("step('Spotify pause','pass'")&&dj.includes("step('DJ audio playback','pass'")&&dj.includes("step('Spotify resume','pass'"),'Voice Check must exercise a real pause/voice/resume handoff');
 ok(easy.includes("live=phase==='SPEAKING'")&&easy.includes("setDjLive(detail.phase==='SPEAKING'"),'DJ LIVE UI must only follow the speaking phase');

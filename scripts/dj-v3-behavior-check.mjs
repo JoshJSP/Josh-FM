@@ -13,7 +13,7 @@ class FakeEventTarget{
 class FakeCustomEvent{constructor(type,options={}){this.type=type;this.detail=options.detail}}
 function makeElement(extra={}){return{value:'',textContent:'',dataset:{},checked:false,addEventListener(){},querySelector(){return null},cloneNode(){return makeElement({...this})},replaceWith(){},...extra}}
 
-function createHarness({speakSucceeds=true,hidden=false,sdkTransport=true}={}){
+function createHarness({speakSucceeds=true,hidden=false,sdkTransport=true,writerSucceeds=true,writerText='Dit is een voorbereide MAIR DJ-break.'}={}){
   const bus=new FakeEventTarget();
   const elements={talk:makeElement({value:'1'}),talkValue:makeElement(),djBreakTime:makeElement(),djText:makeElement()};
   const document={readyState:'complete',visibilityState:hidden?'hidden':'visible',getElementById:id=>elements[id]||null,addEventListener(){}};
@@ -35,7 +35,7 @@ function createHarness({speakSucceeds=true,hidden=false,sdkTransport=true}={}){
     if(path.startsWith('/me/player/seek?')){metrics.seekApi++;remote.progress=0;return null}
     throw new Error(`Unexpected API call ${path}`);
   };
-  const fetch=async url=>{if(url==='/api/dj-writer'){metrics.writer++;return{ok:true,status:200,json:async()=>({text:'Dit is een voorbereide MAIR DJ-break.',provider:'groq',model:'test-model'})}}throw new Error(`Unexpected fetch ${url}`)};
+  const fetch=async url=>{if(url==='/api/dj-writer'){metrics.writer++;if(!writerSucceeds)throw new Error('writer offline');return{ok:true,status:200,json:async()=>({text:writerText,provider:'groq',model:'test-model'})}}throw new Error(`Unexpected fetch ${url}`)};
   const audioStatus={provider:'fish',model:'test-fish',voiceId:'voice',cacheSize:0,audioUnlocked:true,playbackMode:'html-audio'};
   const JFMDJAudio={status:audioStatus,unlock:async()=>true};
   const prepareSpeech=async()=>{metrics.prepare++;audioStatus.cacheSize=1;return true};
@@ -52,13 +52,14 @@ function createHarness({speakSucceeds=true,hidden=false,sdkTransport=true}={}){
   }
   const window={addEventListener:(...a)=>bus.addEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:playbackTruth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}}};
   const math=Object.create(Math);math.random=()=>0;
-  const context={window,document,localStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText,setTimeout,clearTimeout,Promise,Date,Math:math,console};
+  const context={window,document,localStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText,setTimeout,clearTimeout,AbortController,Promise,Date,Math:math,console};
   Object.assign(window,{window,document,localStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText});Object.assign(context,window);
   vm.createContext(context);vm.runInContext(source,context,{filename:'mair-dj-v2.js'});
   const setTrack=(id,{playing=true,progress=4000}={})=>{remote.id=id;remote.uri=`spotify:track:${id}`;remote.playing=playing;remote.progress=progress};
   const natural=(ended,newId)=>{setTrack(newId);bus.dispatchEvent(new FakeCustomEvent('jfm:natural-next-ready',{detail:{endedTrackId:ended,newTrackId:newId,auto:true,fast:true}}))};
   const changed=(previous,newId,sourceName='primary-next')=>{setTrack(newId);bus.dispatchEvent(new FakeCustomEvent('jfm:trackchange',{detail:{trackId:newId,previousTrackId:previous,source:sourceName}}))};
-  return{window,document,metrics,setTrack,natural,changed,state:()=>window.MAIRDJ.state()};
+  const setProfile=id=>{window.MAIRDJProfiles.current={id,name:id,role:'MAIR DJ'}};
+  return{window,document,metrics,setTrack,setProfile,natural,changed,state:()=>window.MAIRDJ.state()};
 }
 
 async function prepareAutomaticDue(h){h.natural('A','B');await sleep(20);h.natural('B','C');await sleep(80);assert.equal(h.state().phase,'ARMED','DJ should be fully prepared one song before air')}
@@ -99,6 +100,15 @@ async function testWebApiFallbackStillWorks(){
   const h=createHarness({sdkTransport:false});await prepareAutomaticDue(h);h.natural('C','D');await sleep(1300);
   assert.equal(h.metrics.genericPause,1,'fallback uses generic primary pause');assert.equal(h.metrics.genericResume,1,'fallback uses generic primary resume');assert.equal(h.metrics.speak,1);assert.equal(h.state().played,1);assert.equal(h.state().transport,'web-api-fallback')
 }
+async function testWriterFailureUsesSafeDutchFallback(){
+  const h=createHarness({writerSucceeds:false});await prepareAutomaticDue(h);assert.equal(h.state().writer.provider,'local-fallback');assert.match(h.state().writer.text,/^Dat was .* Nu hoor je .* MAIR\.$/);h.natural('C','D');await sleep(700);assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djResume,1);assert.equal(h.state().played,1)
+}
+async function testChangedNextTrackDropsStaleCopyBeforePause(){
+  const h=createHarness();await prepareAutomaticDue(h);h.natural('C','X');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.match(h.state().lastMissReason,/break-missed/)
+}
+async function testChangedVoiceProfileDropsPreparedBreakBeforePause(){
+  const h=createHarness();await prepareAutomaticDue(h);h.setProfile('maya');h.natural('C','D');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.match(h.state().error,/DJ-profiel wijzigde/)
+}
 const tests=[
   ['automatic break uses SDK-first critical path',testSuccessfulAutomaticBreak],
   ['duplicate natural event is idempotent',testDuplicateNaturalEventCannotDoubleAir],
@@ -107,6 +117,9 @@ const tests=[
   ['backgrounded break never pauses music',testBackgroundedBreakNeverPausesMusic],
   ['manual DJ airs on next natural transition',testManualDJAtNextNaturalTransition],
   ['generic primary transport remains fallback',testWebApiFallbackStillWorks],
+  ['writer failure uses safe Dutch fallback',testWriterFailureUsesSafeDutchFallback],
+  ['changed next track drops stale DJ copy before pause',testChangedNextTrackDropsStaleCopyBeforePause],
+  ['changed DJ profile drops prepared voice before pause',testChangedVoiceProfileDropsPreparedBreakBeforePause],
 ];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(e){console.error('FAIL',name,'—',e?.stack||e);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`MAIR DJ v3 behavioral simulation: ${passed}/${tests.length} PASS`);
