@@ -28,8 +28,8 @@
   async function verifySdk(predicate,tries=8){const p=player();if(!p)return null;for(let i=0;i<tries;i++){try{const s=await p.getCurrentState();if(s&&predicate(s))return s}catch{}await wait(45+i*25)}return null}
   const sdkUri=s=>String(s?.track_window?.current_track?.uri||'');
   async function observedPlaying(){
-    const s=await remote();if(s?.item)return!!s.is_playing;
     try{const sdk=await player()?.getCurrentState?.();if(sdk?.track_window?.current_track)return!sdk.paused}catch{}
+    const s=await remote();if(s?.item)return!!s.is_playing;
     const t=truth()?.get?.();if(t?.trackId||t?.uri)return!!t.isPlaying;
     return null
   }
@@ -71,7 +71,7 @@
   async function pauseDirect(){
     const{p,id,state}=await ensureActive(),wasExpected=!!truth()?.get?.()?.expectedLive;
     let sdk=null;try{sdk=await p.getCurrentState()}catch{}
-    const playing=state?.item?!!state.is_playing:(sdk?.track_window?.current_track?!sdk.paused:!!truth()?.get?.()?.isPlaying);
+    const playing=sdk?.track_window?.current_track?!sdk.paused:(state?.item?!!state.is_playing:!!truth()?.get?.()?.isPlaying);
     if(!playing){truth()?.setExpectedLive?.(false,'pause');return true}
     truth()?.setExpectedLive?.(false,'pause');
     try{
@@ -83,7 +83,7 @@
   }
   async function resumeDirect(){
     const{p,id,state}=await ensureActive();let sdk=null;try{sdk=await p.getCurrentState()}catch{}
-    const hasTrack=!!(state?.item||sdk?.track_window?.current_track||truth()?.get?.()?.trackId),playing=state?.item?!!state.is_playing:(sdk?.track_window?.current_track?!sdk.paused:!!truth()?.get?.()?.isPlaying);
+    const hasTrack=!!(state?.item||sdk?.track_window?.current_track||truth()?.get?.()?.trackId),playing=sdk?.track_window?.current_track?!sdk.paused:(state?.item?!!state.is_playing:!!truth()?.get?.()?.isPlaying);
     if(playing){if(state)ingest(state,'primary-resume-already');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;return true}
     if(!hasTrack){truth()?.setExpectedLive?.(true,'restart-empty');return startDirect()}
     truth()?.setExpectedLive?.(true,'resume');let local=false;try{await p.resume();local=!!(await verifySdk(x=>!x.paused,8))}catch{}
