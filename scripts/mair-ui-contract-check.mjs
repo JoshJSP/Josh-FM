@@ -7,6 +7,7 @@ const voiceEngine=read('mair-voice-engine.js');
 const voice=read('debug-tts.js');
 const radio=read('mair-radio-home.js');
 const radioCss=read('mair-radio-home.css');
+const releaseFixCss=read('request-layer-fix.css');
 const failures=[];
 const ok=(cond,msg)=>{if(!cond)failures.push(msg)};
 
@@ -34,7 +35,7 @@ ok(!voice.includes('stopPropagation('),'TTS mag click-events niet stoppen');
 ok(radio.includes("window.addEventListener('mair:channelchange',syncMode)")&&radio.includes("window.addEventListener('jfm:trackchange'")&&radio.includes('window.MAIRRadioHome={')&&radio.includes('refresh'),'radio-home moet station/track events volgen en handmatig kunnen verversen');
 ok(radioCss.includes('.mair-now-v2 .mair-live-strip{display:none!important}'),'oude live/queue tekst mag niet over now-playing heen staan');
 ok(radioCss.includes('overflow-wrap:normal!important')&&radioCss.includes('word-break:normal!important'),'tracktitel mag niet agressief afbreken');
-ok(radioCss.includes('.mair-radio-actions-v2{display:none!important}'),'oude dashboard-acties moeten uit template-radio verdwijnen');
+ok(releaseFixCss.includes('.mair-radio-actions-v2')&&releaseFixCss.includes('display: grid !important')&&releaseFixCss.includes('min-height: 52px !important'),'DJ nu en break overslaan moeten als compacte touchbediening zichtbaar blijven');
 ok(radioCss.includes('.mair-up-next-v2{display:none!important}'),'oude dashboard-queue moet uit template-radio verdwijnen');
 
 if(failures.length){console.error('MAIR UI contract FAILED');for(const x of failures)console.error('- '+x);process.exit(1)}
