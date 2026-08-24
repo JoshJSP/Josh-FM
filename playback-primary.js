@@ -84,7 +84,7 @@
   async function resumeDirect(){
     const{p,id,state}=await ensureActive();let sdk=null;try{sdk=await p.getCurrentState()}catch{}
     const hasTrack=!!(state?.item||sdk?.track_window?.current_track||truth()?.get?.()?.trackId),playing=sdk?.track_window?.current_track?!sdk.paused:(state?.item?!!state.is_playing:!!truth()?.get?.()?.isPlaying);
-    if(playing){if(state)ingest(state,'primary-resume-already');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;return true}
+    if(playing){if(state)ingest(state,'primary-resume-already');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM speelt.');return true}
     if(!hasTrack){truth()?.setExpectedLive?.(true,'restart-empty');return startDirect()}
     truth()?.setExpectedLive?.(true,'resume');let local=false;try{await p.resume();local=!!(await verifySdk(x=>!x.paused,8))}catch{}
     let s=await verify(x=>x.device?.id===id&&x.is_playing,3);if(!local&&!s){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,8)}
