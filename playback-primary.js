@@ -90,7 +90,7 @@
     let s=await verify(x=>x.device?.id===id&&x.is_playing,3);if(!local&&!s){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,8)}
     if(!local&&!s)throw Error('Spotify bevestigde hervatten niet.');if(s)ingest(s,'primary-resume');recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM speelt.');return true
   }
-  async function playPause(){activateNow();return withBusy(async()=>{try{const playing=await observedPlaying();if(playing===null)throw Error('Spotify-status is tijdelijk niet beschikbaar.');return playing?pauseDirect():resumeDirect()}catch(e){return rememberError(e,'Play/pauze mislukt: ')}})}
+  async function playPause(){activateNow();return withBusy(async()=>{try{const playing=await observedPlaying();if(playing===null)return startDirect();return playing?pauseDirect():resumeDirect()}catch(e){return rememberError(e,'Play/pauze mislukt: ')}})}
   async function pause(){return withBusy(async()=>{try{return await pauseDirect()}catch(e){return rememberError(e,'Pauzeren mislukt: ')}})}
   async function resume(){return withBusy(async()=>{try{return await resumeDirect()}catch(e){return rememberError(e,'Hervatten mislukt: ')}})}
 
