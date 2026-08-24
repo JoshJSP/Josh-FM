@@ -45,11 +45,15 @@ try{
   res=await call(writer,{method:'POST',body:{currentTrack:{name:'Test',artists:['Artiest']}}});
   assert.equal(res.statusCode,429);assert.equal(res.body.error,'rate limited');
 
+  process.env.GROQ_DJ_MODEL='llama-3.3-70b-versatile';calls=[];
+  globalThis.fetch=async(url,opt)=>{calls.push(JSON.parse(opt.body).model);return calls.length===1?{ok:false,status:400,json:async()=>({error:{message:'model unavailable'}})}:{ok:true,status:200,json:async()=>({choices:[{message:{content:'Dit is betrouwbare Nederlandse radiotekst.'}}]})}};
+  res=await call(writer,{method:'POST',body:{}});assert.equal(res.statusCode,200);assert.deepEqual(calls,['llama-3.3-70b-versatile','openai/gpt-oss-120b']);assert.equal(res.body.model,'openai/gpt-oss-120b');assert.equal(res.body.attempts.length,1);
+
   globalThis.fetch=async()=>({ok:true,status:200,json:async()=>({choices:[{message:{content:'   '}}]})});
-  res=await call(writer,{method:'POST',body:{}});assert.equal(res.statusCode,502);assert.match(res.body.error,/geen DJ-tekst/);
+  res=await call(writer,{method:'POST',body:{}});assert.equal(res.statusCode,502);assert.match(res.body.error,/geen DJ-tekst/);assert.equal(res.body.attempts.length,3);
 
   globalThis.fetch=async()=>{const error=new Error('aborted');error.name='AbortError';throw error};
-  res=await call(writer,{method:'POST',body:{}});assert.equal(res.statusCode,504);assert.equal(res.body.error,'Groq timeout');
+  res=await call(writer,{method:'POST',body:{}});assert.equal(res.statusCode,504);assert.equal(res.body.error,'Groq timeout');assert.equal(res.body.attempts.length,3);
 
   console.log('MAIR API failure behavior: PASS');
 }finally{globalThis.fetch=originalFetch;restoreEnv()}

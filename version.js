@@ -1,14 +1,14 @@
 // MAIR release metadata and cache/build reconciliation.
-window.JFM_RELEASE={version:'2.0.0-beta.6',displayVersion:'2b.0.6',build:'unknown',asset:'65',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
-window.JFM_ASSET_VERSION='65';
+window.JFM_RELEASE={version:'2.0.0-beta.6',displayVersion:'2b.0.6',build:'unknown',asset:'66',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
+window.JFM_ASSET_VERSION='66';
 (()=>{
   function addStyle(id,src){if(document.getElementById(id))return;const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=src;document.head.appendChild(l)}
   function addSyncScript(id,src){if(document.getElementById(id))return;const s=document.createElement('script');s.id=id;s.src=src;s.async=false;document.head.appendChild(s)}
   function loadMairUI(){
     addStyle('mair-foundation-css','./mair-foundation.css');
     addStyle('mair-radio-home-css','./mair-radio-home.css');
-    addStyle('mair-station-art-css','./mair-station-art.css?v=65');
-    addStyle('mair-request-layer-fix-css','./request-layer-fix.css?v=65');
+    addStyle('mair-station-art-css','./mair-station-art.css?v=66');
+    addStyle('mair-request-layer-fix-css','./request-layer-fix.css?v=66');
     addSyncScript('mair-foundation-js','./mair-foundation.js');
     addSyncScript('mair-radio-home-js','./mair-radio-home.js')
   }
