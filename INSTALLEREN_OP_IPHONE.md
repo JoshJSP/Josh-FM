@@ -1,28 +1,17 @@
-# Josh FM installeren vanaf je iPhone
+# MAIR installeren op iPhone
 
-De code staat volledig in deze repository. Voor gebruik heb je alleen nog een HTTPS-deployment en je eigen Spotify Client ID nodig.
+1. Open de gedeployde MAIR-URL in Safari.
+2. Ga naar `Instellingen` en kopieer de getoonde Redirect URL.
+3. Voeg die URL exact toe aan Redirect URIs in je Spotify Developer-app.
+4. Zorg dat `SPOTIFY_CLIENT_ID`, `GROQ_API_KEY` en `FISH_AUDIO_API_KEY` als Vercel Environment Variables zijn ingesteld en redeploy na een wijziging.
+5. Kies in MAIR `Koppel Spotify` en rond Spotify OAuth af.
+6. Start MAIR eenmaal via een zichtbare tik; daarmee mag iOS muziek en DJ-audio afspelen.
+7. Kies in Safari Deel → `Zet op beginscherm`.
 
-1. Open Vercel in Safari en log in met GitHub.
-2. Importeer de repository `JoshJSP/Josh-FM`.
-3. Kies Deploy.
-4. Open daarna de Vercel-URL van Josh FM.
-5. Ga in Josh FM naar `Instellingen` en kopieer de Redirect URL.
-6. Open Spotify for Developers, maak een app en voeg die Redirect URL exact toe aan de Redirect URIs.
-7. Kopieer de Spotify Client ID naar Josh FM en kies `Koppel Spotify`.
-8. Open de site in Safari en kies Deel -> `Zet op beginscherm`.
+De DJ-writer gebruikt Groq; Fish Audio verzorgt de vier Nederlandse DJ-stemmen. `OPENAI_API_KEY` is alleen nodig voor optionele discovery- en categoriefilters, niet voor DJ-copy of TTS.
 
-## Beste AI-DJ en stem
+Bij problemen open je `Instellingen` → `Diagnose`. Controleer daar Spotify-device, playback, queue, DJ-writer, stem en TTS-status. `Herstel MAIR` synchroniseert veilig cache, device, playerstate en wachtrij zonder persoonlijke voorkeuren te wissen.
 
-Voeg in Vercel onder Project Settings -> Environment Variables toe:
+iOS kan een PWA in de achtergrond tijdelijk bevriezen. Spotify-playback kan doorlopen; bij terugkeer synchroniseert MAIR opnieuw. Als Safari audio blokkeert, open MAIR en tik eenmaal op play.
 
-`OPENAI_API_KEY` = jouw OpenAI API-key
-
-Optioneel kun je de modellen/stem aanpassen met:
-
-- `OPENAI_TEXT_MODEL=gpt-5-mini`
-- `OPENAI_TTS_MODEL=gpt-4o-mini-tts`
-- `OPENAI_TTS_VOICE=cedar`
-
-Zonder OpenAI API-key blijft Josh FM werken met ingebouwde Nederlandse fallbackteksten en de Nederlandse stem van het apparaat.
-
-Zet nooit je echte API-key in GitHub, `app.js`, `.env.example` of een ander publiek/bewaard bestand. Gebruik uitsluitend Vercel Environment Variables.
+Zet nooit API-keys, Spotify-tokens of credentials in GitHub, frontendcode of gedeelde logs. Gebruik uitsluitend server-side Environment Variables.

@@ -1,95 +1,66 @@
-# Josh FM v2
+# MAIR
 
-A personal AI radio show on top of your own Spotify account.
+MAIR is een persoonlijke Nederlandse AI-radio boven op een Spotify Premium-account. De app programmeert een doorlopende radioset, beheert verzoeken en voegt op natuurlijke trackovergangen korte DJ-breaks toe.
 
-## What is included
+## Architectuur
 
-- Spotify OAuth PKCE: no Spotify client secret in the browser.
-- Spotify playback: play/pause/previous/next and generated radio sets.
-- Sources: Top Tracks, Recently Played, Saved Tracks and owned/collaborative playlists.
-- Spotify Search for requests; requests can be added directly to the Spotify queue.
-- English AI DJ that talks naturally between selected tracks, not after every song.
-- Talk frequency: Low / Normal / Radio / High.
-- Programs: Normal, Morning, Chill, Party, Throwback and Late Night.
-- Track facts with source-aware fallbacks.
-- Time and optional local weather context.
-- Josh FM station IDs/jingles.
-- Local skip history so frequently skipped material can be deprioritized.
-- Browser/device TTS fallback.
-- OpenAI serverless endpoint for DJ copy.
-- Fish Audio serverless endpoint for the main DJ voice.
-- PWA / Add to Home Screen on iPhone.
-
-## AI architecture
-
-Josh FM keeps API secrets on the server.
-
-- `/api/dj` generates the English DJ script with OpenAI when `OPENAI_API_KEY` is configured.
-- `/api/tts` turns the script into MP3 speech with Fish Audio.
-- Fish Audio voice ID: `b347db033a6549378b48d00acb0d06cd`.
-- Fish Audio model: `s2-pro` by default.
-- No Fish Audio key is stored in the repository or browser.
+- Spotify OAuth gebruikt PKCE; er staat geen Spotify client secret in de browser.
+- Eén Spotify Web Playback SDK-instance registreert het afspeeldevice.
+- `playback-primary.js` is eigenaar van play/pause/previous/next, natuurlijke overgangen en herstel.
+- `queue-core.js` serialiseert queue-wijzigingen; Spotify blijft de bron voor wat daadwerkelijk als volgende klaarstaat.
+- `mair-dj-v2.js` plant en speelt DJ-breaks. `mair-dj-schedule-sync.js` levert één gededupliceerd fallback-signaal als een primair trackeinde-event ontbreekt.
+- `/api/dj-writer` genereert uitsluitend Nederlandse DJ-copy via Groq. Als de writer faalt, blijft de muziek spelen en gebruikt MAIR een korte lokale Nederlandse fallback.
+- `/api/tts` genereert MP3 via Fish Audio. Elke DJ heeft een eigen Nederlandse voice; ongeldige audio, timeouts en voicefouten blokkeren de muziek niet.
+- De diagnosekaart toont playback-, queue-, DJ-, writer-, voice-, TTS-, cache- en herstelstatus zonder secrets te tonen.
+- De service worker maakt de hoofdinterface installeerbaar als PWA en bewaakt release/cacheversies.
 
 ## Environment variables
 
-### Required for Fish Audio voice
+Configureer secrets uitsluitend in Vercel of een vergelijkbare serveromgeving. Commit nooit keys of tokens.
 
-`FISH_AUDIO_API_KEY`
+Vereist voor de volledige ervaring:
 
-Add this only as a secret/environment variable on the deployment platform. Never put it in `app.js`, commit it to GitHub, or expose it in frontend code.
+- `SPOTIFY_CLIENT_ID`: publieke Spotify-app Client ID. Kan anders lokaal in Instellingen worden ingevoerd.
+- `GROQ_API_KEY`: Nederlandse DJ-copy via `/api/dj-writer`.
+- `FISH_AUDIO_API_KEY`: Nederlandse DJ-audio via `/api/tts`.
 
-### Optional Fish Audio overrides
+Optioneel:
 
-`FISH_AUDIO_VOICE_ID`
+- `GROQ_DJ_MODEL`: expliciet ondersteund Groq-model. Zonder override probeert MAIR `openai/gpt-oss-120b` en daarna `openai/gpt-oss-20b`.
+- `FISH_AUDIO_MODEL`: expliciet Fish-model. Zonder override probeert MAIR `s2.1-pro-free` en daarna `s2-pro`.
+- `FISH_AUDIO_VOICE_JOSH`, `FISH_AUDIO_VOICE_MAYA`, `FISH_AUDIO_VOICE_MAX`, `FISH_AUDIO_VOICE_NOAH`: per-DJ voice override.
+- `FISH_AUDIO_VOICE_ID`: algemene voice override als geen profieloverride bestaat.
+- `OPENAI_API_KEY`: alleen nodig voor discovery/category-endpoints die OpenAI gebruiken; niet voor de DJ-writer of TTS.
 
-Defaults to:
+Een ontbrekende AI- of TTS-key mag playback niet stoppen. MAIR slaat de break over of gebruikt lokale copy en meldt de oorzaak in Diagnose.
 
-`b347db033a6549378b48d00acb0d06cd`
+## Spotify en deployment
 
-`FISH_AUDIO_MODEL`
+1. Maak een Spotify Developer-app en kopieer de Client ID.
+2. Deploy de repository naar HTTPS; Vercel is ingericht via `vercel.json`.
+3. Open de deployment. Kopieer in Instellingen de exacte Redirect URL en voeg die toe aan de Spotify-app.
+4. Voeg de environment variables toe en redeploy.
+5. Koppel Spotify in MAIR. Spotify Premium is vereist voor Web Playback SDK-streaming.
 
-Defaults to:
+Wijzigingen worden ontwikkeld op een branch en met `npm run predeploy` gevalideerd. Gebruik een preview/branch deployment voor runtimevalidatie; merge of deploy niet rechtstreeks naar productie zonder bewuste releasebeslissing.
 
-`s2-pro`
+## Testen en diagnose
 
-### DJ text generation
+`npm run predeploy` voert de statische regressiepoort en gedragsimulaties uit voor playback, queue, requests, DJ-scheduling, voice, TTS en API-fouten.
 
-`OPENAI_API_KEY`
+Open in de app `Instellingen` → `Diagnose` voor:
 
-Used only by `/api/dj` for the AI-written radio breaks. Without it, Josh FM can fall back to local script generation.
+- huidige en volgende track;
+- laatste trackevent en Spotify-queue sync;
+- DJ-fase, volgende beslissing en fallback-overgangssignalen;
+- gebruikte writer/model en stem;
+- TTS-status, route en laatste fout;
+- playback-herstel, cacheversie en een veilige herstelactie.
 
-Optional:
+## iPhone/PWA
 
-`OPENAI_TEXT_MODEL`
-
-## Spotify setup
-
-### 1. Spotify Developer app
-
-Create a Spotify Developer app and copy the Client ID.
-
-### 2. Deploy Josh FM
-
-Deploy this repository to an HTTPS host. Vercel is the intended setup for the serverless `/api/dj` and `/api/tts` routes.
-
-### 3. Redirect URL
-
-Open the deployed Josh FM. In Settings it shows the exact Redirect URL. Add that URL exactly in Spotify Developer Dashboard under Redirect URIs.
-
-### 4. Client ID
-
-Add the Spotify Client ID to Josh FM and connect Spotify.
-
-### 5. Fish Audio
-
-The Fish Audio integration and selected voice are already configured in the code. The final required step is adding `FISH_AUDIO_API_KEY` to the deployment environment and redeploying.
-
-## iPhone
-
-Open the deployed URL in Safari, tap Share, then Add to Home Screen.
-
-iOS can freeze web apps that remain in the background for a long time. Spotify playback itself can continue, but the most reliable DJ experience is with Josh FM active or recently active.
+Open de productie-URL in Safari, kies Deel → Zet op beginscherm. Start audio altijd eenmaal vanuit een zichtbare gebruikersactie; iOS vereist dat om audio te ontgrendelen. iOS kan webapps in de achtergrond bevriezen. Spotify kan blijven spelen en MAIR synchroniseert state en herstel bij terugkeer naar de voorgrond.
 
 ## Privacy
 
-Spotify tokens, preferences and skip history are stored locally in the browser. Serverless routes receive only the context required to generate DJ copy or speech. API keys must remain server-side.
+Spotify tokens, voorkeuren en luisterhistorie worden lokaal in de browser opgeslagen. Serverroutes ontvangen alleen de context die nodig is voor DJ-copy, discovery of spraak. Diagnose toont geen API-keys, OAuth-tokens of volledige credentials.
