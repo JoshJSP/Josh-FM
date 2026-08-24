@@ -27,6 +27,12 @@
   async function verify(predicate,tries=10){for(let i=0;i<tries;i++){await wait(140+i*45);const s=await remote();if(s&&predicate(s))return s}return null}
   async function verifySdk(predicate,tries=8){const p=player();if(!p)return null;for(let i=0;i<tries;i++){try{const s=await p.getCurrentState();if(s&&predicate(s))return s}catch{}await wait(45+i*25)}return null}
   const sdkUri=s=>String(s?.track_window?.current_track?.uri||'');
+  async function observedPlaying(){
+    const s=await remote();if(s?.item)return!!s.is_playing;
+    try{const sdk=await player()?.getCurrentState?.();if(sdk?.track_window?.current_track)return!sdk.paused}catch{}
+    const t=truth()?.get?.();if(t?.trackId||t?.uri)return!!t.isPlaying;
+    return null
+  }
   function setBusy(on){busy=!!on;const ready=!!player()&&!!deviceId();['play','next','prev','start'].forEach(id=>{const b=$(id);if(b)b.disabled=busy||!ready})}
   async function withBusy(fn){if(busy)return false;setBusy(true);try{return await fn()}finally{setBusy(false)}}
   function ingest(s,source='primary'){if(!s)return;const confirmed=String(s?.device?.id||'').trim();if(confirmed&&localStorage.getItem(DEVICE_KEY)!==confirmed)localStorage.setItem(DEVICE_KEY,confirmed);try{playback=s;renderPlayback(s)}catch{};try{truth()?.ingest?.(s,source)}catch{}}
@@ -62,9 +68,29 @@
     return withBusy(async()=>{try{return await startDirect()}catch(e){truth()?.setExpectedLive?.(false,'start-failed');return rememberError(e,'Starten lukte niet: ')}})
   }
 
-  async function pauseDirect(){const{id,state}=await ensureActive();if(!state?.is_playing){truth()?.setExpectedLive?.(false,'pause');return true}await api('/me/player/pause?device_id='+encodeURIComponent(id),{method:'PUT'});let s=await verify(x=>x.device?.id===id&&!x.is_playing,8);if(!s){await player()?.pause?.();s=await verify(x=>x.device?.id===id&&!x.is_playing,6)}if(!s)throw Error('Spotify bevestigde pauzeren niet.');ingest(s,'primary-pause');truth()?.setExpectedLive?.(false,'pause');info('Josh FM staat gepauzeerd.');return true}
-  async function resumeDirect(){const{id,state}=await ensureActive();if(state?.is_playing){ingest(state,'primary-resume-already');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;return true}if(!state?.item){truth()?.setExpectedLive?.(true,'restart-empty');return startDirect()}await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});let s=await verify(x=>x.device?.id===id&&x.is_playing,8);if(!s){await player()?.resume?.();s=await verify(x=>x.device?.id===id&&x.is_playing,6)}if(!s)throw Error('Spotify bevestigde hervatten niet.');ingest(s,'primary-resume');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM speelt.');return true}
-  async function playPause(){activateNow();return withBusy(async()=>{try{const s=await remote();return s?.is_playing?pauseDirect():resumeDirect()}catch(e){return rememberError(e,'Play/pauze mislukt: ')}})}
+  async function pauseDirect(){
+    const{p,id,state}=await ensureActive(),wasExpected=!!truth()?.get?.()?.expectedLive;
+    let sdk=null;try{sdk=await p.getCurrentState()}catch{}
+    const playing=state?.item?!!state.is_playing:(sdk?.track_window?.current_track?!sdk.paused:!!truth()?.get?.()?.isPlaying);
+    if(!playing){truth()?.setExpectedLive?.(false,'pause');return true}
+    truth()?.setExpectedLive?.(false,'pause');
+    try{
+      let local=false;try{await p.pause();local=!!(await verifySdk(x=>x.paused,8))}catch{}
+      let s=await verify(x=>x.device?.id===id&&!x.is_playing,3);
+      if(!local&&!s){await api('/me/player/pause?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&!x.is_playing,8)}
+      if(!local&&!s)throw Error('Spotify bevestigde pauzeren niet.');if(s)ingest(s,'primary-pause');info('Josh FM staat gepauzeerd.');return true
+    }catch(e){truth()?.setExpectedLive?.(wasExpected,'pause-failed');throw e}
+  }
+  async function resumeDirect(){
+    const{p,id,state}=await ensureActive();let sdk=null;try{sdk=await p.getCurrentState()}catch{}
+    const hasTrack=!!(state?.item||sdk?.track_window?.current_track||truth()?.get?.()?.trackId),playing=state?.item?!!state.is_playing:(sdk?.track_window?.current_track?!sdk.paused:!!truth()?.get?.()?.isPlaying);
+    if(playing){if(state)ingest(state,'primary-resume-already');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;return true}
+    if(!hasTrack){truth()?.setExpectedLive?.(true,'restart-empty');return startDirect()}
+    truth()?.setExpectedLive?.(true,'resume');let local=false;try{await p.resume();local=!!(await verifySdk(x=>!x.paused,8))}catch{}
+    let s=await verify(x=>x.device?.id===id&&x.is_playing,3);if(!local&&!s){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,8)}
+    if(!local&&!s)throw Error('Spotify bevestigde hervatten niet.');if(s)ingest(s,'primary-resume');recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM speelt.');return true
+  }
+  async function playPause(){activateNow();return withBusy(async()=>{try{const playing=await observedPlaying();if(playing===null)throw Error('Spotify-status is tijdelijk niet beschikbaar.');return playing?pauseDirect():resumeDirect()}catch(e){return rememberError(e,'Play/pauze mislukt: ')}})}
   async function pause(){return withBusy(async()=>{try{return await pauseDirect()}catch(e){return rememberError(e,'Pauzeren mislukt: ')}})}
   async function resume(){return withBusy(async()=>{try{return await resumeDirect()}catch(e){return rememberError(e,'Hervatten mislukt: ')}})}
 

@@ -33,15 +33,16 @@ async function testAuthSingleFlightAndRetry(){
 function element(id,elements){return{id,textContent:'',disabled:true,dataset:{},style:{},addEventListener(){},closest(){return null},cloneNode(){return element(id,elements)},replaceWith(next){elements[id]=next}}}
 async function testPrimarySingletonAndNaturalEnd(){
   const bus=new Events(),docBus=new Events(),elements={};for(const id of ['start','play','next','prev','queueInfo'])elements[id]=element(id,elements);
-  const localStorage=storage({jfm_spotify_device_id:'device-1'}),metrics={intervals:0,play:0},remote={item:{id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'},device:{id:'device-1'},is_playing:false};
-  const player={getCurrentState:async()=>({paused:!remote.is_playing,position:0,track_window:{current_track:{uri:remote.item.uri}}}),activateElement(){}};
-  const api=async(path,opt={})=>{if(path==='/me/player')return structuredClone(remote);if(path.startsWith('/me/player/play?')){metrics.play++;remote.item={id:'B',uri:'spotify:track:BBBBBBBBBBBBBBBBBBBBBB'};remote.is_playing=true;return null}throw Error(`Unexpected API ${path} ${opt.method||'GET'}`)};
+  const localStorage=storage({jfm_spotify_device_id:'device-1'}),metrics={intervals:0,play:0,pauseSdk:0},remote={item:{id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'},device:{id:'device-1'},is_playing:false};let remoteVisible=true;
+  const player={getCurrentState:async()=>({paused:!remote.is_playing,position:0,track_window:{current_track:{uri:remote.item.uri}}}),activateElement(){},async pause(){metrics.pauseSdk++;remote.is_playing=false}};
+  const api=async(path,opt={})=>{if(path==='/me/player')return remoteVisible?structuredClone(remote):null;if(path.startsWith('/me/player/play?')){metrics.play++;remote.item={id:'B',uri:'spotify:track:BBBBBBBBBBBBBBBBBBBBBB'};remote.is_playing=true;return null}throw Error(`Unexpected API ${path} ${opt.method||'GET'}`)};
   const context={window:null,document:{visibilityState:'visible',body:{getAttribute:()=>null},getElementById:id=>elements[id]||null,addEventListener:(...args)=>docBus.addEventListener(...args)},localStorage,CustomEvent:FakeCustomEvent,api,queue:[{id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'},{id:'B',uri:'spotify:track:BBBBBBBBBBBBBBBBBBBBBB'}],playback:null,renderPlayback(){},setTimeout:fn=>{queueMicrotask(fn);return 1},setInterval:()=>{metrics.intervals++;return 1},Promise,Date,Math,console};
   Object.assign(context,{addEventListener:(...args)=>bus.addEventListener(...args),dispatchEvent:(...args)=>bus.dispatchEvent(...args),jfmSpotifyPlayer:player,JFMSpotifySDK:{deviceId:'device-1',ensureDevice:async()=> 'device-1'},JFMPlaybackState:{get:()=>({expectedLive:true}),ingest(){},setExpectedLive(){},error(){}}});context.window=context;
   vm.createContext(context);const source=read('playback-primary.js');vm.runInContext(source,context,{filename:'playback-primary.js'});vm.runInContext(source,context,{filename:'playback-primary-duplicate.js'});
   assert.equal(bus.count('jfm:natural-track-end'),1,'duplicate script execution must not add a second natural-end listener');assert.equal(metrics.intervals,1,'duplicate script execution must not add a second watchdog');
   bus.dispatchEvent(new FakeCustomEvent('jfm:natural-track-end',{detail:{trackId:'A'}}));bus.dispatchEvent(new FakeCustomEvent('jfm:natural-track-end',{detail:{trackId:'A'}}));await sleep(20);
   assert.equal(metrics.play,1,'duplicate natural-end events must advance only once');assert.equal(remote.item.id,'B');
+  remote.is_playing=true;remoteVisible=false;await context.JFMPlayback.playPause();assert.equal(metrics.pauseSdk,1,'an empty Web API status must use the playing SDK state and pause, never restart');assert.equal(metrics.play,1,'pause fallback must not restart the queue');
 }
 
 async function testSdkSingleton(){
