@@ -44,5 +44,5 @@
   window.addEventListener('pageshow',()=>setTimeout(()=>sync(true),250));
   setInterval(()=>sync(false),WATCHDOG_MS);
   const upcoming=()=>[...lastItems];window.jfmUpcoming=upcoming;
-  window.JFMSpotifyUpcomingTruth={version:'v2.1-rate-limit-aware',sync,upcoming,get items(){return[...lastItems]},get current(){return lastCurrent},get lastOk(){return lastOk},get syncing(){return syncing},get health(){return{watchdogMs:WATCHDOG_MS,cooldownMs:Math.max(0,cooldownUntil-Date.now()),lastAttempt,lastError}}};
+  window.JFMSpotifyUpcomingTruth={version:'v2-single-authoritative-owner-rate-limit-aware',sync,upcoming,get items(){return[...lastItems]},get current(){return lastCurrent},get lastOk(){return lastOk},get syncing(){return syncing},get health(){return{watchdogMs:WATCHDOG_MS,cooldownMs:Math.max(0,cooldownUntil-Date.now()),lastAttempt,lastError}}};
 })();
