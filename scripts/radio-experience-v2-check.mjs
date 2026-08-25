@@ -10,7 +10,9 @@ const rotation=read('rotation-engine.js');
 const memory=read('mair-dj-memory.js');
 const imaging=read('mair-imaging.js');
 const liveNews=read('mair-live-news.js');
+const bulletin=read('mair-news-bulletin.js');
 const headlines=read('api/live-headlines.js');
+const bulletinWriter=read('api/news-bulletin.js');
 const voiceLab=read('mair-voice-lab.js');
 const soak=read('mair-soak-monitor.js');
 const director=read('mair-station-director.js');
@@ -46,11 +48,17 @@ check('radio imaging active',has(imaging,'mair-imaging-v1','sonicLogo','beforeBr
 check('imaging respects user jingles toggle',has(imaging,"$('jingles')?.checked",'document.visibilityState'));
 check('DJ handoff calls imaging before speech',has(dj,'MAIRImaging?.beforeBreak','await playPrepared(pack)'));
 
-check('live news is opt-in',has(liveNews,"mair_news_enabled_v1","Nieuwscontext staat uit","setEnabled"));
-check('live news half-hour slots and freshness',has(liveNews,'COOLDOWN=27*60*1000','12*60*60*1000',"['top','half']",'LAST_SLOT','LAST_TITLE'));
-check('headline API is source attributed and cached',has(headlines,'feeds.nos.nl','sourceLabel','TTL=5*60*1000','stale-while-revalidate'));
-check('DJ runtime passes headline context',has(dj,'MAIRLiveNews?.take','news};'));
+check('live news is opt-in',has(liveNews,"mair_news_enabled_v1","MAIR Nieuws (:00) + headlines (:30)",'setEnabled'));
+check('half-hour headline is isolated from top-of-hour news',has(liveNews,'COOLDOWN=27*60*1000','12*60*60*1000',"p!=='half'",'LAST_SLOT','LAST_TITLE'));
+check('live news exposes fresh bulletin items',has(liveNews,'bulletinItems(max=6)','FEED_MAX_AGE=20*60*1000','feedFresh'));
+check('headline API is source attributed, summarized and cached',has(headlines,'feeds.nos.nl','sourceLabel','summary:description','TTL=5*60*1000','stale-while-revalidate'));
+check('DJ runtime passes :30 headline context',has(dj,'MAIRLiveNews?.take','news};'));
 check('DJ writer constrains headline use',has(writer,'headline exact te citeren','verander de headline niet','newsUsed'));
+check('hourly news bulletin prepares before a natural transition',has(bulletin,"mair-news-bulletin-v1-hourly-natural-transition","jfm:natural-next-ready","prepareSpeech","GRACE_MINUTE=12"));
+check('hourly news uses only primary playback transport',has(bulletin,'window.JFMPlayback','djPause','djRewind','djResume')&&!bulletin.includes("api('/me/player")&&!bulletin.includes('fetch(\'/me/player'));
+check('hourly news yields to an active DJ handoff',has(bulletin,'djHasPriority','HANDOFF','SPEAKING','RESTORING'));
+check('hourly news writer is source constrained',has(bulletinWriter,'uitsluitend de aangeleverde nieuwsitems','Gebruik geen eigen kennis','Dit is MAIR Nieuws.','Dit was MAIR Nieuws. Je luistert naar MAIR.'));
+check('hourly news has deterministic fallback',has(bulletinWriter,'deterministic-news','fallback(items,source'));
 
 check('show-driven presenter mode active',has(liveContext,"mair-live-context-v3-show-mode","mode==='show'","jfm:show-change","showDJ"));
 check('weather/time context retained',has(liveContext,'weatherHint','timeHint','contextFor'));
@@ -69,14 +77,14 @@ check('Sleep keeps playback single-owner',has(sleep,'window.JFMPlayback?.pause',
 check('Spotify budget is rate-limit aware',has(budget,'POLL_MS=30000','cooldownUntil','api-budget-v2-rate-limit-aware'));
 check('Spotify upcoming queue is no longer 1.6s polling',has(upcoming,'WATCHDOG_MS=15000','FORCE_DEDUPE_MS=1200','rate-limit-aware')&&!upcoming.includes('setInterval(()=>sync(false),1600)'));
 
-check('diagnostics exposes radio brain',has(diagnostics,'RADIO BREIN','Music Director','DJ-geheugen','Nieuwscontext','LANGE-DUURTEST','VOICE LAB'));
+check('diagnostics exposes radio brain and hourly news',has(diagnostics,'RADIO BREIN','Music Director','DJ-geheugen','Nieuwscontext','Uurjournaal','LANGE-DUURTEST','VOICE LAB'));
 check('DJ runtime v3.4 owns integrated context',has(dj,"v3.4-deferred-breaks-memory-imaging","writer-memory-imaging-handoff-v3-deferred","automatic-break-deferred"));
 
-const versionRuntime=['./mair-dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
+const versionRuntime=['./mair-dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-news-bulletin.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
 const cachedRuntime=[...versionRuntime,'./spotify-api-budget.js','./spotify-upcoming-truth.js'];
-check('version loader wires UI radio experience modules',versionRuntime.every(x=>version.includes(x))&&version.includes("JFM_ASSET_VERSION='77'"));
-check('service worker caches all radio experience modules',cachedRuntime.every(x=>sw.includes(x))&&sw.includes('mair-v91-sleep-radio-20260825'));
-check('server release endpoint matches v91 cache',apiVersion.includes('mair-v91-sleep-radio-20260825'));
+check('version loader wires UI radio experience modules',versionRuntime.every(x=>version.includes(x))&&version.includes("JFM_ASSET_VERSION='78'"));
+check('service worker caches all radio experience modules',cachedRuntime.every(x=>sw.includes(x))&&sw.includes('mair-v92-hourly-news-20260826'));
+check('server release endpoint matches v92 cache',apiVersion.includes('mair-v92-hourly-news-20260826'));
 check('runtime facade remains explicit',has(runtime,"const owners=","playback:'playback-primary + mair-reload-audibility'","dj:'mair-dj-v2'"));
 
 const failed=checks.filter(x=>!x.ok);
