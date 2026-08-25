@@ -13,6 +13,7 @@ const stations={
   nl:{label:'MAIR NEDERLANDSTALIG',kind:'station',chartSource:'spotify-je-moerstaal',semantic:true,language:'nl',minConfidence:.95,minTracks:5,queries:()=>['nederlandstalige hits','Je Moerstaal','Nederlandse pop hits','100% NL hits']},
   party:{label:'MAIR PARTY',kind:'station',semantic:true,minConfidence:.90,minTracks:5,queries:()=>['dance hits','party hits','edm hits','dance pop']},
   chill:{label:'MAIR CHILL',kind:'station',semantic:true,minConfidence:.90,minTracks:5,queries:()=>['chill pop','acoustic pop','indie chill','soft pop']},
+  sleep:{label:'MAIR SLEEP',kind:'station',semantic:true,minConfidence:.94,minTracks:5,queries:()=>['sleep music','deep sleep music','calm piano sleep','ambient sleep music','soft acoustic sleep']},
   summer:{label:'MAIR SUMMER',kind:'station',semantic:true,minConfidence:.90,minTracks:5,queries:()=>['summer hits','tropical house','feel good pop','summer pop']}
 };
 function releaseYear(t){return Number(String(t?.release||t?.album?.release_date||'').slice(0,4))||0}
@@ -23,5 +24,5 @@ function needsSemantic(id){return !!get(id).semantic}
 function confidence(id){return Number(get(id).minConfidence||.90)}
 function minTracks(id){return Number(get(id).minTracks||5)}
 function label(id){return get(id).label}
-window.MAIRStationPolicy={version:'mair-station-policy-v1.5-nl-editorial',stations,get,queries,hardFilter,needsSemantic,confidence,minTracks,label,releaseYear};
+window.MAIRStationPolicy={version:'mair-station-policy-v1.6-sleep',stations,get,queries,hardFilter,needsSemantic,confidence,minTracks,label,releaseYear};
 })();
