@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const $=id=>document.getElementById(id),LABELS={hits:'MAIR HITS',top40:'MAIR TOP 40',new:'MAIR DISCOVERY',nl:'MAIR NEDERLANDSTALIG',party:'MAIR PARTY',chill:'MAIR CHILL',summer:'MAIR SUMMER',throwback:'MAIR THROWBACK','00s':'MAIR 00s','10s':'MAIR 10s',mix:'MY MAIR'};
+const $=id=>document.getElementById(id),LABELS={hits:'MAIR HITS',top40:'MAIR TOP 40',new:'MAIR DISCOVERY',nl:'MAIR NEDERLANDSTALIG',party:'MAIR PARTY',chill:'MAIR CHILL',sleep:'MAIR SLEEP',summer:'MAIR SUMMER',throwback:'MAIR THROWBACK','00s':'MAIR 00s','10s':'MAIR 10s',mix:'MY MAIR'};
 function findCard(id){return $(id)?.closest('article.card')||null}function radio(){return $('tab-radio')}
 function activeId(){return window.MAIRStationController?.channel||window.JFMMusicChoice?.channel||localStorage.getItem('jfm_music_channel_v1')||'mix'}
 function activeLabel(){const id=activeId();return window.MAIRStationPolicy?.label?.(id)||LABELS[id]||String(id||'MAIR').toUpperCase()}
@@ -17,6 +17,6 @@ function readQueue(){const out=[];document.querySelectorAll('.jfm-nnl-item:not(.
 function renderUpNext(){const list=$('mair-up-next-list');if(!list)return;const items=readQueue();list.innerHTML=items.length?items.map((x,i)=>`<div class="mair-up-row"><span class="mair-up-num">${String(i+1).padStart(2,'0')}</span><div><b>${escapeHtml(x.title)}</b><span>${escapeHtml(x.artist||'MAIR FM')}</span></div></div>`).join(''):'<div class="mair-up-empty">MAIR maakt je volgende tracks klaar zodra de radio draait.</div>'}
 function syncMode(){const label=activeLabel(),p=$('mairRadioMode');if(p)p.textContent=label;let badge=$('mairActiveStation');if(!badge){badge=document.createElement('div');badge.id='mairActiveStation';badge.className='mair-active-station';const art=document.querySelector('#tab-radio .art');art?.parentNode?.insertBefore(badge,art)}if(badge){badge.textContent=label;badge.dataset.station=activeId()}}
 function refresh(){purgeLegacy();decorateFallback();decorateNow();renderUpNext();syncMode()}
-function install(){const r=radio();if(!r)return;r.classList.add('mair-radio-v2');ensureHeading();decorateNow();decorateFallback();decorateDj();decorateActions();hideLegacyRadioCards();purgeLegacy();ensureUpNext();renderUpNext();syncMode();window.addEventListener('mair:channelchange',syncMode);window.addEventListener('mair:station-selected',syncMode);window.addEventListener('jfm:trackchange',()=>{renderUpNext();syncMode()});window.MAIRRadioHome={version:'mair-radio-home-v2.3-station-truth',refresh,build:5}}
+function install(){const r=radio();if(!r)return;r.classList.add('mair-radio-v2');ensureHeading();decorateNow();decorateFallback();decorateDj();decorateActions();hideLegacyRadioCards();purgeLegacy();ensureUpNext();renderUpNext();syncMode();window.addEventListener('mair:channelchange',syncMode);window.addEventListener('mair:station-selected',syncMode);window.addEventListener('jfm:trackchange',()=>{renderUpNext();syncMode()});window.MAIRRadioHome={version:'mair-radio-home-v2.4-sleep-station',refresh,build:5}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
