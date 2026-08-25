@@ -18,7 +18,7 @@ for(const file of runtimeAssets){
  if(!sw.includes(`./${file}`))throw Error('Actuele MAIR runtime asset ontbreekt in PWA CORE-cache: '+file);
 }
 if(!sw.includes("'./channel-click-fix.js'"))throw Error('Autoritatieve stationcontroller ontbreekt in PWA CORE-cache');
-if(!/const CACHE='mair-v89-dj-cast-reload-audibility-20260825'/.test(sw))throw Error('PWA cacheversie klopt niet met MAIR DJ/reload release');
+if(!/const CACHE='mair-v90-radio-experience-20260825'/.test(sw))throw Error('PWA cacheversie klopt niet met MAIR radio experience release');
 if(!sw.includes("'./mair-background-guard.js'"))throw Error('Background guard ontbreekt in PWA CORE-cache');
 if(!background.includes("recover?.('foreground-return')")||!primary.includes('if(backgrounded())return false'))throw Error('Foreground-only background recovery guard ontbreekt');
 if(!reloadGuard.includes('verifyLocal')||!reloadGuard.includes('await p.resume()'))throw Error('Reload guard verifieert lokale Web Playback SDK niet');
