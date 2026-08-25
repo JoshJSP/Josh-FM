@@ -1,6 +1,6 @@
 // MAIR release metadata and cache/build reconciliation.
-window.JFM_RELEASE={version:'2.0.0-beta.6',displayVersion:'2b.0.6',build:'unknown',asset:'70',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
-window.JFM_ASSET_VERSION='70';
+window.JFM_RELEASE={version:'2.0.0-beta.6',displayVersion:'2b.0.6',build:'unknown',asset:'71',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
+window.JFM_ASSET_VERSION='71';
 (()=>{
   function addStyle(id,src){if(document.getElementById(id))return;const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=src;document.head.appendChild(l)}
   function ensureAppleIcon(){let l=document.querySelector('link[rel="apple-touch-icon"]');if(!l){l=document.createElement('link');l.rel='apple-touch-icon';document.head.appendChild(l)}l.href='./apple-touch-icon.png';l.sizes='180x180'}
@@ -10,8 +10,8 @@ window.JFM_ASSET_VERSION='70';
     setTimeout(ensureAppleIcon,3000);
     addStyle('mair-foundation-css','./mair-foundation.css');
     addStyle('mair-radio-home-css','./mair-radio-home.css');
-    addStyle('mair-station-art-css','./mair-station-art.css?v=70');
-    addStyle('mair-request-layer-fix-css','./request-layer-fix.css?v=70');
+    addStyle('mair-station-art-css','./mair-station-art.css?v=71');
+    addStyle('mair-request-layer-fix-css','./request-layer-fix.css?v=71');
     addSyncScript('mair-foundation-js','./mair-foundation.js');
     addSyncScript('mair-radio-home-js','./mair-radio-home.js')
   }
