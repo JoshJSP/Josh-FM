@@ -14,24 +14,26 @@ try{
   let res=await call(tts,{method:'POST',body:{text:'Hallo'}});
   assert.equal(res.statusCode,503);assert.equal(res.body.error,'fish_key_missing');
 
-  process.env.FISH_AUDIO_API_KEY='test-key';delete process.env.FISH_AUDIO_MODEL;
+  process.env.FISH_AUDIO_API_KEY='test-key';delete process.env.FISH_AUDIO_MODEL;delete process.env.MAIR_TTS_ALLOW_VOICE_OVERRIDE;
   let calls=[];
-  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});if(url.includes('/model/'))return fishResponse(JSON.stringify({_id:'voice-josh',title:'Josh',languages:['nl']}),{type:'application/json'});return fishResponse('unexpected')};
+  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});if(url.includes('/model/'))return fishResponse(JSON.stringify({_id:'9324023ff6ec48fb9c4b2b236e9146c4',title:'Dutch natural radio',languages:['nl']}),{type:'application/json'});return fishResponse('unexpected')};
   res=await call(tts,{method:'GET',query:{djProfile:'UNKNOWN'}});
-  assert.equal(res.statusCode,200);assert.equal(res.body.djProfile,'josh');assert.match(calls[0].url,/\/model\//);
+  assert.equal(res.statusCode,200);assert.equal(res.body.djProfile,'josh');assert.equal(res.body.voiceId,'9324023ff6ec48fb9c4b2b236e9146c4');assert.equal(res.body.cast.role,'main / daytime');assert.equal(res.body.voiceOverrideEnabled,false);assert.match(calls[0].url,/\/model\//);
 
+  // Old or accidental Vercel voice variables must not silently replace the curated MAIR cast.
   process.env.FISH_AUDIO_VOICE_MAX='802e3bc2b27e49c2995d23ef70e6ac89';calls=[];
-  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return fishResponse(JSON.stringify({_id:'149694610a7449b6b2c5aef22859e2d3',title:'Jonge Nederlandse Stem',languages:['nl']}),{type:'application/json'})};
-  res=await call(tts,{method:'GET',query:{djProfile:'max'}});assert.equal(res.statusCode,200);assert.equal(res.body.djProfile,'max');assert.equal(res.body.voiceId,'149694610a7449b6b2c5aef22859e2d3');assert.equal(res.body.voice.dutchReady,true);delete process.env.FISH_AUDIO_VOICE_MAX;
+  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return fishResponse(JSON.stringify({_id:'c7ab1ccc330c467c9e72663573a202f1',title:'Energetic Radio Host',languages:['nl']}),{type:'application/json'})};
+  res=await call(tts,{method:'GET',query:{djProfile:'max'}});assert.equal(res.statusCode,200);assert.equal(res.body.djProfile,'max');assert.equal(res.body.voiceId,'c7ab1ccc330c467c9e72663573a202f1');assert.equal(res.body.voice.dutchReady,true);delete process.env.FISH_AUDIO_VOICE_MAX;
 
-  process.env.FISH_AUDIO_VOICE_NOAH='custom-english-only';
+  // Overrides remain possible, but only after an explicit opt-in.
+  process.env.MAIR_TTS_ALLOW_VOICE_OVERRIDE='1';process.env.FISH_AUDIO_VOICE_NOAH='custom-english-only';
   globalThis.fetch=async()=>fishResponse(JSON.stringify({_id:'custom-english-only',title:'English only',languages:['en']}),{type:'application/json'});
-  res=await call(tts,{method:'GET',query:{djProfile:'noah'}});assert.equal(res.statusCode,422);assert.equal(res.body.voice.dutchReady,false);assert.match(res.body.voice.detail,/geen Nederlandse/);delete process.env.FISH_AUDIO_VOICE_NOAH;
+  res=await call(tts,{method:'GET',query:{djProfile:'noah'}});assert.equal(res.statusCode,422);assert.equal(res.body.voiceId,'custom-english-only');assert.equal(res.body.voiceOverrideEnabled,true);assert.equal(res.body.voice.dutchReady,false);assert.match(res.body.voice.detail,/geen Nederlandse/);delete process.env.FISH_AUDIO_VOICE_NOAH;delete process.env.MAIR_TTS_ALLOW_VOICE_OVERRIDE;
 
   calls=[];
   globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return calls.length===1?fishResponse(JSON.stringify({message:'temporary'}),{status:500,type:'application/json'}):fishResponse(Buffer.from([0x49,0x44,0x33,1]))};
   res=await call(tts,{method:'POST',body:{text:'Dit is een test.',djProfile:'maya'}});
-  assert.equal(res.statusCode,200);assert.equal(calls.length,2);assert.equal(res.headers['X-MAIR-DJ'],'maya');assert.equal(res.headers['X-JoshFM-Fish-Model'],'s2-pro');assert.ok(Buffer.isBuffer(res.body));
+  assert.equal(res.statusCode,200);assert.equal(calls.length,2);assert.equal(res.headers['X-MAIR-DJ'],'maya');assert.equal(res.headers['X-JoshFM-Voice'],'f47a8dcf789144028f7bc2752ae00451');assert.equal(res.headers['X-JoshFM-Fish-Model'],'s2-pro');assert.ok(Buffer.isBuffer(res.body));
 
   calls=[];
   globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return fishResponse(JSON.stringify({message:'invalid token'}),{status:401,type:'application/json'})};
