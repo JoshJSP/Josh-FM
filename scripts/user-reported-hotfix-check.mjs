@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
-const sleep=read('mair-sleep.js'),choice=read('music-choice.js'),policy=read('mair-station-policy.js'),classifier=read('api/category-filter.js'),purity=read('mair-category-purity.js'),rotation=read('rotation-engine.js'),queue=read('station-queue.js'),news=read('mair-live-news.js'),dj=read('mair-dj-v2.js'),version=read('version.js'),sw=read('sw.js');
+const sleep=read('mair-sleep.js'),choice=read('music-choice.js'),policy=read('mair-station-policy.js'),classifier=read('api/category-filter.js'),purity=read('mair-category-purity.js'),rotation=read('rotation-engine.js'),queue=read('station-queue.js'),news=read('mair-live-news.js'),dj=read('mair-dj-v2.js'),version=read('version.js'),sw=read('sw.js'),budget=read('spotify-api-budget.js'),upcoming=read('spotify-upcoming-truth.js');
 
 assert.match(sleep,/mair-sleep-v1\.2/);
 assert.match(sleep,/data-sleep-minutes="15"/);assert.match(sleep,/data-sleep-minutes="30"/);assert.match(sleep,/data-sleep-minutes="45"/);assert.match(sleep,/data-sleep-minutes="60"/);
@@ -21,5 +21,8 @@ assert.match(news,/COOLDOWN=27\*60\*1000/);assert.match(news,/\['top','half'\]\.
 
 assert.match(dj,/v3\.4-deferred-breaks-memory-imaging/);assert.match(dj,/function deferBreak/);assert.match(dj,/automatic-break-deferred/);assert.doesNotMatch(dj,/miss\('automatic-break-not-ready'\)/);assert.match(dj,/deferred/);
 
+assert.match(budget,/POLL_MS=30000/);assert.match(budget,/api-budget-v2-rate-limit-aware/);assert.match(budget,/cooldownUntil/);assert.match(budget,/match\(\/over\\s\+\(\\d\+\)\\s\*sec\/i\)/);
+assert.match(upcoming,/WATCHDOG_MS=15000/);assert.match(upcoming,/FORCE_DEDUPE_MS=1200/);assert.match(upcoming,/v2-single-authoritative-owner-rate-limit-aware/);assert.doesNotMatch(upcoming,/setInterval\(\(\)=>sync\(false\),1600\)/,'Spotify queue truth may not poll every 1.6 seconds');
+
 assert.match(version,/mair-sleep\.js/);assert.match(version,/JFM_ASSET_VERSION='77'/);assert.match(sw,/mair-v91-sleep-radio-20260825/);assert.match(sw,/\.\/mair-sleep\.js/);
-console.log('MAIR user-reported hotfix gate: PASS — Sleep, half-hour headlines, deferred DJ and HITS repeat lock');
+console.log('MAIR user-reported hotfix gate: PASS — Sleep, half-hour headlines, deferred DJ, HITS repeat lock and Spotify rate-limit mitigation');
