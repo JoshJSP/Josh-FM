@@ -9,7 +9,7 @@ const checks=[
  ['Build7 runtime loaded',html.includes('src="build7.js"')],
  ['MAIR visible brand',html.includes('<h1>MAIR</h1>')&&html.includes('Start MAIR')],
  ['DJ profiles owned by MAIR foundation',['josh','maya','max','noah'].every(x=>foundation.includes(`${x}:{id:'${x}'`))&&foundation.includes('window.MAIRDJProfiles')],
- ['Runtime rotation preference',b7.includes('rotation:60')&&b7.includes('setRotationMinutes')&&b7.includes("setMode?.('rotation')")],
+ ['Runtime show preference',b7.includes('rotation:60')&&b7.includes('setRotationMinutes')&&b7.includes("setMode?.('show')")&&ctx.includes("mode==='show'")&&ctx.includes('showDJ')],
  ['Natural rotation engine',ctx.includes("window.addEventListener('jfm:trackchange'")&&ctx.includes('maybeRotate')],
  ['Request confirmation gate',b7.includes('mairConfirmed')&&b7.includes('b7ReqConfirm')],
  ['Live context runtime preference',b7.includes('liveContext:true')&&b7.includes("$('weatherMention')")&&b7.includes("$('timeMention')")&&b7.includes('window.MAIRRuntimePrefs')],
