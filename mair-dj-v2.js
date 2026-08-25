@@ -50,7 +50,7 @@ async function pauseMusic(uri){const transport=window.JFMPlayback;if(!transport)
 async function rewindCurrent(uri){const transport=window.JFMPlayback;if(typeof transport?.djRewind==='function')return !!(await transport.djRewind(uri));const id=String(window.JFMSpotifySDK?.deviceId||localStorage.getItem('jfm_spotify_device_id')||'').trim();if(!id)return false;try{await api('/me/player/seek?position_ms=0&device_id='+encodeURIComponent(id),{method:'PUT'});for(let i=0;i<4;i++){await wait(90+i*60);const s=await liveSnapshot().catch(()=>null);if(s?.live?.item?.uri===uri&&Number(s.live.progress_ms||0)<1800)return true}}catch{}return false}
 async function resumeMusic(uri){const transport=window.JFMPlayback;if(!transport)throw Error('MAIR playback-controller ontbreekt');const fn=typeof transport.djResume==='function'?transport.djResume.bind(transport):transport.resume?.bind(transport);if(typeof fn!=='function')throw Error('MAIR playback-controller kan Spotify niet hervatten');const ok=await fn(uri);if(!ok)throw Error(`Spotify resume: ${transport?.health?.lastError||'hervatten mislukt'}`);try{truthApi()?.setExpectedLive?.(true,'radio-live')}catch{};if(transport.djResume)return true;if(await confirmLive(uri,true,6))return true;throw Error('Spotify hervatten kon niet worden bevestigd')}
 function assertVoicePrepared(){if(document.visibilityState==='hidden')throw Error('MAIR is op de achtergrond');if(Number(audioStatus().cacheSize||0)<1)throw Error('Voorbereide DJ-audio ontbreekt');return true}
-async function ensureVoiceReady(){assertVoicePrepared();const ok=await unlock().catch(()=>false);if(!ok&&!audioStatus().audioUnlocked)throw Error('DJ-audio is niet ontgrendeld');return true}
+async function ensureVoiceReady(){assertVoicePrepared();if(audioStatus().audioUnlocked)return true;const ok=await unlock().catch(()=>false);if(!ok&&!audioStatus().audioUnlocked)throw Error('DJ-audio is niet ontgrendeld');return true}
 async function playPrepared(pack){if(typeof window.speakText!=='function')throw Error('Centrale MAIR Voice Engine is niet geladen');setPhase('SPEAKING',pack.manual?'manual':'automatic');const ok=await window.speakText(pack.text,false);if(!ok)throw Error(audioStatus().error||'DJ-audio werd niet hoorbaar afgespeeld');return true}
 async function restoreMusic(uri,{rewind=true}={}){setPhase('RESTORING','music-restore');if(rewind)await rewindCurrent(uri).catch(()=>false);await resumeMusic(uri);return true}
 async function air(expectedTrackId='',pack=prepared,{rewind=true}={}){
@@ -59,7 +59,7 @@ async function air(expectedTrackId='',pack=prepared,{rewind=true}={}){
     if(pack.generation!==planGeneration)throw Error('DJ-break is niet meer actueel');
     if(pack.nextHintId&&expectedTrackId&&String(expectedTrackId)!==String(pack.nextHintId))throw Error('De volgende Spotify-track wijzigde na het voorbereiden van de DJ-break');
     if(pack.voiceProfileId&&String(profile()?.id||'josh')!==String(pack.voiceProfileId))throw Error('DJ-profiel wijzigde na het voorbereiden van de stem');
-    assertVoicePrepared();
+    await ensureVoiceReady();
     const hinted=truth(),hintedId=String(hinted?.trackId||''),hintedUri=String(hinted?.uri||'');
     if(expectedTrackId&&hintedId===String(expectedTrackId)&&hintedUri){
       uri=hintedUri;beginHandoff(uri);setPhase('HANDOFF',pack.manual?'manual':'automatic');await pauseMusic(uri);paused=true;
@@ -69,7 +69,6 @@ async function air(expectedTrackId='',pack=prepared,{rewind=true}={}){
     if(pack.nextHintId&&currentId!==String(pack.nextHintId))throw Error('De volgende Spotify-track wijzigde na het voorbereiden van de DJ-break');
     uri=uri||s.live.item.uri||'';if(!uri)throw Error('Spotify-track heeft geen URI');
     if(!paused){beginHandoff(uri);setPhase('HANDOFF',pack.manual?'manual':'automatic');await pauseMusic(uri);paused=true}
-    await ensureVoiceReady();
     await playPrepared(pack);await restoreMusic(uri,{rewind});paused=false;endHandoff();state.lastAirAt=Date.now();state.lastAirText=pack.text;state.played++;state.error='';recent.unshift(pack.text);recent.splice(8);const bt=$('djBreakTime');if(bt)bt.textContent=new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});const dt=$('djText');if(dt)dt.textContent=pack.text;resetPlan('break-complete');return true
   }catch(e){error=safeErr(e);state.lastMissAt=Date.now();state.lastMissReason='air-failed';state.error=error;return false}finally{if(paused&&uri){try{await restoreMusic(uri,{rewind:false})}catch{}}endHandoff(error);busy=false;if(error)miss('break-missed',error);else emit()}
 }
