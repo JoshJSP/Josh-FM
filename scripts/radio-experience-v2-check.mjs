@@ -23,6 +23,8 @@ const dj=read('mair-dj-v2.js');
 const writer=read('api/dj-writer.js');
 const liveContext=read('mair-live-context.js');
 const diagnostics=read('mair-diagnostics-hub.js');
+const userControls=read('mair-user-controls.js');
+const templateAssets=read('mair-template-assets.css');
 const runtime=read('mair-runtime-core.js');
 const version=read('version.js');
 const sw=read('sw.js');
@@ -74,11 +76,14 @@ check('station director exposes radio controls',has(director,'dj-now','skip-dj',
 
 check('Sleep screen active',has(sleep,'MAIR SLEEP','Stop na dit nummer','data-sleep-minutes="15"','data-sleep-minutes="60"'));
 check('Sleep keeps playback single-owner',has(sleep,'window.JFMPlayback?.pause',"truth?.begin?.('pause'")&&!sleep.includes("api('/me/player"));
+check('Sleep timer removed from Settings owner',has(userControls,'settings-only','Car Mode')&&!userControls.includes('Sleeptimer')&&!userControls.includes('data-mair-sleep'));
+check('Sleep has dedicated station cover',has(templateAssets,"assets/stations/mair-sleep.svg?v=78")&&sw.includes("'./assets/stations/mair-sleep.svg'"));
 check('Spotify budget is rate-limit aware',has(budget,'POLL_MS=30000','cooldownUntil','api-budget-v2-rate-limit-aware'));
 check('Spotify upcoming queue is no longer 1.6s polling',has(upcoming,'WATCHDOG_MS=15000','FORCE_DEDUPE_MS=1200','rate-limit-aware')&&!upcoming.includes('setInterval(()=>sync(false),1600)'));
 
 check('diagnostics exposes radio brain and hourly news',has(diagnostics,'RADIO BREIN','Music Director','DJ-geheugen','Nieuwscontext','Uurjournaal','LANGE-DUURTEST','VOICE LAB'));
-check('DJ runtime v3.4 owns integrated context',has(dj,"v3.4-deferred-breaks-memory-imaging","writer-memory-imaging-handoff-v3-deferred","automatic-break-deferred"));
+check('diagnostic/test UI is centralized',has(diagnostics,"moveCard('mairStationDirectorCard','STATION DIRECTOR')","moveCard('mairVoiceEngineCard','VOICE ENGINE')","moveControl('mairImagingPreview','SONIC LOGO TEST')"));
+check('DJ runtime preserves automatic cadence',has(dj,"v3.4-deferred-breaks-memory-imaging","writer-memory-imaging-handoff-v4-auto-schedule-preserve","automatic-break-deferred","automatic-track-change-preserved","function rearmOwed"));
 
 const versionRuntime=['./mair-dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-news-bulletin.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
 const cachedRuntime=[...versionRuntime,'./spotify-api-budget.js','./spotify-upcoming-truth.js'];
