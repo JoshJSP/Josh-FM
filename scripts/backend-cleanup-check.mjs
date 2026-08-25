@@ -1,1 +1,32 @@
-noop
+import fs from 'node:fs';
+const exists=p=>fs.existsSync(new URL('../'+p,import.meta.url));
+const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const fail=msg=>{throw new Error(msg)};
+for(const p of ['.build-trigger-v2b-20260813-2229','.vercel-preview-trigger-20260812.txt','.vercel-redeploy','backups','assets/mair-visual-sprite.svg','api/assistant.js','api/dj.js','api/jingle.js','kokoro-controller.js','kokoro-worker.js','dj-language-force.js'])if(exists(p))fail(`Obsolete repository artifact bestaat nog: ${p}`);
+const build7=read('build7.js');
+if(/b7ForYou|b7DjCard/.test(build7))fail('Build7 injecteert nog dubbele Voor jou/DJ UI');
+if(!build7.includes('window.MAIRRuntimePrefs'))fail('Runtime preferences hebben geen MAIR eigenaar');
+const foundation=read('mair-foundation.js');
+if(foundation.includes('data-mair-tab="for-you"')||foundation.includes('mair-daily-hero'))fail('Voor jou bestaat nog als legacy bron-tab');
+if(!foundation.includes('data-mair-tab="radio"')||!foundation.includes('data-mair-tab="stations"')||!foundation.includes('data-mair-tab="requests"')||!foundation.includes('data-mair-tab="settings"'))fail('Vier-tab navigatiecontract is incompleet');
+const station=read('channel-click-fix.js'),policy=read('mair-station-policy.js');
+if(station.includes('setInterval(boot,1000)'))fail('Station controller gebruikt nog permanente ownership polling');
+if(!station.includes('window.MAIRStationController'))fail('Station controller heeft geen MAIR eigenaar');
+if(!station.includes('MAIRStationPolicy')&&!station.includes('mair-station-policy.js'))fail('Station controller gebruikt geen centrale policy');
+if(!policy.includes('MAIR NEDERLANDSTALIG')||!policy.includes("language:'nl'")||!policy.includes('minConfidence:.95'))fail('Nederlandstalig policy is niet expliciet fail-closed op 0.95');
+if(/status\(`Josh FM/.test(station))fail('Station controller bevat nog zichtbare Josh FM statusbranding');
+const voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js'),runtime=read('mair-runtime-core.js'),controls=read('mair-user-controls.js'),sleep=read('mair-sleep.js'),modes=read('runtime-modes.js'),visuals=read('mair-dj-visuals.js'),sw=read('sw.js'),hub=read('mair-diagnostics-hub.js'),reloadGuard=read('mair-reload-audibility.js'),profilePolish=read('mair-dj-profile-polish.js');
+if(!voice.includes("'mair:dj-speaking'")||!easy.includes("'mair:dj-speaking'"))fail('DJ LIVE is niet gekoppeld aan de echte voice-engine');
+if(!easy.includes("'mair:dj-schedule'"))fail('DJ countdown gebruikt niet de authoritative scheduler event');
+if(!runtime.includes('window.MAIRRuntime')||!runtime.includes("playback:'playback-primary + mair-reload-audibility'")||!runtime.includes("dj:'mair-dj-v2'")||!runtime.includes("djCopy:'api/dj-writer + mair-dj-profile-polish'")||!runtime.includes("voice:'mair-voice-engine + api/tts'"))fail('Centrale MAIR runtime ownership facade ontbreekt of is ambigu');
+if(!reloadGuard.includes('window.MAIRReloadAudibilityGuard')||!profilePolish.includes('window.MAIRDJProfilePolish'))fail('Nieuwe reload/personality owners zijn niet expliciet beschikbaar');
+if(!controls.includes('Car Mode')||!controls.includes('settings-only'))fail('Car Mode / settings-only gebruikerslaag ontbreekt');
+if(controls.includes('Sleeptimer')||controls.includes('data-mair-sleep')||controls.includes('MAIRSleepTimer'))fail('Sleeptimer mag niet meer door Instellingen worden geïnjecteerd');
+if(!sleep.includes('MAIR SLEEP')||!sleep.includes('Stop na dit nummer')||!sleep.includes('data-sleep-minutes="15"')||!sleep.includes('data-sleep-minutes="60"'))fail('Aparte MAIR Sleep-view mist de sleeptimerbediening');
+for(const retired of ['Data Saver','Battery Friendly Mode','Night Interface nu','Night Interface automatisch','Webapp gedrag'])if(modes.includes(retired))fail(`Legacy instelling is terug in runtime-modes.js: ${retired}`);
+if(modes.includes('jfmRuntimeModes')||modes.includes('ensureSettings'))fail('runtime-modes.js injecteert nog een legacy instellingenkaart');
+for(const id of ['jfmRuntimeModes','jfmSleepCard','mairAdvancedDiagnostics'])if(!controls.includes(`'${id}'`))fail(`Nieuwe instellingenlaag verwijdert gecachete legacy UI niet: ${id}`);
+for(const id of ['mairAdvancedDiagnostics','jfmSleepCard','jfmDataPortability'])if(!hub.includes(`'${id}'`))fail(`Diagnose-hub verwijdert retired kaart niet: ${id}`);
+for(const id of ['josh','maya','max','noah']){const asset=`assets/dj-${id}.webp`;if(!exists(asset))fail(`Concept DJ asset ontbreekt: ${asset}`);if(!visuals.includes(`./${asset}`))fail(`DJ visuals verwijst niet naar ${asset}`);if(!sw.includes(`'./${asset}'`))fail(`PWA cache mist ${asset}`)}
+if(!sw.includes("'./mair-dj-visuals.js'"))fail('PWA cache mist mair-dj-visuals.js');
+console.log('MAIR backend cleanup checks: OK');
