@@ -12,19 +12,20 @@ if(!policy.includes("language:'nl'")||!policy.includes('minConfidence:.95'))thro
 if(!controller.includes('semanticQualityFilter')||!controller.includes("boundedFetch('/api/category-filter'")||!controller.includes('policy()?.confidence?.(id)'))throw Error('Semantische stationkwaliteitscontrole ontbreekt');
 if(!controller.includes('if(!c||switching)return false')||!controller.includes('queue=previousQueue'))throw Error('Stationwissel moet race- en rollback-safe blijven');
 if(!controller.includes("if(active!=='mix'&&Array.isArray(queue)&&queue.length)return queue"))throw Error('Actief station moet beschermd zijn tegen achtergrond rebuilds');
-const runtimeAssets=['mair-station-policy.js','mair-ui-hardening.js','mair-user-controls.js','mair-dj-visuals.js','mair-runtime-core.js','mair-reload-audibility.js','mair-dj-profile-polish.js','mair-sleep.js','spotify-api-budget.js','spotify-upcoming-truth.js'];
+const runtimeAssets=['mair-station-policy.js','mair-ui-hardening.js','mair-user-controls.js','mair-dj-visuals.js','mair-runtime-core.js','mair-reload-audibility.js','mair-dj-profile-polish.js','mair-live-news.js','mair-news-bulletin.js','mair-sleep.js','spotify-api-budget.js','spotify-upcoming-truth.js'];
 for(const file of runtimeAssets){
- if(!pwa.includes(file)&&!['mair-reload-audibility.js','mair-dj-profile-polish.js','mair-sleep.js','spotify-api-budget.js','spotify-upcoming-truth.js'].includes(file))throw Error('Actuele MAIR runtime asset wordt niet geladen: '+file);
+ if(!pwa.includes(file)&&!['mair-reload-audibility.js','mair-dj-profile-polish.js','mair-live-news.js','mair-news-bulletin.js','mair-sleep.js','spotify-api-budget.js','spotify-upcoming-truth.js'].includes(file))throw Error('Actuele MAIR runtime asset wordt niet geladen: '+file);
  if(!sw.includes(`./${file}`))throw Error('Actuele MAIR runtime asset ontbreekt in PWA CORE-cache: '+file);
 }
 if(!sw.includes("'./channel-click-fix.js'"))throw Error('Autoritatieve stationcontroller ontbreekt in PWA CORE-cache');
-if(!/const CACHE='mair-v91-sleep-radio-20260825'/.test(sw))throw Error('PWA cacheversie klopt niet met MAIR Sleep release');
+if(!/const CACHE='mair-v92-hourly-news-20260826'/.test(sw))throw Error('PWA cacheversie klopt niet met MAIR v92 hourly-news release');
 if(!sw.includes("'./mair-background-guard.js'"))throw Error('Background guard ontbreekt in PWA CORE-cache');
 if(!background.includes("recover?.('foreground-return')")||!primary.includes('if(backgrounded())return false'))throw Error('Foreground-only background recovery guard ontbreekt');
 if(!reloadGuard.includes('verifyLocal')||!reloadGuard.includes('await p.resume()'))throw Error('Reload guard verifieert lokale Web Playback SDK niet');
 if(!profilePolish.includes('Hoofdpresentator')||!profilePolish.includes('Curator voor avond en late night'))throw Error('DJ personality polish ontbreekt');
 if(!dj.includes('ensureVoiceReady')||dj.indexOf('await ensureVoiceReady()')>dj.indexOf('await pauseMusic(uri)'))throw Error('DJ voice-ready gate moet vóór Spotify-pauze staan');
 if(dj.includes('schedulePendingRetry')||dj.includes('retryTimer')||dj.includes('retryAfter'))throw Error('DJ mag een mislukte handoff niet binnen dezelfde track blijven retryen');
+if(!dj.includes('function rearmOwed')||!dj.includes('automatic-track-change-preserved'))throw Error('Automatische DJ-break moet verschuldigd blijven na een gemiste/late overgang');
 if(!dj.includes("truthApi()?.begin?.('dj-handoff'")||!dj.includes('endHandoff'))throw Error('DJ-handoff moet playback recovery expliciet blokkeren');
 if(!voice.includes("CustomEvent('mair:dj-speaking'")||!voice.includes("classList.toggle('dj-speaking',speaking)"))throw Error('Voice engine moet betrouwbare DJ speaking lifecycle events uitsturen');
 if(!easy.includes("addEventListener('mair:dj-speaking'")||!easy.includes('setDjLive'))throw Error('DJ LIVE UI moet speaking lifecycle volgen');

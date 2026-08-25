@@ -15,12 +15,14 @@ if(!station.includes('window.MAIRStationController'))fail('Station controller he
 if(!station.includes('MAIRStationPolicy')&&!station.includes('mair-station-policy.js'))fail('Station controller gebruikt geen centrale policy');
 if(!policy.includes('MAIR NEDERLANDSTALIG')||!policy.includes("language:'nl'")||!policy.includes('minConfidence:.95'))fail('Nederlandstalig policy is niet expliciet fail-closed op 0.95');
 if(/status\(`Josh FM/.test(station))fail('Station controller bevat nog zichtbare Josh FM statusbranding');
-const voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js'),runtime=read('mair-runtime-core.js'),controls=read('mair-user-controls.js'),modes=read('runtime-modes.js'),visuals=read('mair-dj-visuals.js'),sw=read('sw.js'),hub=read('mair-diagnostics-hub.js'),reloadGuard=read('mair-reload-audibility.js'),profilePolish=read('mair-dj-profile-polish.js');
+const voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js'),runtime=read('mair-runtime-core.js'),controls=read('mair-user-controls.js'),sleep=read('mair-sleep.js'),modes=read('runtime-modes.js'),visuals=read('mair-dj-visuals.js'),sw=read('sw.js'),hub=read('mair-diagnostics-hub.js'),reloadGuard=read('mair-reload-audibility.js'),profilePolish=read('mair-dj-profile-polish.js');
 if(!voice.includes("'mair:dj-speaking'")||!easy.includes("'mair:dj-speaking'"))fail('DJ LIVE is niet gekoppeld aan de echte voice-engine');
 if(!easy.includes("'mair:dj-schedule'"))fail('DJ countdown gebruikt niet de authoritative scheduler event');
 if(!runtime.includes('window.MAIRRuntime')||!runtime.includes("playback:'playback-primary + mair-reload-audibility'")||!runtime.includes("dj:'mair-dj-v2'")||!runtime.includes("djCopy:'api/dj-writer + mair-dj-profile-polish'")||!runtime.includes("voice:'mair-voice-engine + api/tts'"))fail('Centrale MAIR runtime ownership facade ontbreekt of is ambigu');
 if(!reloadGuard.includes('window.MAIRReloadAudibilityGuard')||!profilePolish.includes('window.MAIRDJProfilePolish'))fail('Nieuwe reload/personality owners zijn niet expliciet beschikbaar');
-if(!controls.includes('Car Mode')||!controls.includes('Sleeptimer')||!controls.includes('Na dit nummer'))fail('Car Mode/Sleeptimer controls ontbreken');
+if(!controls.includes('Car Mode')||!controls.includes('settings-only'))fail('Car Mode / settings-only gebruikerslaag ontbreekt');
+if(controls.includes('Sleeptimer')||controls.includes('data-mair-sleep')||controls.includes('MAIRSleepTimer'))fail('Sleeptimer mag niet meer door Instellingen worden geïnjecteerd');
+if(!sleep.includes('MAIR SLEEP')||!sleep.includes('Stop na dit nummer')||!sleep.includes('data-sleep-minutes="15"')||!sleep.includes('data-sleep-minutes="60"'))fail('Aparte MAIR Sleep-view mist de sleeptimerbediening');
 for(const retired of ['Data Saver','Battery Friendly Mode','Night Interface nu','Night Interface automatisch','Webapp gedrag'])if(modes.includes(retired))fail(`Legacy instelling is terug in runtime-modes.js: ${retired}`);
 if(modes.includes('jfmRuntimeModes')||modes.includes('ensureSettings'))fail('runtime-modes.js injecteert nog een legacy instellingenkaart');
 for(const id of ['jfmRuntimeModes','jfmSleepCard','mairAdvancedDiagnostics'])if(!controls.includes(`'${id}'`))fail(`Nieuwe instellingenlaag verwijdert gecachete legacy UI niet: ${id}`);

@@ -79,18 +79,21 @@ async function testDuplicateNaturalEventCannotDoubleAir(){
   const h=createHarness();await prepareAutomaticDue(h);h.natural('C','D');h.natural('C','D');await sleep(700);
   assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djResume,1)
 }
-async function testVoiceFailureRestoresOnceAndNeverRetries(){
+async function testVoiceFailureRestoresOnceAndRearmsFutureBreak(){
   const h=createHarness({speakSucceeds:false});await prepareAutomaticDue(h);h.natural('C','D');await sleep(800);const first={...h.metrics};
-  assert.equal(first.djPause,1);assert.equal(first.speak,1);assert.equal(first.djResume,1,'failed voice restores music once');assert.equal(first.djRewind,0,'failed voice must not rewind before restore');assert.equal(h.state().missed,1);
-  await sleep(1900);assert.equal(h.metrics.djPause,first.djPause);assert.equal(h.metrics.speak,first.speak);assert.equal(h.metrics.djResume,first.djResume)
+  assert.equal(first.djPause,1);assert.equal(first.speak,1);assert.equal(first.djResume,1,'failed voice restores music once');assert.equal(first.djRewind,0,'failed voice must not rewind before restore');assert.equal(h.state().missed,1);assert.equal(h.state().remaining,0,'failed automatic break stays owed');
+  await sleep(1900);assert.equal(h.metrics.djPause,first.djPause);assert.equal(h.metrics.speak,first.speak);assert.equal(h.metrics.djResume,first.djResume,'owed break waits for a future natural transition instead of retrying same track')
 }
 async function testManualSkipCancelsPreparedBreakWithoutTouchingMusic(){
-  const h=createHarness();h.window.MAIRDJ.armManual();await sleep(80);assert.equal(h.state().phase,'ARMED');h.changed('A','B','primary-next');await sleep(1900);
+  const h=createHarness();h.window.MAIRDJ.armManual();await sleep(80);assert.equal(h.state().phase,'ARMED');h.changed('A','B','primary-next');await sleep(4400);
   assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().phase,'COUNTING');assert.equal(h.state().lastMissReason,'manual-or-unexpected-track-change')
+}
+async function testAutomaticTrackChangePreservesCadence(){
+  const h=createHarness();h.natural('A','B');await sleep(30);assert.equal(h.state().count,1);h.changed('B','C','sdk-state');await sleep(4400);assert.equal(h.state().count,1,'generic trackchange must not reset automatic cadence');assert.equal(h.state().lastMissReason,'');h.natural('C','D');await sleep(100);assert.equal(h.state().phase,'ARMED','automatic schedule should still prepare one track before due')
 }
 async function testBackgroundedBreakNeverPausesMusic(){
   const h=createHarness();await prepareAutomaticDue(h);h.document.visibilityState='hidden';h.natural('C','D');await sleep(600);
-  assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1)
+  assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.equal(h.state().remaining,0)
 }
 async function testManualDJAtNextNaturalTransition(){
   const h=createHarness();assert.equal(h.window.MAIRDJ.armManual(),true);await sleep(80);assert.equal(h.state().phase,'ARMED');h.natural('A','B');await sleep(700);
@@ -103,23 +106,24 @@ async function testWebApiFallbackStillWorks(){
 async function testWriterFailureUsesSafeDutchFallback(){
   const h=createHarness({writerSucceeds:false});await prepareAutomaticDue(h);assert.equal(h.state().writer.provider,'local-fallback');assert.match(h.state().writer.text,/^Dat was .* Nu hoor je .* MAIR\.$/);h.natural('C','D');await sleep(700);assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djResume,1);assert.equal(h.state().played,1)
 }
-async function testChangedNextTrackDropsStaleCopyBeforePause(){
-  const h=createHarness();await prepareAutomaticDue(h);h.natural('C','X');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.match(h.state().lastMissReason,/break-missed/)
+async function testChangedNextTrackRearmsBeforePause(){
+  const h=createHarness();await prepareAutomaticDue(h);h.natural('C','X');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.equal(h.state().remaining,0);assert.match(h.state().lastMissReason,/break-missed/)
 }
-async function testChangedVoiceProfileDropsPreparedBreakBeforePause(){
-  const h=createHarness();await prepareAutomaticDue(h);h.setProfile('maya');h.natural('C','D');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.match(h.state().error,/DJ-profiel wijzigde/)
+async function testChangedVoiceProfileRearmsPreparedBreak(){
+  const h=createHarness();await prepareAutomaticDue(h);h.setProfile('maya');h.natural('C','D');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.equal(h.state().remaining,0,'profile change must not erase the owed automatic break')
 }
 const tests=[
   ['automatic break uses SDK-first critical path',testSuccessfulAutomaticBreak],
   ['duplicate natural event is idempotent',testDuplicateNaturalEventCannotDoubleAir],
-  ['voice failure restores once without retry',testVoiceFailureRestoresOnceAndNeverRetries],
+  ['voice failure restores and rearms future break',testVoiceFailureRestoresOnceAndRearmsFutureBreak],
   ['manual skip cancels stale prepared break',testManualSkipCancelsPreparedBreakWithoutTouchingMusic],
-  ['backgrounded break never pauses music',testBackgroundedBreakNeverPausesMusic],
+  ['automatic generic trackchange preserves cadence',testAutomaticTrackChangePreservesCadence],
+  ['backgrounded break never pauses music but stays owed',testBackgroundedBreakNeverPausesMusic],
   ['manual DJ airs on next natural transition',testManualDJAtNextNaturalTransition],
   ['generic primary transport remains fallback',testWebApiFallbackStillWorks],
   ['writer failure uses safe Dutch fallback',testWriterFailureUsesSafeDutchFallback],
-  ['changed next track drops stale DJ copy before pause',testChangedNextTrackDropsStaleCopyBeforePause],
-  ['changed DJ profile drops prepared voice before pause',testChangedVoiceProfileDropsPreparedBreakBeforePause],
+  ['changed next track rearms DJ copy before pause',testChangedNextTrackRearmsBeforePause],
+  ['changed DJ profile rearms prepared break',testChangedVoiceProfileRearmsPreparedBreak],
 ];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(e){console.error('FAIL',name,'—',e?.stack||e);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`MAIR DJ v3 behavioral simulation: ${passed}/${tests.length} PASS`);
