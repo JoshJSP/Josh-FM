@@ -42,6 +42,7 @@ expect(stationPolicy.includes("nl:{label:'MAIR NEDERLANDSTALIG'")&&stationPolicy
 expect(ui.includes("setTimeout(()=>{b.classList.remove('loading');sync()},4000)"),'station loading-state herstelt niet naar echte status');
 expect(!/\.mair-station-card\.loading\{[^}]*pointer-events\s*:\s*none/.test(polish),'station loading-state blokkeert taps');
 for(const asset of ['mair-hits.webp','mair-top40.webp','mair-discovery.webp','mair-nederlandstalig.webp','mair-party.webp','mair-chill.webp','mair-summer.webp','mair-throwback.webp','mair-00s.webp','mair-10s.webp'])expect(templateAssets.includes(`./assets/stations/${asset}?v=47`),`exact station artwork ontbreekt: ${asset}`);
+expect(templateAssets.includes("./assets/stations/mair-sleep.svg?v=78"),'MAIR SLEEP gebruikt niet de eigen cover');
 expect(templateAssets.includes("./assets/mair-mix.svg?v=47"),'MY MAIR artwork ontbreekt');
 expect(templateAssets.includes('.top{display:flex!important'),'MAIR-header wordt niet expliciet hersteld op Stations/Voor jou');
 expect(logo.includes('MAIR app icon')&&logo.includes('▥')===false,'app icon moet de nieuwe MAIR templateversie zijn');
@@ -59,7 +60,8 @@ expect(writer.includes('Vermijd de automatische formule')&&writer.includes('RADI
 expect(dj.indexOf('window.prepareSpeech')<dj.indexOf('await pauseMusic(uri)'),'DJ-audio moet vóór Spotify-pauze voorbereid zijn');
 expect(dj.includes('ensureVoiceReady')&&dj.indexOf('await ensureVoiceReady()')<dj.indexOf('await pauseMusic(uri)'),'DJ mag Spotify niet pauzeren voordat voice start-ready is');
 expect(dj.includes('const ok=await window.speakText(pack.text,false)')&&dj.includes("setPhase('SPEAKING'")&&!dj.includes('const audio=new Audio()'),'Hoorbare DJ-completion moet via de centrale Voice Engine lopen');
-expect(!dj.includes('schedulePendingRetry')&&!dj.includes('retryTimer')&&!dj.includes('retryAfter')&&dj.includes("miss('break-missed',error)"),'Mislukte DJ-break moet worden gedropt en opnieuw gepland, nooit binnen dezelfde track retryen');
+expect(!dj.includes('schedulePendingRetry')&&!dj.includes('retryTimer')&&!dj.includes('retryAfter')&&dj.includes('rearmOwed(!!pack.manual')&&dj.includes('count=Math.max(count,target)'),'Mislukte automatische DJ-break moet muziek herstellen en verschuldigd blijven voor een volgende overgang, zonder same-track retry');
+expect(dj.includes('automatic-track-change-preserved'),'Generieke trackchange mag de automatische DJ-teller niet resetten');
 expect(dj.includes("window.addEventListener('jfm:natural-next-ready'")&&dj.includes('async function naturalTransition')&&!dj.includes('setInterval('),'Automatische DJ scheduler moet uitsluitend door natuurlijke trackovergangen worden gedreven');
 expect(dj.includes('await pauseMusic(uri)')&&dj.includes('await playPrepared(pack)')&&dj.includes('await restoreMusic(uri,{rewind})'),'DJ Spotify handoff is incompleet');
 expect(dj.includes('lastNaturalSig')&&dj.includes('if(sig===lastNaturalSig)return false'),'Dubbele natural-next events mogen geen dubbele DJ-break veroorzaken');
@@ -75,8 +77,9 @@ expect(bootstrap.includes('mair-dj-v2.js')&&bootstrap.includes('mair-background-
 expect(handoff.includes('legacy-shim-to-mair-dj-v2')&&!handoff.includes('/me/player/pause'),'Legacy handoff bezit nog playbacklogica');
 expect(voiceCheck.includes('Complete Voice Check')&&voiceCheck.includes('Groq schrijver')&&voiceCheck.includes('Spotify pauze/hervatten'),'Tijdelijke complete Voice Check ontbreekt');
 expect(voiceCheck.includes("dataset.temporaryRelease='voice-check-v1'"),'Voice Check is niet als tijdelijk gemarkeerd');
-expect(sw.includes("const CACHE='mair-v91-sleep-radio-20260825'"),'service-worker cache is niet MAIR v91 Sleep release');
-for(const asset of ['./mair-dj-v2.js','./mair-voice-check.js','./mair-background-guard.js','./mair-category-search.js','./mair-station-policy.js','./channel-click-fix.js','./mair-ui-hardening.js','./mair-runtime-core.js','./mair-voice-engine.js','./mair-easy-use-v1.js','./mair-reload-audibility.js','./mair-dj-profile-polish.js','./mair-dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js','./spotify-api-budget.js','./spotify-upcoming-truth.js'])expect(sw.includes(`'${asset}'`),`service worker cachet actuele runtime niet: ${asset}`);
+expect(sw.includes("const CACHE='mair-v92-hourly-news-20260826'"),'service-worker cache is niet MAIR v92 hourly-news release');
+for(const asset of ['./mair-dj-v2.js','./mair-voice-check.js','./mair-background-guard.js','./mair-category-search.js','./mair-station-policy.js','./channel-click-fix.js','./mair-ui-hardening.js','./mair-runtime-core.js','./mair-voice-engine.js','./mair-easy-use-v1.js','./mair-reload-audibility.js','./mair-dj-profile-polish.js','./mair-dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-news-bulletin.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js','./spotify-api-budget.js','./spotify-upcoming-truth.js'])expect(sw.includes(`'${asset}'`),`service worker cachet actuele runtime niet: ${asset}`);
 for(const asset of ['mair-hits.webp','mair-top40.webp','mair-discovery.webp','mair-nederlandstalig.webp','mair-party.webp','mair-chill.webp','mair-summer.webp','mair-throwback.webp','mair-00s.webp','mair-10s.webp'])expect(sw.includes(`'./assets/stations/${asset}'`),`service worker cachet stationcover niet: ${asset}`);
+expect(sw.includes("'./assets/stations/mair-sleep.svg'"),'service worker cachet MAIR SLEEP-cover niet');
 expect(sw.includes("k.startsWith('josh-fm-')")&&sw.includes("k.startsWith('mair-')"),'service worker moet oude Josh FM/MAIR caches opruimen');
 if(failures.length){console.error('\nMAIR regression gate FAILED');for(const f of failures)console.error(`- ${f}`);process.exit(1)}console.log('MAIR regression gate OK');
