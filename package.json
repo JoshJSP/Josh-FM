@@ -28,7 +28,7 @@
     "dj-personality": "node --check mair-dj-profile-polish.js && node --check api/dj-writer.js && node scripts/dj-personality-radio-check.mjs",
     "reload-audibility": "node --check mair-reload-audibility.js && node scripts/reload-audibility-check.mjs",
     "api-failure-behavior": "node --check api/tts.js && node --check api/dj-writer.js && node scripts/api-failure-behavior-check.mjs",
-    "radio-experience-v2": "node --check station-clock.js && node --check rotation-engine.js && node --check mair-dj-memory.js && node --check mair-imaging.js && node --check mair-live-news.js && node --check mair-voice-lab.js && node --check mair-soak-monitor.js && node --check mair-station-director.js && node --check mair-sleep.js && node --check api/live-headlines.js && node scripts/radio-experience-v2-check.mjs",
+    "radio-experience-v2": "node --check station-clock.js && node --check rotation-engine.js && node --check mair-dj-memory.js && node --check mair-imaging.js && node --check mair-live-news.js && node --check mair-news-bulletin.js && node --check mair-voice-lab.js && node --check mair-soak-monitor.js && node --check mair-station-director.js && node --check mair-sleep.js && node --check api/live-headlines.js && node --check api/news-bulletin.js && node scripts/radio-experience-v2-check.mjs",
     "radio-product": "node scripts/mair-radio-product-check.mjs",
     "radio-soak": "node scripts/mair-soak-simulation.mjs",
     "user-reported-hotfix": "node scripts/user-reported-hotfix-check.mjs",
