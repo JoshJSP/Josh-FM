@@ -14,6 +14,9 @@ const headlines=read('api/live-headlines.js');
 const voiceLab=read('mair-voice-lab.js');
 const soak=read('mair-soak-monitor.js');
 const director=read('mair-station-director.js');
+const sleep=read('mair-sleep.js');
+const budget=read('spotify-api-budget.js');
+const upcoming=read('spotify-upcoming-truth.js');
 const dj=read('mair-dj-v2.js');
 const writer=read('api/dj-writer.js');
 const liveContext=read('mair-live-context.js');
@@ -28,11 +31,12 @@ check('special shows exist',has(clock,"weekend-warmup","new-music","saturday-nig
 check('show clock assigns DJs',has(clock,"djId:'josh'","djId:'maya'","djId:'max'","djId:'noah'"));
 check('show clock exposes radio moments',has(clock,"Top of hour","Half-hour show ID","jfm:clock-moment","jfm:show-change"));
 
-check('music director 2.0 active',has(rotation,"music-director-v2-show-clock","cooldownPenalty","transitionPenalty","clockFit","momentum"));
+check('music director 2.1 Sleep active',has(rotation,"music-director-v2.1-sleep","cooldownPenalty","transitionPenalty","clockFit","momentum"));
 check('music director separates tracks and artists',has(rotation,'TRACK_COOLDOWN_PLAYS=18','ARTIST_WINDOW=7','lastArtists'));
 check('music director respects requests',has(rotation,"return'Request'","JFMRequests","jfmIsRequest"));
 check('music director uses personal learning',has(rotation,'likes','discoveryWins','discoveryLosses','jfm_skips'));
 check('music director explains choices',has(rotation,'function reason','_why=reason'));
+check('Sleep uses low momentum',has(rotation,"station==='sleep'?-.24","station==='sleep'?.28"));
 
 check('persistent DJ memory active',has(memory,"mair_dj_memory_v2","MAX_AGE=72*60*60*1000","avoidOpeners","recentArtists","isTooSimilar"));
 check('DJ runtime consumes persistent memory',has(dj,'MAIRDJMemory?.context','memory,recentDJ','MAIRDJMemory?.record'));
@@ -43,7 +47,7 @@ check('imaging respects user jingles toggle',has(imaging,"$('jingles')?.checked"
 check('DJ handoff calls imaging before speech',has(dj,'MAIRImaging?.beforeBreak','await playPrepared(pack)'));
 
 check('live news is opt-in',has(liveNews,"mair_news_enabled_v1","Nieuwscontext staat uit","setEnabled"));
-check('live news has cooldown and freshness',has(liveNews,'COOLDOWN=90*60*1000','12*60*60*1000',"['top','half']"));
+check('live news half-hour slots and freshness',has(liveNews,'COOLDOWN=27*60*1000','12*60*60*1000',"['top','half']",'LAST_SLOT','LAST_TITLE'));
 check('headline API is source attributed and cached',has(headlines,'feeds.nos.nl','sourceLabel','TTL=5*60*1000','stale-while-revalidate'));
 check('DJ runtime passes headline context',has(dj,'MAIRLiveNews?.take','news};'));
 check('DJ writer constrains headline use',has(writer,'headline exact te citeren','verander de headline niet','newsUsed'));
@@ -60,13 +64,19 @@ check('soak monitor is passive',has(soak,'De monitor bestuurt Spotify niet','jfm
 check('station director dashboard active',has(director,'MAIR CONTROL ROOM','VOLGENDE 5 TRACKS','LAATSTE DJ-LINKS','STATION HEALTH'));
 check('station director exposes radio controls',has(director,'dj-now','skip-dj','talk-down','talk-up'));
 
-check('diagnostics exposes radio brain',has(diagnostics,'RADIO BREIN','Music Director','DJ-geheugen','Nieuwscontext','LANGE-DUURTEST','VOICE LAB'));
-check('DJ runtime v3.3 owns integrated context',has(dj,"v3.3-memory-imaging-show-context","writer-memory-imaging-handoff-v2"));
+check('Sleep screen active',has(sleep,'MAIR SLEEP','Stop na dit nummer','data-sleep-minutes="15"','data-sleep-minutes="60"'));
+check('Sleep keeps playback single-owner',has(sleep,'window.JFMPlayback?.pause',"truth?.begin?.('pause'")&&!sleep.includes("api('/me/player"));
+check('Spotify budget is rate-limit aware',has(budget,'POLL_MS=30000','cooldownUntil','api-budget-v2-rate-limit-aware'));
+check('Spotify upcoming queue is no longer 1.6s polling',has(upcoming,'WATCHDOG_MS=15000','FORCE_DEDUPE_MS=1200','rate-limit-aware')&&!upcoming.includes('setInterval(()=>sync(false),1600)'));
 
-const newRuntime=['./mair-dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js'];
-check('version loader wires all radio experience modules',newRuntime.every(x=>version.includes(x))&&version.includes("JFM_ASSET_VERSION='76'"));
-check('service worker caches all radio experience modules',newRuntime.every(x=>sw.includes(x))&&sw.includes('mair-v90-radio-experience-20260825'));
-check('server release endpoint matches v90 cache',apiVersion.includes('mair-v90-radio-experience-20260825'));
+check('diagnostics exposes radio brain',has(diagnostics,'RADIO BREIN','Music Director','DJ-geheugen','Nieuwscontext','LANGE-DUURTEST','VOICE LAB'));
+check('DJ runtime v3.4 owns integrated context',has(dj,"v3.4-deferred-breaks-memory-imaging","writer-memory-imaging-handoff-v3-deferred","automatic-break-deferred"));
+
+const versionRuntime=['./mair-dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
+const cachedRuntime=[...versionRuntime,'./spotify-api-budget.js','./spotify-upcoming-truth.js'];
+check('version loader wires UI radio experience modules',versionRuntime.every(x=>version.includes(x))&&version.includes("JFM_ASSET_VERSION='77'"));
+check('service worker caches all radio experience modules',cachedRuntime.every(x=>sw.includes(x))&&sw.includes('mair-v91-sleep-radio-20260825'));
+check('server release endpoint matches v91 cache',apiVersion.includes('mair-v91-sleep-radio-20260825'));
 check('runtime facade remains explicit',has(runtime,"const owners=","playback:'playback-primary + mair-reload-audibility'","dj:'mair-dj-v2'"));
 
 const failed=checks.filter(x=>!x.ok);

@@ -6,9 +6,10 @@ const RULES={
   nl:'Accepteer alleen als de gezongen tekst echt hoofdzakelijk Nederlands is: als strenge richtlijn minstens ongeveer 90% van de hoorbare songtekst Nederlands, inclusief het grootste deel van refrein en coupletten. Een paar Nederlandse woorden, een Nederlandstalige intro, een tweetalig nummer met veel Engels, of een Nederlandse/Vlaamse artiest met een Engelstalig nummer is NIET genoeg. Instrumentale tracks, volledig Engelstalige tracks en ieder twijfelgeval afwijzen.',
   party:'Accepteer alleen als dit duidelijk een energieke, dansbare feesttrack is die logisch werkt op een feestje of dansvloer. Ballads, rustige akoestische tracks, ambient en andere lage-energie tracks afwijzen.',
   chill:'Accepteer alleen als dit duidelijk rustig, ontspannen en warm/soft is. Harde dance, agressieve rock/rap, zeer hoge energie en uitgesproken feesttracks afwijzen.',
+  sleep:'Accepteer alleen als dit overtuigend geschikt is om bij in slaap te vallen: zeer rustig, zacht, laag in energie, zonder plotselinge harde drops, agressieve drums, schreeuwerige vocalen of feestelijke drive. Ambient, zachte piano, rustige instrumentale muziek, zachte akoestische muziek en zeer kalme vocalen mogen. Gewone midtempo pop, chill-dance, energieke lo-fi en tracks die vooral “relaxed” maar niet slaapvriendelijk zijn bij twijfel afwijzen.',
   summer:'Accepteer alleen als dit duidelijk een zonnige, feelgood of zomerse sfeer heeft. Een gewone poptrack zonder duidelijke zomer/feelgood-associatie bij twijfel afwijzen.'
 };
-const MIN_CONFIDENCE={nl:.95,party:.90,chill:.90,summer:.90};
+const MIN_CONFIDENCE={nl:.95,party:.90,chill:.90,sleep:.94,summer:.90};
 
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
