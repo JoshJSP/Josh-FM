@@ -2,9 +2,9 @@ import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8'),fail=[];const ok=(x,m)=>{if(!x)fail.push(m)};
 const dj=read('mair-dj-v2.js'),writer=read('api/dj-writer.js'),voice=read('debug-tts.js'),engine=read('mair-voice-engine.js'),resume=read('dj-resume.js'),boot=read('dj-now-queue.js'),easy=read('mair-easy-use-v1.js'),primary=read('playback-primary.js'),spotifyConfig=read('spotify-test-config.js'),integration=read('integration-guards.js'),runtime=read('runtime-modes.js'),health=read('station-health.js'),diagnostics=read('release-diagnostics.js');
 const discovery=read('discovery.js'),channel=read('channel-click-fix.js'),purity=read('mair-category-purity.js'),ttsApi=read('api/tts.js'),discoverApi=read('api/discover.js'),categoryApi=read('api/category-filter.js');
-ok(dj.includes("v3.2-sdk-first-single-owner"),'DJ v3.2 runtime marker missing');
+ok(dj.includes("v3.3-memory-imaging-show-context"),'DJ v3.3 runtime marker missing');
 ok(writer.includes('process.env.GROQ_API_KEY'),'Groq key must remain server-side');
-ok(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'ARMED'")&&dj.includes("'HANDOFF'")&&dj.includes("'SPEAKING'")&&dj.includes("'RESTORING'"),'DJ v3.2 state machine incomplete');
+ok(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'ARMED'")&&dj.includes("'HANDOFF'")&&dj.includes("'SPEAKING'")&&dj.includes("'RESTORING'"),'DJ v3.3 state machine incomplete');
 ok(dj.includes("fetch('/api/dj-writer'")&&dj.includes('window.prepareSpeech')&&dj.includes('window.speakText'),'DJ must use writer + prepared central voice route');
 ok(dj.indexOf('window.prepareSpeech')<dj.indexOf('await pauseMusic(uri)'),'Voice must be prepared before Spotify pause');
 ok(dj.includes("window.addEventListener('jfm:natural-next-ready'")&&dj.includes('async function naturalTransition'),'Natural transitions must be the only automatic DJ cadence trigger');
@@ -43,4 +43,4 @@ ok(health.includes('currentTrack:')&&health.includes('nextTrack:')&&health.inclu
 ok(discovery.includes("boundedFetch('/api/discover'")&&channel.includes("boundedFetch('/api/nl-charts")&&purity.includes("boundedFetch('/api/category-filter'"),'Optional enrichment must be bounded so station building cannot hang');
 ok(ttsApi.includes('normalizeProfile')&&ttsApi.includes("Object.hasOwn(DJ_ENV,id)?id:'josh'"),'TTS API must normalize unknown profiles to the actual Josh fallback voice');
 ok(ttsApi.includes('NON_DUTCH_VOICES')&&ttsApi.includes("languages.includes('nl')")&&ttsApi.includes('dutchReady'),'TTS API must reject the known English Max voice and diagnose Dutch readiness');
-if(fail.length){console.error('MAIR DJ v3.2 regression FAILED');for(const x of fail)console.error('-',x);process.exit(1)}console.log('MAIR DJ v3.2 regression OK');
+if(fail.length){console.error('MAIR DJ v3.3 regression FAILED');for(const x of fail)console.error('-',x);process.exit(1)}console.log('MAIR DJ v3.3 regression OK');
