@@ -52,7 +52,7 @@ expect(!health.includes('Test Josh FM opnieuw'),'Self Test bevat nog oude Josh F
 expect(health.includes("btn.textContent='Test MAIR opnieuw'")&&health.includes("b.textContent='Test MAIR opnieuw'"),'Self Test gebruikt niet overal MAIR');
 expect(health.includes("name:brand(c.show.name)")&&health.includes("esc(brand(s.show?.name||'—'))"),'Self Test scrubt oude programmanaam niet');
 expect(dj.includes('TALK_RANGES=[[6,9],[3,5],[2,4],[1,3]]'),'DJ praatfrequentie-ranges zijn onverwacht gewijzigd');
-expect(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'ARMED'")&&dj.includes("'HANDOFF'")&&dj.includes("'SPEAKING'")&&dj.includes("'RESTORING'"),'Nieuwe DJ v3.2 state machine is incompleet');
+expect(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'ARMED'")&&dj.includes("'HANDOFF'")&&dj.includes("'SPEAKING'")&&dj.includes("'RESTORING'"),'Nieuwe DJ state machine is incompleet');
 expect(writer.includes('process.env.GROQ_API_KEY')&&writer.includes('openai/gpt-oss-120b')&&writer.includes('openai/gpt-oss-20b'),'Groq DJ Writer ontbreekt, gebruikt verouderde modellen of key is niet server-side');
 expect(writer.includes('Nederlandse muziek-radio-DJ'),'Groq DJ Writer is niet strikt Nederlands');
 expect(writer.includes('Vermijd de automatische formule')&&writer.includes('RADIOKLOK')&&writer.includes('PERSONAS'),'DJ Writer mist persona- of radioklokvariatie');
@@ -75,8 +75,8 @@ expect(bootstrap.includes('mair-dj-v2.js')&&bootstrap.includes('mair-background-
 expect(handoff.includes('legacy-shim-to-mair-dj-v2')&&!handoff.includes('/me/player/pause'),'Legacy handoff bezit nog playbacklogica');
 expect(voiceCheck.includes('Complete Voice Check')&&voiceCheck.includes('Groq schrijver')&&voiceCheck.includes('Spotify pauze/hervatten'),'Tijdelijke complete Voice Check ontbreekt');
 expect(voiceCheck.includes("dataset.temporaryRelease='voice-check-v1'"),'Voice Check is niet als tijdelijk gemarkeerd');
-expect(sw.includes("const CACHE='mair-v89-dj-cast-reload-audibility-20260825'"),'service-worker cache is niet MAIR v89');
-for(const asset of ['./mair-dj-v2.js','./mair-voice-check.js','./mair-background-guard.js','./mair-category-search.js','./mair-station-policy.js','./channel-click-fix.js','./mair-ui-hardening.js','./mair-runtime-core.js','./mair-voice-engine.js','./mair-easy-use-v1.js','./mair-reload-audibility.js','./mair-dj-profile-polish.js'])expect(sw.includes(`'${asset}'`),`service worker cachet actuele runtime niet: ${asset}`);
+expect(sw.includes("const CACHE='mair-v90-radio-experience-20260825'"),'service-worker cache is niet MAIR v90 radio experience');
+for(const asset of ['./mair-dj-v2.js','./mair-voice-check.js','./mair-background-guard.js','./mair-category-search.js','./mair-station-policy.js','./channel-click-fix.js','./mair-ui-hardening.js','./mair-runtime-core.js','./mair-voice-engine.js','./mair-easy-use-v1.js','./mair-reload-audibility.js','./mair-dj-profile-polish.js','./mair-dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js'])expect(sw.includes(`'${asset}'`),`service worker cachet actuele runtime niet: ${asset}`);
 for(const asset of ['mair-hits.webp','mair-top40.webp','mair-discovery.webp','mair-nederlandstalig.webp','mair-party.webp','mair-chill.webp','mair-summer.webp','mair-throwback.webp','mair-00s.webp','mair-10s.webp'])expect(sw.includes(`'./assets/stations/${asset}'`),`service worker cachet stationcover niet: ${asset}`);
 expect(sw.includes("k.startsWith('josh-fm-')")&&sw.includes("k.startsWith('mair-')"),'service worker moet oude Josh FM/MAIR caches opruimen');
 if(failures.length){console.error('\nMAIR regression gate FAILED');for(const f of failures)console.error(`- ${f}`);process.exit(1)}console.log('MAIR regression gate OK');

@@ -1,60 +1,25 @@
-// Josh FM Rotation Engine — categories, cooldowns, artist separation and explainable programming.
+// MAIR Music Director 2.0 — explainable rotation, show clocks, momentum and separation.
 (()=>{
-  const RECENT_WINDOW=24,ARTIST_WINDOW=7,TRACK_COOLDOWN_PLAYS=18;
-  const nowYear=()=>new Date().getFullYear();
-  const norm=s=>String(s||'').toLowerCase().trim();
+  const RECENT_WINDOW=24,ARTIST_WINDOW=7,TRACK_COOLDOWN_PLAYS=18,clamp=(n,a=0,b=1)=>Math.max(a,Math.min(b,n));
+  const nowYear=()=>new Date().getFullYear(),norm=s=>String(s||'').toLowerCase().trim();
   function memory(){try{return window.jfmDirectorMemory?.()||JSON.parse(localStorage.getItem('jfm_director_memory')||'{}')}catch{return{}}}
   function skips(){try{return typeof skipMap==='function'?skipMap():JSON.parse(localStorage.getItem('jfm_skips')||'{}')}catch{return{}}}
   function history(){try{return window.JFMRadioSuite?.state?.()||{lastIds:[],lastArtists:[]}}catch{return{lastIds:[],lastArtists:[]}}}
+  function clock(){const c=window.JFMStationClock?.current?.()||{},show=c.show||{};return{show,phase:c.phase||'open',pattern:Array.isArray(show.musicPattern)&&show.musicPattern.length?show.musicPattern:['Familiar','Current','Power','Discovery'],targetMomentum:Number.isFinite(Number(show.targetMomentum))?Number(show.targetMomentum):.66}}
   function year(t){return Number(String(t?.release||'').slice(0,4))||0}
   function artist(t){return norm(t?.artists?.[0]||'')}
   function requested(t){try{return !!window.JFMRequests?.isRequest?.(t)||!!window.jfmIsRequest?.(t)}catch{return false}}
-  function category(t){
-    if(requested(t))return'Request';
-    if(t?._discovery)return'Discovery';
-    const m=memory(),likes=Number(m.likes?.[t?.id]||0),plays=Number(m.plays?.[t?.id]||0),y=year(t),age=y?nowYear()-y:0;
-    if(likes>=2||plays>=5)return'Power';
-    if(y&&age<=2)return'Current';
-    if(y&&age>=10)return'Throwback';
-    return'Familiar'
-  }
-  function cooldownPenalty(t){
-    const h=history(),ids=(h.lastIds||[]).slice(0,RECENT_WINDOW),artists=(h.lastArtists||[]).slice(0,ARTIST_WINDOW).map(norm);
-    const idIndex=ids.indexOf(t?.id),a=artist(t),artistIndex=a?artists.indexOf(a):-1;let p=0;
-    if(idIndex>=0)p-=idIndex<TRACK_COOLDOWN_PLAYS?-40+(idIndex*1.4):-8;
-    if(artistIndex===0)p-=28;else if(artistIndex===1)p-=18;else if(artistIndex===2)p-=12;else if(artistIndex>=3)p-=Math.max(3,9-artistIndex);
-    return p
-  }
-  function preferenceScore(t){
-    const m=memory(),s=skips(),id=t?.id||'';
-    return Number(m.likes?.[id]||0)*3.8-Number(s[id]||0)*4.4+Number(m.discoveryWins?.[id]||0)*2.8-Number(m.discoveryLosses?.[id]||0)*4.4
-  }
-  function transitionPenalty(t,out=[]){
-    const a=artist(t),recent=(out||[]).slice(-7),cat=category(t);let p=0;
-    for(let back=1;back<=recent.length;back++)if(a&&a===artist(recent[recent.length-back]))p-=[0,32,22,15,10,7,5,3][back]||3;
-    if(cat==='Discovery'&&recent.slice(-2).some(x=>category(x)==='Discovery'))p-=14;
-    if(cat==='Throwback'&&recent.slice(-3).filter(x=>category(x)==='Throwback').length>=2)p-=6;
-    if(cat==='Request'&&recent.slice(-3).some(requested))p-=12;
-    return p
-  }
-  function score(t,out=[]){return cooldownPenalty(t)+preferenceScore(t)+transitionPenalty(t,out)}
-  function reason(t){
-    if(requested(t))return'Jouw verzoek staat gepland in de uitzending.';
-    if(t?._discovery)return t._discoveryReason||'Nieuwe muziek die past bij je luisterprofiel.';
-    const m=memory(),s=skips(),id=t?.id||'',c=category(t);
-    if(Number(m.likes?.[id]||0)>0)return'Je hebt eerder positief op deze track gereageerd.';
-    if(Number(s[id]||0)>0)return`${c} rotation, maar met lagere prioriteit door eerdere skips.`;
-    if(c==='Power')return'Een sterke persoonlijke favoriet in de Power rotation.';
-    if(c==='Current')return'Relatief nieuwe muziek die bij je profiel past.';
-    if(c==='Throwback')return'Een bekende oudere track voor spreiding in de mix.';
-    return'Vertrouwde muziek die past bij je luisterprofiel.'
-  }
-  function annotate(t){if(!t)return t;t._rotationCategory=category(t);t._why=reason(t);return t}
+  function category(t){if(requested(t))return'Request';if(t?._discovery)return'Discovery';const m=memory(),likes=Number(m.likes?.[t?.id]||0),plays=Number(m.plays?.[t?.id]||0),y=year(t),age=y?nowYear()-y:0;if(likes>=2||plays>=5)return'Power';if(y&&age<=2)return'Current';if(y&&age>=10)return'Throwback';return'Familiar'}
+  function momentum(t){const c=category(t),pop=clamp(Number(t?.popularity||55)/100),y=year(t),fresh=y&&nowYear()-y<=2?.07:0,cat=({Power:.13,Current:.09,Request:.07,Discovery:.02,Familiar:0,Throwback:-.05})[c]||0,station=localStorage.getItem('jfm_music_channel_v1')||'mix',stationAdj=station==='party'?.12:station==='chill'?-.12:station==='hits'||station==='top40'?.06:0;return clamp(pop*.72+.18+fresh+cat+stationAdj)}
+  function cooldownPenalty(t){const h=history(),ids=(h.lastIds||[]).slice(0,RECENT_WINDOW),artists=(h.lastArtists||[]).slice(0,ARTIST_WINDOW).map(norm),idIndex=ids.indexOf(t?.id),a=artist(t),artistIndex=a?artists.indexOf(a):-1;let p=0;if(idIndex>=0)p-=idIndex<TRACK_COOLDOWN_PLAYS?40-idIndex*1.4:8;if(artistIndex===0)p-=28;else if(artistIndex===1)p-=18;else if(artistIndex===2)p-=12;else if(artistIndex>=3)p-=Math.max(3,9-artistIndex);return p}
+  function preferenceScore(t){const m=memory(),s=skips(),id=t?.id||'';return Number(m.likes?.[id]||0)*3.8-Number(s[id]||0)*4.4+Number(m.discoveryWins?.[id]||0)*2.8-Number(m.discoveryLosses?.[id]||0)*4.4}
+  function transitionPenalty(t,out=[]){const a=artist(t),recent=(out||[]).slice(-8),cat=category(t);let p=0;for(let back=1;back<=recent.length;back++)if(a&&a===artist(recent[recent.length-back]))p-=[0,34,24,16,11,8,5,3,2][back]||2;if(cat==='Discovery'&&recent.slice(-2).some(x=>category(x)==='Discovery'))p-=15;if(cat==='Throwback'&&recent.slice(-3).filter(x=>category(x)==='Throwback').length>=2)p-=8;if(cat==='Request'&&recent.slice(-3).some(requested))p-=12;const y=year(t),lastY=year(recent.at(-1));if(y&&lastY&&Math.abs(y-lastY)>28)p-=2.4;return p}
+  function clockFit(t,out=[]){const c=clock(),slot=(Math.floor(new Date().getMinutes()/10)+(out?.length||0))%c.pattern.length,target=c.pattern[slot],cat=category(t),mom=momentum(t);let s=cat===target?5.2:(cat==='Request'?3.4:0);s-=Math.abs(mom-c.targetMomentum)*8;if(c.phase==='top'&&['Power','Current','Request'].includes(cat))s+=3.2;if(c.phase==='sweep'&&cat==='Discovery')s-=1.5;if(c.show?.preferredStation&&(localStorage.getItem('jfm_music_channel_v1')||'mix')===c.show.preferredStation)s+=.8;return s}
+  function score(t,out=[]){return cooldownPenalty(t)+preferenceScore(t)+transitionPenalty(t,out)+clockFit(t,out)}
+  function reason(t){if(requested(t))return'Jouw verzoek staat gepland in de uitzending.';if(t?._discovery)return t._discoveryReason||'Nieuwe muziek die past bij je luisterprofiel.';const m=memory(),s=skips(),id=t?.id||'',c=category(t),cl=clock(),target=cl.pattern[Math.floor(new Date().getMinutes()/10)%cl.pattern.length];if(Number(m.likes?.[id]||0)>0)return'Je hebt eerder positief op deze track gereageerd.';if(Number(s[id]||0)>0)return`${c} rotation, maar met lagere prioriteit door eerdere skips.`;if(c===target)return`${c} past in de muziekkolk van ${cl.show?.name||'de huidige MAIR-show'}.`;if(c==='Power')return'Een sterke persoonlijke favoriet in de Power rotation.';if(c==='Current')return'Relatief nieuwe muziek die bij je profiel past.';if(c==='Throwback')return'Een bekende oudere track voor spreiding in de mix.';return'Vertrouwde muziek die past bij je luisterprofiel.'}
+  function annotate(t){if(!t)return t;t._rotationCategory=category(t);t._momentum=momentum(t);t._why=reason(t);return t}
   function annotateAll(list=[]){return(list||[]).map(annotate)}
-  function isHardBlocked(t){
-    if(requested(t))return false;
-    const ids=(history().lastIds||[]).slice(0,TRACK_COOLDOWN_PLAYS);
-    return !!t?.id&&ids.includes(t.id)
-  }
-  window.JFMRotation={version:'rotation-v1-explainable',category,score,reason,annotate,annotateAll,isHardBlocked,cooldownPenalty,preferenceScore};
+  function isHardBlocked(t){if(requested(t))return false;const ids=(history().lastIds||[]).slice(0,TRACK_COOLDOWN_PLAYS);return !!t?.id&&ids.includes(t.id)}
+  function plan(list=[],context=[]){let pool=(list||[]).filter(Boolean),out=[];while(pool.length){let best=0,bestScore=-Infinity;for(let i=0;i<pool.length;i++){const s=score(pool[i],[...(context||[]).slice(-8),...out]);if(s>bestScore){bestScore=s;best=i}}out.push(annotate(pool.splice(best,1)[0]))}return out}
+  window.JFMRotation={version:'music-director-v2-show-clock',category,score,reason,annotate,annotateAll,isHardBlocked,cooldownPenalty,preferenceScore,transitionPenalty,clockFit,momentum,clockProfile:clock,plan};
 })();
