@@ -3,8 +3,9 @@ let CACHE={at:0,data:null};
 const TTL=5*60*1000;
 async function timedFetch(url,ms=6500){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{headers:{'User-Agent':'MAIR/2.0 personal-radio'},signal:c.signal})}finally{clearTimeout(t)}}
 function decode(s=''){return String(s).replace(/^<!\[CDATA\[|\]\]>$/g,'').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim()}
+function stripHtml(s=''){return decode(String(s).replace(/<br\s*\/?\s*>/gi,' ').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ')).slice(0,900)}
 function tag(xml,name){const m=String(xml).match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)<\\/${name}>`,'i'));return decode(m?.[1]||'')}
-function parse(xml=''){const items=[];for(const m of String(xml).matchAll(/<item[^>]*>([\s\S]*?)<\/item>/gi)){const block=m[1],title=tag(block,'title'),link=tag(block,'link'),pubDate=tag(block,'pubDate');if(!title||!/^https?:\/\//i.test(link))continue;items.push({title,link,publishedAt:pubDate?new Date(pubDate).toISOString():null,source:'NOS'});if(items.length>=8)break}return items}
+function parse(xml=''){const items=[];for(const m of String(xml).matchAll(/<item[^>]*>([\s\S]*?)<\/item>/gi)){const block=m[1],title=tag(block,'title'),link=tag(block,'link'),pubDate=tag(block,'pubDate'),description=stripHtml(tag(block,'description'));if(!title||!/^https?:\/\//i.test(link))continue;items.push({title,summary:description&&description!==title?description:'',link,publishedAt:pubDate?new Date(pubDate).toISOString():null,source:'NOS'});if(items.length>=10)break}return items}
 export default async function handler(req,res){
  if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
  res.setHeader('Cache-Control','s-maxage=300, stale-while-revalidate=600');
