@@ -22,7 +22,7 @@
     "backend-cleanup": "node --check build7.js && node scripts/backend-cleanup-check.mjs",
     "dj-v2": "node --check mair-dj-v2.js && node --check mair-voice-check.js && node --check api/dj-writer.js && node scripts/dj-v2-regression.mjs",
     "dj-behavior": "node scripts/dj-v3-behavior-check.mjs && node scripts/dj-schedule-sync-behavior-check.mjs",
-    "dj-deferred-break": "node scripts/dj-deferred-break-check.mjs",
+    "dj-deferred-break": "node scripts/dj-deferred-break-check.mjs && node scripts/dj-break-owed-guard-check.mjs",
     "dj-transition-order": "node scripts/dj-transition-order-check.mjs",
     "voice-behavior": "node --check debug-tts.js && node --check mair-voice-engine.js && node scripts/voice-engine-behavior-check.mjs",
     "dj-personality": "node --check mair-dj-profile-polish.js && node --check api/dj-writer.js && node scripts/dj-personality-radio-check.mjs",
