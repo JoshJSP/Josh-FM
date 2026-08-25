@@ -10,9 +10,6 @@ async function sonicLogo(force=false){if(!force&&!enabled())return false;if(docu
 function shouldPlay(p=phase(),force=false){if(force)return true;if(!enabled())return false;if(!['top','q1','half','q3'].includes(p))return false;if(Date.now()-lastAt<7*60*1000&&p===lastPhase)return false;return true}
 async function beforeBreak(meta={}){const p=String(meta.phase||phase());if(!shouldPlay(p,!!meta.force))return false;return sonicLogo(!!meta.force)}
 function emit(){try{window.dispatchEvent(new CustomEvent('mair:imaging',{detail:status()}))}catch{}}
-function status(){return{version:'mair-imaging-v1',enabled:enabled(),plays,lastAt,lastPhase,error:lastError}}
-function installUI(){const j=$('jingles');if(!j||$('mairImagingPreview'))return;const label=j.closest('label');if(!label)return;const b=document.createElement('button');b.id='mairImagingPreview';b.type='button';b.className='secondary';b.style.marginTop='8px';b.textContent='▶ Test MAIR sonic logo';b.addEventListener('click',()=>sonicLogo(true));label.insertAdjacentElement('afterend',b)}
-function boot(){installUI();setTimeout(installUI,1000)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-window.MAIRImaging={version:'mair-imaging-v1',beforeBreak,preview:()=>sonicLogo(true),shouldPlay,status};
+function status(){return{version:'mair-imaging-v1.1-diagnostics-only',enabled:enabled(),plays,lastAt,lastPhase,error:lastError}}
+window.MAIRImaging={version:'mair-imaging-v1.1-diagnostics-only',beforeBreak,preview:()=>sonicLogo(true),shouldPlay,status};
 })();
