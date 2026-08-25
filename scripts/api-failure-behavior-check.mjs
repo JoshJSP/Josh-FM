@@ -53,9 +53,9 @@ try{
   res=await call(writer,{method:'POST',body:{currentTrack:{name:'Test',artists:['Artiest']}}});
   assert.equal(res.statusCode,429);assert.equal(res.body.error,'rate limited');
 
-  process.env.GROQ_DJ_MODEL='llama-3.3-70b-versatile';calls=[];
-  globalThis.fetch=async(url,opt)=>{calls.push(JSON.parse(opt.body).model);return calls.length===1?{ok:false,status:400,json:async()=>({error:{message:'model unavailable'}})}:{ok:true,status:200,json:async()=>({choices:[{message:{content:'Dit is betrouwbare Nederlandse radiotekst.'}}]})}};
-  res=await call(writer,{method:'POST',body:{}});assert.equal(res.statusCode,200);assert.deepEqual(calls,['llama-3.3-70b-versatile','openai/gpt-oss-120b']);assert.equal(res.body.model,'openai/gpt-oss-120b');assert.equal(res.body.attempts.length,1);
+  process.env.GROQ_DJ_MODEL='llama-3.3-70b-versatile';calls=[];let writerBodies=[];
+  globalThis.fetch=async(url,opt)=>{const body=JSON.parse(opt.body);writerBodies.push(body);calls.push(body.model);return calls.length===1?{ok:false,status:400,json:async()=>({error:{message:'model unavailable'}})}:{ok:true,status:200,json:async()=>({choices:[{message:{content:'Dit is betrouwbare Nederlandse radiotekst.'}}]})}};
+  res=await call(writer,{method:'POST',body:{}});assert.equal(res.statusCode,200);assert.deepEqual(calls,['llama-3.3-70b-versatile','openai/gpt-oss-120b']);assert.equal(res.body.model,'openai/gpt-oss-120b');assert.equal(res.body.attempts.length,1);assert.equal(writerBodies[1].max_completion_tokens,700);assert.equal(writerBodies[1].reasoning_effort,'low');assert.equal(writerBodies[1].include_reasoning,false);assert.equal('max_tokens'in writerBodies[1],false);
 
   globalThis.fetch=async()=>({ok:true,status:200,json:async()=>({choices:[{message:{content:'   '}}]})});
   res=await call(writer,{method:'POST',body:{}});assert.equal(res.statusCode,502);assert.match(res.body.error,/geen DJ-tekst/);assert.equal(res.body.attempts.length,3);
