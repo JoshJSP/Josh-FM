@@ -2,7 +2,7 @@
 (()=>{
   'use strict';
   if(window.__jfmQueueCoreInstalled)return;window.__jfmQueueCoreInstalled=true;
-  const TRACK_URI=/^spotify:track:[A-Za-z0-9]{22}$/,MAX_CONTEXT=30;
+  const TRACK_URI=/^spotify:track:[A-Za-z0-9]{22}$/,MAX_CONTEXT=30,ACTIVE_KEY='jfm_active_queue_v1';
   let revision=0,source='boot',station='',lastReason='',lastError='',buildTail=Promise.resolve(),transportTail=Promise.resolve(),building=0,transporting=0;
   const events=[];
   const trace=(stage,detail={})=>{events.unshift({at:Date.now(),stage,...detail});if(events.length>120)events.length=120};
@@ -17,11 +17,13 @@
     return out
   }
   function current(){try{return normalize(Array.isArray(queue)?queue:[])}catch{return[]}}
+  function loadActive(){try{const x=JSON.parse(sessionStorage.getItem(ACTIVE_KEY)||'{}');if(Date.now()-Number(x.at||0)>6*60*60*1000||x.station!==(localStorage.getItem('jfm_music_channel_v1')||'mix'))return[];return normalize(x.tracks)}catch{return[]}}
+  function persistActive(list,stationId=station){try{sessionStorage.setItem(ACTIVE_KEY,JSON.stringify({at:Date.now(),station:stationId||localStorage.getItem('jfm_music_channel_v1')||'mix',tracks:normalize(list).slice(0,60)}))}catch{}}
   function emit(reason){try{window.dispatchEvent(new CustomEvent('jfm:queue-change',{detail:{revision,reason,station,tracks:current().length}}))}catch{}}
   function commit(list,meta={}){
     const next=normalize(list);if(!next.length)throw Error('De radioset bevat geen geldige Spotify-tracks.');
     queue=next;revision++;source=String(meta.source||source||'unknown');station=String(meta.station||localStorage.getItem('jfm_music_channel_v1')||'mix');lastReason=String(meta.reason||'commit');lastError='';
-    try{window.__jfmStationQueueSig=''}catch{};trace('commit',{revision,source,station,reason:lastReason,tracks:next.length});emit(lastReason);return next
+    persistActive(next,station);try{window.__jfmStationQueueSig=''}catch{};trace('commit',{revision,source,station,reason:lastReason,tracks:next.length});emit(lastReason);return next
   }
   function serialize(kind,work){
     const isTransport=kind==='transport',previous=isTransport?transportTail:buildTail;
@@ -58,7 +60,7 @@
       try{window.JFMSpotifyUpcomingTruth?.sync?.(true)}catch{};return true
     })
   }
-  function state(){return{version:'queue-core-v1',revision,source,station,lastReason,lastError,tracks:current().length,building:building>0,transporting:transporting>0,events:events.length}}
-  window.JFMQueue={version:'queue-core-v1-single-truth',valid,normalize,current,commit,build,buildActive,programNext,authoredAfter,state,log:()=>[...events]};
-  try{if(Array.isArray(queue)&&queue.length)commit(queue,{source:'bootstrap',station:localStorage.getItem('jfm_music_channel_v1')||'mix',reason:'core-bootstrap'})}catch(e){lastError=String(e?.message||e);trace('bootstrap-error',{error:lastError})}
+  function state(){return{version:'queue-core-v2',revision,source,station,lastReason,lastError,tracks:current().length,building:building>0,transporting:transporting>0,events:events.length}}
+  window.JFMQueue={version:'queue-core-v2-reload-persisted',valid,normalize,current,commit,build,buildActive,programNext,authoredAfter,state,log:()=>[...events]};
+  try{if((!Array.isArray(queue)||!queue.length)){const restored=loadActive();if(restored.length)queue=restored}if(Array.isArray(queue)&&queue.length)commit(queue,{source:'bootstrap',station:localStorage.getItem('jfm_music_channel_v1')||'mix',reason:'core-bootstrap'})}catch(e){lastError=String(e?.message||e);trace('bootstrap-error',{error:lastError})}
 })();

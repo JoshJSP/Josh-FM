@@ -3,7 +3,9 @@
   if(window.__jfmPlaybackPrimaryInstalled)return;window.__jfmPlaybackPrimaryInstalled=true;
   const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
   const DEVICE_KEY='jfm_spotify_device_id';
-  let bound=false,busy=false,lastError='',recoveries=0,failures=0,deviceHandovers=0,endGuardBusy=false,lastNaturalEnd='',recoveryFailures=0,recoveryCooldownUntil=0,startPending=false;
+  const TRUTH_KEY='jfm_playback_truth_v1',TRACK_URI=/^spotify:track:[A-Za-z0-9]{22}$/;
+  function readReloadIntent(){try{const x=JSON.parse(sessionStorage.getItem(TRUTH_KEY)||'{}'),age=Date.now()-Number(x.updatedAt||0);if(x.expectedLive&&TRACK_URI.test(String(x.uri||''))&&age>=0&&age<5*60*1000)return{uri:String(x.uri),trackId:String(x.trackId||''),progressMs:Math.max(0,Number(x.progressMs||0)),durationMs:Math.max(0,Number(x.durationMs||0)),deviceId:String(x.deviceId||''),updatedAt:Number(x.updatedAt||0)}}catch{}return null}
+  let reloadIntent=readReloadIntent(),bound=false,busy=false,lastError='',recoveries=0,failures=0,deviceHandovers=0,reloadRestores=0,endGuardBusy=false,lastNaturalEnd='',recoveryFailures=0,recoveryCooldownUntil=0,startPending=false;
   const info=(text,bad=false)=>{const q=$('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}};
   const player=()=>{const p=window.jfmSpotifyPlayer;return p&&typeof p.getCurrentState==='function'?p:null};
   const sdkDeviceId=()=>String(window.JFMSpotifySDK?.deviceId||'').trim();
@@ -24,6 +26,13 @@
   }
   async function transfer(id,play){await api('/me/player',{method:'PUT',body:{device_ids:[id],play:!!play}});await wait(220);return remote()}
   async function ensureActive({preserve=true}={}){const p=await ensurePlayer(),id=await freshDevice();let s=await remote();if(s?.device?.id!==id){s=await transfer(id,preserve&&!!s?.is_playing);deviceHandovers++}return{p,id,state:s}}
+  async function restoreReloadPlayback(){
+    const intent=reloadIntent;if(!intent)return null;const p=await ensurePlayer(),id=await freshDevice();let s=await remote(),elapsed=Math.max(0,Date.now()-intent.updatedAt),remaining=intent.durationMs?Math.max(0,intent.durationMs-intent.progressMs):Infinity,naturalAdvanceDue=remaining<=elapsed+3000;
+    if(s?.is_playing&&(s.item?.uri===intent.uri||naturalAdvanceDue)){if(s.device?.id!==id){s=await transfer(id,true);deviceHandovers++}reloadIntent=null;return{p,id,state:s}}
+    if(s?.device?.id!==id){await transfer(id,false);deviceHandovers++}
+    const uris=stationContext(intent.uri);await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris:uris.length?uris:[intent.uri],position_ms:Math.min(Math.max(0,intent.progressMs+elapsed),Math.max(0,(intent.durationMs||Infinity)-1500))}});
+    s=await verify(x=>x.device?.id===id&&x.is_playing&&x.item?.uri===intent.uri,10);if(!s)throw Error('Spotify bevestigde de track na vernieuwen niet.');await nudgeSdkPlayback();reloadRestores++;reloadIntent=null;return{p,id,state:s}
+  }
   async function verify(predicate,tries=10){for(let i=0;i<tries;i++){await wait(140+i*45);const s=await remote();if(s&&predicate(s))return s}return null}
   async function verifySdk(predicate,tries=8){const p=player();if(!p)return null;for(let i=0;i<tries;i++){try{const s=await p.getCurrentState();if(s&&predicate(s))return s}catch{}await wait(45+i*25)}return null}
   async function nudgeSdkPlayback(){if(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,4))return true;try{await player()?.resume?.()}catch{}return!!(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,6))}
@@ -170,7 +179,7 @@
   }
 
   async function playUri(uri){activateNow();if(!uri)return resume();return withBusy(async()=>{try{const{id}=await ensureActive();await playContextDirect(uri,id,'primary-uri');recoveryFailures=0;recoveryCooldownUntil=0;return true}catch(e){return rememberError(e,'Track starten mislukt: ')}})}
-  async function recover(reason='watchdog'){if(backgrounded())return false;if(Date.now()<recoveryCooldownUntil||busy||endGuardBusy||djOwnsTransport())return false;const t=truth()?.get?.();if(!t?.expectedLive)return false;if(truth()?.shouldRecover&&!truth().shouldRecover())return !!t.isPlaying;try{const{state:s}=await ensureActive({preserve:true});if(djOwnsTransport())return false;if(s?.is_playing){ingest(s,'primary-recovery-already');recoveryFailures=0;recoveryCooldownUntil=0;return true}if(djOwnsTransport())return false;const ok=await resume();if(ok){recoveryFailures=0;recoveryCooldownUntil=0;recoveries++;info('Spotify-verbinding hersteld.')}return ok}catch(e){recoveryFailures++;if(recoveryFailures>=3){recoveryCooldownUntil=Date.now()+30000;recoveryFailures=0;info('Spotify-herstel wacht 30 seconden na meerdere fouten.',true)}return rememberError(e,'Playback-herstel mislukt: ')}}
+  async function recover(reason='watchdog'){if(backgrounded())return false;if(Date.now()<recoveryCooldownUntil||busy||endGuardBusy||djOwnsTransport())return false;const t=truth()?.get?.();if(!t?.expectedLive)return false;const reloadPending=!!reloadIntent;if(!reloadPending&&truth()?.shouldRecover&&!truth().shouldRecover())return !!t.isPlaying;try{const{state:s}=reloadPending?await restoreReloadPlayback():await ensureActive({preserve:true});if(djOwnsTransport())return false;if(s?.is_playing){ingest(s,reloadPending?'primary-reload-restored':'primary-recovery-already');recoveryFailures=0;recoveryCooldownUntil=0;return true}if(djOwnsTransport())return false;const ok=await resume();if(ok){recoveryFailures=0;recoveryCooldownUntil=0;recoveries++;info('Spotify-verbinding hersteld.')}return ok}catch(e){recoveryFailures++;if(recoveryFailures>=3){recoveryCooldownUntil=Date.now()+30000;recoveryFailures=0;info('Spotify-herstel wacht 30 seconden na meerdere fouten.',true)}return rememberError(e,'Playback-herstel mislukt: ')}}
 
   function actionFor(id){return id==='start'?start:id==='play'?playPause:id==='next'?()=>skip(1):id==='prev'?()=>skip(-1):null}
   function controlsOwned(){return['start','play','next','prev'].every(id=>$(id)?.dataset?.jfmOwner==='primary')}
@@ -181,6 +190,6 @@
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
   window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),450)});setInterval(()=>recover('watchdog'),12000);
 
-  window.JFMPlayback={primary:true,version:'primary-v10-reload-device-handover',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now())}}};
+  window.JFMPlayback={primary:true,version:'primary-v11-reload-exact-resume',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now())}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
 })();
