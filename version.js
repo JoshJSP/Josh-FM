@@ -15,6 +15,7 @@ window.JFM_ASSET_VERSION='77';
     addSyncScript('mair-foundation-js','./mair-foundation.js');
     addSyncScript('mair-dj-profile-polish-js','./mair-dj-profile-polish.js');
     addSyncScript('mair-dj-memory-js','./mair-dj-memory.js');
+    addSyncScript('mair-dj-break-owed-guard-js','./mair-dj-break-owed-guard.js');
     addSyncScript('mair-imaging-js','./mair-imaging.js');
     addSyncScript('mair-live-news-js','./mair-live-news.js');
     addSyncScript('mair-radio-home-js','./mair-radio-home.js');
