@@ -11,12 +11,12 @@ function playback(){return window.JFMPlaybackState?.get?.()||null}
 function track(){const p=playback()||{};return{trackId:String(p.trackId||''),uri:String(p.uri||''),title:String($('title')?.textContent||'MAIR'),artist:String($('artist')?.textContent||'')}}
 function remainingMs(){return state?.mode==='time'?Math.max(0,Number(state.at||0)-Date.now()):0}
 function fmt(ms){const total=Math.max(0,Math.ceil(ms/1000)),m=Math.floor(total/60),s=total%60;return`${m}:${String(s).padStart(2,'0')}`}
-function status(){return{version:'mair-sleep-v1.1',active:!!state,mode:state?.mode||'',endsAt:state?.mode==='time'?Number(state.at||0):0,remainingMs:remainingMs(),trackId:state?.trackId||'',open,lastError,lastStoppedAt}}
+function status(){return{version:'mair-sleep-v1.2',active:!!state,mode:state?.mode||'',endsAt:state?.mode==='time'?Number(state.at||0):0,remainingMs:remainingMs(),trackId:state?.trackId||'',open,lastError,lastStoppedAt}}
 function emit(){try{window.dispatchEvent(new CustomEvent('mair:sleep',{detail:status()}))}catch{}}
 async function stopRadio(reason='sleep-timer'){
-  if(stopBusy)return false;stopBusy=true;lastError='';const truth=window.JFMPlaybackState,before=truth?.get?.();
+  if(stopBusy)return false;stopBusy=true;lastError='';const truth=window.JFMPlaybackState,before=truth?.get?.();let op=0;
   try{
-    try{truth?.setExpectedLive?.(false,reason)}catch{}
+    try{op=truth?.begin?.('pause',{expectedUri:String(before?.uri||''),timeoutMs:10000})||0;truth?.setExpectedLive?.(false,reason)}catch{}
     const pause=window.JFMPlayback?.pause;
     if(typeof pause!=='function')throw Error('MAIR playback-controller is nog niet beschikbaar');
     const ok=await pause();if(!ok)throw Error(window.JFMPlayback?.health?.lastError||'Spotify kon niet worden gepauzeerd');
@@ -24,7 +24,7 @@ async function stopRadio(reason='sleep-timer'){
     try{window.dispatchEvent(new CustomEvent('mair:sleep-complete',{detail:{reason,at:lastStoppedAt}}))}catch{}
     return true
   }catch(e){if(before?.expectedLive)try{truth?.setExpectedLive?.(true,'sleep-pause-failed')}catch{};lastError=String(e?.message||e||'Sleep timer kon MAIR niet pauzeren');emit();render();return false}
-  finally{stopBusy=false}
+  finally{try{if(op)truth?.end?.(op,{error:lastError})}catch{};stopBusy=false}
 }
 function scheduleMinutes(minutes){const n=Math.max(1,Math.min(240,Number(minutes)||0));lastError='';save({mode:'time',at:Date.now()+n*60000,minutes:n,createdAt:Date.now()});ensureTick();return status()}
 function scheduleAfterTrack(){const t=track();if(!t.trackId){lastError='Start eerst een nummer voordat je “na dit nummer” gebruikt.';emit();render();return false}lastError='';save({mode:'after-track',trackId:t.trackId,createdAt:Date.now(),title:t.title,artist:t.artist});ensureTick();return true}
@@ -42,5 +42,5 @@ function setOpen(v){ensureUI();open=!!v;const o=$('mairSleepOverlay');if(o)o.hid
 function onNatural(detail={}){if(state?.mode!=='after-track')return;const ended=String(detail.trackId||detail.endedTrackId||'');if(ended&&ended===String(state.trackId||''))stopRadio('after-track').catch(()=>{})}
 function boot(){ensureUI();ensureTick();render();window.addEventListener('jfm:natural-track-end',e=>onNatural(e.detail||{}));window.addEventListener('jfm:natural-next-ready',e=>onNatural(e.detail||{}));window.addEventListener('jfm:trackchange',render);window.addEventListener('mair:channelchange',render);window.addEventListener('pageshow',()=>{state=read();render()});setInterval(()=>{if(open||state)render()},1000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-window.MAIRSleep={version:'mair-sleep-v1.1',open:()=>setOpen(true),close:()=>setOpen(false),scheduleMinutes,scheduleAfterTrack,cancel,status,stop:stopRadio,activateSleepStation};
+window.MAIRSleep={version:'mair-sleep-v1.2',open:()=>setOpen(true),close:()=>setOpen(false),scheduleMinutes,scheduleAfterTrack,cancel,status,stop:stopRadio,activateSleepStation};
 })();
