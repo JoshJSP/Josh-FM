@@ -16,7 +16,7 @@ export default async function handler(req,res){
   const attempts=[];
   for(const model of models){
     try{
-      const r=await timedFetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:user}],temperature:.78,max_tokens:220,top_p:.9})},5000);
+      const r=await timedFetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:user}],temperature:.72,max_completion_tokens:700,top_p:.9,reasoning_effort:'low',include_reasoning:false})},7000);
       const d=await r.json().catch(()=>({}));
       if(!r.ok){const error=safe(d?.error?.message||`Groq HTTP ${r.status}`,500);attempts.push({model,status:r.status,error});if([401,403,429].includes(r.status))break;continue}
       let text=String(d?.choices?.[0]?.message?.content||'').replace(/\s+/g,' ').replace(/^['"“”]+|['"“”]+$/g,'').trim();
