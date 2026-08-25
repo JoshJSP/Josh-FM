@@ -1,24 +1,24 @@
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const ui=read('mair-ui-hardening.js'),policy=read('mair-station-policy.js'),controller=read('channel-click-fix.js'),pwa=read('mair-pwa-polish.js'),sw=read('sw.js'),tts=read('api/tts.js'),background=read('mair-background-guard.js'),primary=read('playback-primary.js'),dj=read('mair-dj-v2.js'),voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js'),reloadGuard=read('mair-reload-audibility.js'),profilePolish=read('mair-dj-profile-polish.js');
-for(const id of ['hits','top40','new','nl','party','chill','summer','throwback','00s','10s','mix'])if(!ui.includes(`'${id}'`))throw Error('Station ontbreekt in UI-hardening: '+id);
+for(const id of ['hits','top40','new','nl','party','chill','sleep','summer','throwback','00s','10s','mix'])if(!ui.includes(`'${id}'`))throw Error('Station ontbreekt in UI-hardening: '+id);
 if(/Today's biggest hits|The songs you love|Relax & unwind|Energy\. Dance\. Repeat\.|Find your next favorite|Your radio\. Your way\./.test(ui))throw Error('Engelse stationtekst teruggevonden');
 if(!ui.includes(".mair-personal-row>strong,.mair-station-card>strong"))throw Error('Pijl-opruiming ontbreekt');
 if(/new\s+MutationObserver\s*\(\s*\(\)\s*=>\s*sync\s*\(\s*\)\s*\)/.test(ui))throw Error('UI-hardening mag geen zelf-triggerende MutationObserver sync-loop bevatten');
 if(/\.mair-station-card\.loading\{[^}]*pointer-events\s*:\s*none/.test(pwa))throw Error('Station loading-state mag taps niet blokkeren');
 if(!ui.includes("setTimeout(()=>{b.classList.remove('loading');sync()},4000)"))throw Error('Station loading-state moet snel herstellen naar de werkelijk actieve categorie');
-for(const id of ['nl','party','chill','summer'])if(!policy.includes(`${id}:{label:`)&&!policy.includes(`'${id}':{label:`))throw Error('Station policy ontbreekt: '+id);
+for(const id of ['nl','party','chill','sleep','summer'])if(!policy.includes(`${id}:{label:`)&&!policy.includes(`'${id}':{label:`))throw Error('Station policy ontbreekt: '+id);
 if(!policy.includes("language:'nl'")||!policy.includes('minConfidence:.95'))throw Error('Nederlandstalig policy moet streng semantisch blijven');
 if(!controller.includes('semanticQualityFilter')||!controller.includes("boundedFetch('/api/category-filter'")||!controller.includes('policy()?.confidence?.(id)'))throw Error('Semantische stationkwaliteitscontrole ontbreekt');
 if(!controller.includes('if(!c||switching)return false')||!controller.includes('queue=previousQueue'))throw Error('Stationwissel moet race- en rollback-safe blijven');
 if(!controller.includes("if(active!=='mix'&&Array.isArray(queue)&&queue.length)return queue"))throw Error('Actief station moet beschermd zijn tegen achtergrond rebuilds');
-const runtimeAssets=['mair-station-policy.js','mair-ui-hardening.js','mair-user-controls.js','mair-dj-visuals.js','mair-runtime-core.js','mair-reload-audibility.js','mair-dj-profile-polish.js'];
+const runtimeAssets=['mair-station-policy.js','mair-ui-hardening.js','mair-user-controls.js','mair-dj-visuals.js','mair-runtime-core.js','mair-reload-audibility.js','mair-dj-profile-polish.js','mair-sleep.js','spotify-api-budget.js','spotify-upcoming-truth.js'];
 for(const file of runtimeAssets){
- if(!pwa.includes(file)&&!['mair-reload-audibility.js','mair-dj-profile-polish.js'].includes(file))throw Error('Actuele MAIR runtime asset wordt niet geladen: '+file);
+ if(!pwa.includes(file)&&!['mair-reload-audibility.js','mair-dj-profile-polish.js','mair-sleep.js','spotify-api-budget.js','spotify-upcoming-truth.js'].includes(file))throw Error('Actuele MAIR runtime asset wordt niet geladen: '+file);
  if(!sw.includes(`./${file}`))throw Error('Actuele MAIR runtime asset ontbreekt in PWA CORE-cache: '+file);
 }
 if(!sw.includes("'./channel-click-fix.js'"))throw Error('Autoritatieve stationcontroller ontbreekt in PWA CORE-cache');
-if(!/const CACHE='mair-v90-radio-experience-20260825'/.test(sw))throw Error('PWA cacheversie klopt niet met MAIR radio experience release');
+if(!/const CACHE='mair-v91-sleep-radio-20260825'/.test(sw))throw Error('PWA cacheversie klopt niet met MAIR Sleep release');
 if(!sw.includes("'./mair-background-guard.js'"))throw Error('Background guard ontbreekt in PWA CORE-cache');
 if(!background.includes("recover?.('foreground-return')")||!primary.includes('if(backgrounded())return false'))throw Error('Foreground-only background recovery guard ontbreekt');
 if(!reloadGuard.includes('verifyLocal')||!reloadGuard.includes('await p.resume()'))throw Error('Reload guard verifieert lokale Web Playback SDK niet');
