@@ -35,6 +35,7 @@ assert.match(sequencer,/mair-radio-sequencer-v1/);assert.match(sequencer,/new Se
 
 assert.match(diagnostics,/moveCard\('mairTraceCard','CENTRALE RUNTIME STATUS'\)/);assert.match(diagnostics,/moveCard\('mairTestLabCard','MAIR TEST LAB'\)/);assert.match(diagnostics,/moveCard\('mairVoiceCheckCard','COMPLETE VOICE CHECK'\)/);assert.match(testLab,/RADIO BRAIN/);assert.match(testLab,/FULL STATION TEST/i);
 assert.match(version,/function scriptLoaded\(src\)/);assert.match(version,/document\.getElementById\(id\)\|\|scriptLoaded\(src\)/);assert.match(build7,/function scriptLoaded\(src\)/);assert.match(build7,/document\.getElementById\(id\)\|\|scriptLoaded\(src\)/);
+assert.doesNotMatch(version,/addSyncScript\('mair-foundation-js'/);assert.doesNotMatch(version,/addSyncScript\('mair-radio-home-js'/);
 
 assert.match(budget,/POLL_MS=30000/);assert.match(budget,/api-budget-v2-rate-limit-aware/);assert.match(budget,/cooldownUntil/);assert.match(budget,/match\(\/over\\s\+\(\\d\+\)\\s\*sec\/i\)/);
 assert.match(upcoming,/WATCHDOG_MS=15000/);assert.match(upcoming,/FORCE_DEDUPE_MS=1200/);assert.match(upcoming,/v2-single-authoritative-owner-rate-limit-aware/);assert.doesNotMatch(upcoming,/setInterval\(\(\)=>sync\(false\),1600\)/,'Spotify queue truth may not poll every 1.6 seconds');
