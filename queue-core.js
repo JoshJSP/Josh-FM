@@ -56,11 +56,13 @@
       await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:position}});
       const remote=await api('/me/player/queue'),next=(remote?.queue||[]).find(t=>t?.uri!==currentUri);
       if(next?.uri!==track.uri)throw Error('Spotify bevestigde het request niet als eerstvolgende track.');
+      window.MAIRTransitionController?.mark?.('REQUEST',{fromTrackId:String(state.item.id||''),expectedTrackId:String(track.id||track.uri.split(':').pop()||''),source:reason,ttlMs:10*60*1000});
       trace('program-next',{reason,uri:track.uri,currentUri,position,context:uris.length});
       try{window.JFMSpotifyUpcomingTruth?.sync?.(true)}catch{};return true
     })
   }
   function state(){return{version:'queue-core-v2',revision,source,station,lastReason,lastError,tracks:current().length,building:building>0,transporting:transporting>0,events:events.length}}
   window.JFMQueue={version:'queue-core-v2-reload-persisted',valid,normalize,current,commit,build,buildActive,programNext,authoredAfter,state,log:()=>[...events]};
+  window.MAIRRuntime?.register?.('queue-core',{version:'queue-core-v2-reload-persisted',owner:'authored-queue'});
   try{if((!Array.isArray(queue)||!queue.length)){const restored=loadActive();if(restored.length)queue=restored}if(Array.isArray(queue)&&queue.length)commit(queue,{source:'bootstrap',station:localStorage.getItem('jfm_music_channel_v1')||'mix',reason:'core-bootstrap'})}catch(e){lastError=String(e?.message||e);trace('bootstrap-error',{error:lastError})}
 })();

@@ -5,7 +5,8 @@
   if(window.__jfmStabilityCoreInstalled)return;window.__jfmStabilityCoreInstalled=true;
   const $=id=>document.getElementById(id);
   const PKCE_V='jfm_pkce_verifier_v2',PKCE_S='jfm_pkce_state_v2',STREAM='jfm_streaming_ready_v2',DEVICE='jfm_spotify_device_id';
-  let player=null,deviceId='',initPromise=null,lastEndSignal='',reconnectPromise=null,playbackErrorTimer=null;
+  let player=null,deviceId='',initPromise=null,lastEndSignal='',lastObserved=null,reconnectPromise=null,playbackErrorTimer=null;
+  function signalNatural(track){if(!track?.id)return false;const sig=`${track.id}:${Math.floor(Number(track.durationMs||0)/1000)}`;if(lastEndSignal===sig)return false;lastEndSignal=sig;try{window.dispatchEvent(new CustomEvent('jfm:natural-track-end',{detail:{trackId:track.id,uri:track.uri||'',durationMs:Number(track.durationMs||0),positionMs:Number(track.positionMs||0),source:track.source||'sdk'}}))}catch{}return true}
   function message(text,bad=false){const el=$('queueInfo');if(el){el.textContent=text;el.style.color=bad?'#ffb4b4':''}}
   function setStatus(ok,text){const s=$('status');if(s){s.classList.toggle('on',ok);s.classList.toggle('off',!ok);s.textContent=text||(ok?'gekoppeld':'offline')}}
   function enable(ok){['start','play','prev','next','djNow','skipTalk','searchBtn','rebuild'].forEach(id=>{const e=$(id);if(e)e.disabled=!ok})}
@@ -31,12 +32,14 @@
         player.addListener('playback_error',({message:m})=>{clearTimeout(playbackErrorTimer);playbackErrorTimer=setTimeout(()=>{playbackErrorTimer=null;const state=window.JFMPlaybackState?.get?.();if(state?.isPlaying&&Date.now()-Number(state.updatedAt||0)<4000){message('MAIR speelt.');return}message('Spotify-afspeelfout: '+m,true)},700)});
         player.addListener('player_state_changed',state=>{
           if(!state)return;const t=state.track_window?.current_track;
-          if(!t){try{window.JFMPlaybackState?.ingest?.({item:null,is_playing:false,progress_ms:0,device:{id:deviceId,name:'Josh FM'}},'sdk-empty')}catch{};return}
+          if(!t){try{window.JFMPlaybackState?.ingest?.({item:null,is_playing:false,progress_ms:0,device:{id:deviceId,name:'Josh FM'}},'sdk-empty')}catch{};lastObserved=null;return}
+          if(lastObserved?.id&&lastObserved.id!==t.id&&lastObserved.durationMs>0&&lastObserved.positionMs>=Math.max(0,lastObserved.durationMs-2500))signalNatural({...lastObserved,source:'sdk-track-advance'});
           const fake={item:{id:t.id,uri:t.uri,name:t.name,duration_ms:t.duration_ms,artists:(t.artists||[]).map(a=>({name:a.name})),album:{name:t.album?.name||'',images:t.album?.images||[]},external_urls:{spotify:t.id?`https://open.spotify.com/track/${t.id}`:''}},progress_ms:state.position,is_playing:!state.paused,device:{id:deviceId,name:'Josh FM'}};
           playback=fake;try{renderPlayback(fake)}catch{};try{window.JFMPlaybackState?.ingest?.(fake,'sdk')}catch{};if(!state.paused&&playbackErrorTimer){clearTimeout(playbackErrorTimer);playbackErrorTimer=null;message('MAIR speelt.')}
           const duration=Number(t.duration_ms||0),position=Number(state.position||0),nearEnd=duration>0&&position>=Math.max(0,duration-1300);
-          if(state.paused&&nearEnd){const sig=`${t.id}:${Math.floor(duration/1000)}`;if(lastEndSignal!==sig){lastEndSignal=sig;try{window.dispatchEvent(new CustomEvent('jfm:natural-track-end',{detail:{trackId:t.id,uri:t.uri,durationMs:duration,positionMs:position}}))}catch{}}}
+          if(state.paused&&nearEnd)signalNatural({id:t.id,uri:t.uri,durationMs:duration,positionMs:position,source:'sdk-paused-end'});
           else if(!state.paused)lastEndSignal=''
+          lastObserved={id:t.id,uri:t.uri,durationMs:duration,positionMs:position,paused:!!state.paused}
         })
       });
       ready.catch(()=>{});
@@ -56,4 +59,5 @@
   async function reconcile(){try{await repairCallback();const t=await ensure();if(!t){rememberDevice('');setStatus(false,'offline');enable(false);if($('connect'))$('connect').disabled=false;message('Koppel Spotify om Josh FM te starten.');return}if(localStorage.getItem('jfm_auth_requested_streaming')==='1'){localStorage.setItem(STREAM,'1');localStorage.removeItem('jfm_auth_requested_streaming');clearPKCE()}try{setConnected(true)}catch{enable(true);setStatus(true,'gekoppeld')}message('Spotify gekoppeld · speler wordt voorbereid…');await initPlayer()}catch(e){rememberDevice('');setStatus(false,'offline');enable(false);if($('connect'))$('connect').disabled=false;message(e.message||String(e),true)}}
   ownConnectButton();setTimeout(reconcile,350);window.addEventListener('pageshow',()=>{ownConnectButton();setTimeout(reconcile,250)});
   window.JFMSpotifySDK={version:'sdk-core-v6-single-owner-timeouts',init:initPlayer,reconnect,isAvailable,ensureDevice,transfer,playUris,get player(){return player},get deviceId(){return deviceId},get health(){return{installed:true,hasPlayer:!!player,deviceId,initializing:!!initPromise,reconnecting:!!reconnectPromise}}};
+  window.MAIRRuntime?.register?.('spotify-sdk-core',{version:'sdk-core-v6-single-owner-timeouts',owner:'spotify-sdk'});
 })();

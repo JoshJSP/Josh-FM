@@ -1,10 +1,11 @@
 // Josh FM playback truth — one state/operation layer shared by playback, recovery and UI.
 (()=>{
+  if(window.JFMPlaybackState?.version)return;
   const KEY='jfm_playback_truth_v1';
   const listeners=new Set();
   const now=()=>Date.now();
   const empty=()=>({
-    revision:0,updatedAt:0,source:'boot',trackId:'',uri:'',progressMs:0,durationMs:0,
+    revision:0,sequence:0,updatedAt:0,source:'boot',trackId:'',uri:'',progressMs:0,durationMs:0,
     isPlaying:false,deviceId:'',deviceName:'',expectedLive:false,intent:'idle',
     operation:null,lastGoodAt:0,lastError:'',lastTransitionAt:0
   });
@@ -15,10 +16,10 @@
 
   function load(){try{return JSON.parse(sessionStorage.getItem(KEY)||'{}')}catch{return{}}}
   function persist(){try{sessionStorage.setItem(KEY,JSON.stringify(state))}catch{}}
-  function emit(reason='update'){
+  function emit(reason='update',previous=null){
     const snapshot=get();
     for(const fn of listeners){try{fn(snapshot,reason)}catch{}}
-    try{window.dispatchEvent(new CustomEvent('jfm:playback-state',{detail:{state:snapshot,reason}}))}catch{}
+    try{window.dispatchEvent(new CustomEvent('jfm:playback-state',{detail:{state:snapshot,previous:previous?{...previous}:null,reason,sequence:snapshot.sequence}}))}catch{}
   }
   function get(){return{...state,operation:state.operation?{...state.operation}:null}}
   function normalize(remote={}){
@@ -41,10 +42,11 @@
   }
   function ingest(remote,source='spotify'){
     if(!remote)return get();
+    const previous=get();
     const previousTrack=state.trackId;
     const next=normalize(remote);
     const changedTrack=next.trackId!==previousTrack&&(!!next.trackId||!!previousTrack);
-    state={...state,...next,source,updatedAt:now(),revision:state.revision+1,lastError:''};
+    state={...state,...next,source,updatedAt:now(),revision:state.revision+1,sequence:Number(state.sequence||0)+1,lastError:''};
     if(next.isPlaying)state.lastGoodAt=now();
     if(changedTrack)state.lastTransitionAt=now();
     if(state.operation&&['next','previous','play-track','start'].includes(state.operation.type)){
@@ -52,8 +54,8 @@
       if((expected&&next.trackId===expected)||(!expected&&changedTrack))state.operation=null;
     }
     try{playback=remote}catch{}
-    persist();emit(changedTrack?'track-change':'state');
-    if(changedTrack)try{window.dispatchEvent(new CustomEvent('jfm:trackchange',{detail:{trackId:next.trackId,previousTrackId:previousTrack,source}}))}catch{}
+    persist();emit(changedTrack?'track-change':'state',previous);
+    if(changedTrack)try{window.dispatchEvent(new CustomEvent('jfm:trackchange',{detail:{trackId:next.trackId,previousTrackId:previousTrack,source,sequence:state.sequence}}))}catch{}
     return get()
   }
   function patch(values={},reason='patch'){
@@ -90,6 +92,7 @@
   function reset(){state=empty();persist();emit('reset')}
 
   window.JFMPlaybackState={
-    version:'truth-v2-empty-state-safe',get,ingest,patch,setExpectedLive,begin,end,activeOperation,blocksRecovery,shouldRecover,error,subscribe,reset
+    version:'truth-v3-sequenced',get,ingest,patch,setExpectedLive,begin,end,activeOperation,blocksRecovery,shouldRecover,error,subscribe,reset
   };
+  window.MAIRRuntime?.register?.('playback-state',{version:'truth-v3-sequenced',owner:'playback-truth'});
 })();

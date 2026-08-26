@@ -11,18 +11,14 @@ const brandRuntime=read('brand-runtime-v9.js');
 const apiVersion=read('api/version.js');
 const primary=read('playback-primary.js');
 const background=read('mair-background-guard.js');
-const reloadGuard=read('mair-reload-audibility.js');
-const profiles=read('mair-dj-profile-polish.js');
 
 const checks=[
-  ['MAIR v92 hourly-news release cache active',sw.includes("mair-v92-hourly-news-20260826")&&apiVersion.includes("mair-v92-hourly-news-20260826")],
-  ['all Product Beta runtime cached',['radio-core-health-v1.js','dj-quality-v2.js','music-intelligence-v3.js','personal-learning-v4.js','product-model-v6.js','product-ux-v5.js','beta-status.js','brand-config.js','brand-runtime-v9.js','channel-start-guard-v2b01.js','dj-handoff-bootstrap-v2b02.js','ios-transport-v2b02.js','mair-category-search.js','mair-station-policy.js','channel-click-fix.js','mair-ui-hardening.js','mair-runtime-core.js','mair-dj-v2.js','mair-dj-schedule-sync.js','mair-voice-engine.js','mair-voice-check.js','mair-background-guard.js','mair-easy-use-v1.js','mair-reload-audibility.js','mair-dj-profile-polish.js','mair-dj-memory.js','mair-imaging.js','mair-live-news.js','mair-news-bulletin.js','mair-voice-lab.js','mair-soak-monitor.js','mair-station-director.js','mair-sleep.js','spotify-api-budget.js','spotify-upcoming-truth.js'].every(x=>sw.includes(`./${x}`))],
+  ['MAIR v95 reliability cache active',sw.includes("mair-v95-reliability-20260826")&&apiVersion.includes("mair-v95-reliability-20260826")],
+  ['all Product Beta runtime cached',['radio-core-health-v1.js','dj-quality-v2.js','music-intelligence-v3.js','personal-learning-v4.js','product-model-v6.js','product-ux-v5.js','beta-status.js','brand-config.js','brand-runtime-v9.js','channel-start-guard-v2b01.js','dj-handoff-bootstrap-v2b02.js','ios-transport-v2b02.js','mair-category-search.js','mair-station-policy.js','channel-click-fix.js','mair-ui-hardening.js','mair-runtime-core.js','mair-dj-v2.js','mair-dj-schedule-sync.js','mair-voice-engine.js','mair-voice-check.js','mair-background-guard.js','mair-easy-use-v1.js'].every(x=>sw.includes(`./${x}`))],
   ['network requests have timeout',sw.includes('AbortController')&&sw.includes('fetchTimed')],
   ['PWA update checks recover on foreground',pwa.includes("visibilitychange")&&pwa.includes('checkForUpdate')&&pwa.includes('pageshow')],
   ['single MediaSession owner remains',pwa.includes("setActionHandler('play'")||pwa.includes("bind('play'")],
-  ['background recovery is foreground-only',primary.includes('if(backgrounded())return false')&&background.includes("recover?.('foreground-return')")],
-  ['reload audibility verifies local SDK',reloadGuard.includes('verifyLocal')&&reloadGuard.includes('await p.seek(position)')&&reloadGuard.includes('await p.resume()')],
-  ['distinct DJ profiles are installed',profiles.includes('Hoofdpresentator')&&profiles.includes('Warme companion')&&profiles.includes('Drive- en partyhost')&&profiles.includes('Curator voor avond en late night')],
+  ['background recovery is foreground-only',primary.includes('if(backgrounded()||reloadNeedsGesture)return false')&&background.includes("recover?.('foreground-return')")],
   ['long-session health detects stalls',health.includes('playback-stall')&&health.includes('stalls++')&&health.includes('deviceFlaps')],
   ['beta readiness observes runtime health',beta.includes('JFMBetaStatus')&&beta.includes('failures<5')&&beta.includes('stalls<2')],
   ['beta readiness loaded at runtime',boot.includes("load('./beta-status.js','jfm-beta-status-v8')")],

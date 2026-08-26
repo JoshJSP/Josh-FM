@@ -1,0 +1,54 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+
+const source=fs.readFileSync(new URL('../mair-ux-state.js',import.meta.url),'utf8');
+const handlers=new Map(),elements=new Map();
+const on=(name,fn)=>handlers.set(name,[...(handlers.get(name)||[]),fn]);
+const dispatch=(name,detail={})=>(handlers.get(name)||[]).forEach(fn=>fn({type:name,detail}));
+const classes=new Set();
+elements.set('status',{classList:{contains:x=>classes.has(x)},textContent:''});
+elements.set('connect',{disabled:false});
+elements.set('title',{textContent:'Test Track'});
+elements.set('artImg',{src:'cover.jpg'});
+const document={readyState:'loading',body:{dataset:{}},getElementById:id=>elements.get(id)||null,addEventListener:on};
+const navigator={onLine:true};
+const window={addEventListener:on,dispatchEvent:()=>{},playback:null,JFMPlaybackState:{get:()=>window.__playback},JFMPlayback:{health:{}},MAIRDJ:{diagnostics:()=>window.__dj},MAIRStationPolicy:{label:id=>id==='mix'?'Your Mix':id},__playback:{},__dj:{phase:'COUNTING'}};
+const context={window,document,navigator,console,setTimeout:()=>0,clearTimeout:()=>{},CustomEvent:class{constructor(type,init){this.type=type;this.detail=init?.detail}},Date,Set,Number,String,Math};
+vm.runInNewContext(source,context,{filename:'mair-ux-state.js'});
+const state=()=>window.MAIRUXState.get();
+let checks=0;
+function ok(name,value){checks++;if(!value)throw new Error(`FAIL: ${name}`)}
+
+ok('fresh load is disconnected',state().appState==='DISCONNECTED');
+elements.get('connect').disabled=true;
+ok('connect request is pending',state().appState==='CONNECTING');
+classes.add('on');elements.get('connect').disabled=false;
+ok('connected without track is empty',state().appState==='EMPTY');
+window.__playback={trackId:'track-a',isPlaying:true,expectedLive:true,progressMs:1200,durationMs:200000};
+ok('playing truth is public',state().appState==='PLAYING'&&state().track.id==='track-a');
+window.__playback.isPlaying=false;
+ok('paused truth is public',state().appState==='PAUSED');
+window.__playback.operation={type:'next'};
+ok('next pending is explicit',state().playbackPendingAction==='next');
+window.__playback.operation={type:'previous'};
+ok('previous pending is explicit',state().playbackPendingAction==='previous');
+window.__playback.operation=null;
+for(const [phase,expected] of [['COUNTING','QUIET'],['PREPARING','PREPARING'],['ARMED','PREPARING'],['HANDOFF','PREPARING'],['SPEAKING','ON_AIR'],['RESTORING','RECOVERING'],['RECOVERING','RECOVERING']]){window.__dj={phase};ok(`DJ ${phase} maps to ${expected}`,state().djPublicState.state===expected)}
+window.__dj={phase:'COUNTING',skipNextBreak:true};
+ok('silent skip is not an error',state().djPublicState.state==='QUIET');
+navigator.onLine=false;
+ok('offline has user-facing recovery copy',state().appState==='OFFLINE'&&state().recoverableError?.diagnosticsCode==='NETWORK_OFFLINE');
+navigator.onLine=true;window.JFMPlayback.health={reloadNeedsGesture:true};
+ok('reload gesture becomes one clear action',state().appState==='GESTURE_REQUIRED'&&state().recoverableError?.primaryAction==='resume');
+window.JFMPlayback.health={lastError:'Spotify Premium 403'};window.__playback.lastError='Spotify Premium 403';
+ok('premium error is translated',state().recoverableError?.diagnosticsCode==='SPOTIFY_PREMIUM');
+window.JFMPlayback.health={lastError:'geen actief device'};window.__playback.lastError='geen actief device';
+ok('device error is translated',state().recoverableError?.primaryAction==='device');
+dispatch('mair:user-error',{scope:'auth',error:'Spotify-configuratie ontbreekt.',at:Date.now()});
+ok('auth internals become a generic retry message',state().recoverableError?.diagnosticsCode==='SPOTIFY_CONNECT'&&!state().recoverableError?.message.includes('configuratie'));
+dispatch('mair:user-error',{scope:'auth',error:'expired',at:Date.now()-20000});
+dispatch('mair:channelchange',{loading:true});
+ok('station switch gets pending feedback',state().station.pending==='Station wisselen…');
+dispatch('mair:station-error',{error:'station network error'});
+ok('station failure preserves a recovery action',state().recoverableError?.primaryAction==='retry-station');
+console.log(`PASS UX state behavior: ${checks} checks`);

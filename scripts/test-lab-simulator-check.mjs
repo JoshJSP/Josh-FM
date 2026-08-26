@@ -1,0 +1,34 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+
+const files=['dj-memory.js','radio-brain.js','dj-context-builder.js','dj-quality-gate.js','mair-test-simulator.js'];
+const window={};const context={window,globalThis:window,Date,Math,Set,Map,Object,Array,String,Number,JSON};vm.createContext(context);
+for(const file of files)vm.runInContext(fs.readFileSync(new URL(`../${file}`,import.meta.url),'utf8'),context,{filename:file});
+const matrix=window.MAIRTestSimulator.runMatrix(),byName=Object.fromEntries(matrix.map(x=>[x.name,x]));
+assert.equal(matrix.length,21,'testmatrix moet alle vereiste adversarial scenario’s bevatten');
+assert.equal(byName.normal.transitionsProcessed,100,'normale simulatie moet exact 100 transitions uitvoeren');
+assert.ok(byName.normal.breaksScheduled>0&&byName.normal.breaksAired>0,'normale simulatie moet echte Radio Brain-breaks doorlopen');
+assert.equal(byName.normal.status,'PASS');
+for(const row of matrix){assert.notEqual(row.status,'FAIL',`${row.name} schond een invariant`);assert.equal(row.invariants.musicBlocked,false,`${row.name} blokkeerde muziek`);assert.equal(row.invariants.duplicateAirs,0,`${row.name} speelde dubbel`);assert.equal(row.invariants.staleAirs,0,`${row.name} speelde stale audio`);assert.equal(row.invariants.overlappingBreaks,0,`${row.name} overlapte breaks`);assert.equal(row.invariants.wrongTrackAirs,0,`${row.name} speelde de verkeerde break`)}
+assert.ok(byName['rapid-skips'].timeline.some(x=>x.stage==='rapid-skip'));
+assert.ok(byName['multi-click'].duplicateEventsDropped>0);
+assert.ok(byName['api-timeout'].apiTimeouts>0);
+assert.ok(byName['malformed-response'].malformedResponses>0&&byName['malformed-response'].regenerations>0);
+assert.ok(byName['tts-failure'].ttsFailures>0);
+assert.ok(byName['network-failure'].networkFailures>0);
+assert.ok(byName['stale-response'].staleResponsesDropped>0);
+assert.ok(byName['duplicate-event'].duplicateEventsDropped>0);
+assert.ok(byName['spotify-disconnect'].spotifyDisconnects>0&&byName['spotify-disconnect'].recoveries>0);
+assert.ok(byName['resume-failure'].resumeFailures>0&&byName['resume-failure'].recoveries>0);
+for(const name of ['wrong-spotify-state','device-change','refresh-generation','refresh-tts','refresh-dj'])assert.ok(byName[name].recoveries>0,`${name} moet aantoonbaar herstellen`);
+for(const name of ['empty-llm-output','oversized-llm-output','wrong-metadata'])assert.ok(byName[name].regenerations>0,`${name} moet regeneratie afdwingen`);
+for(const name of ['corrupt-tts','audio-unavailable'])assert.ok(byName[name].ttsFailures>0&&byName[name].safeSkips>0,`${name} moet veilig overslaan`);
+const endurance=window.MAIRTestSimulator.simulate({name:'normal',transitions:1000});
+assert.equal(endurance.status,'PASS','1000-transition duurtest moet slagen');
+assert.equal(endurance.transitionsProcessed,1000);
+assert.ok(endurance.breaksAired>=100,'duurtest moet voldoende echte breakcycli afleggen');
+assert.equal(endurance.invariants.musicBlocked,false);
+assert.equal(endurance.invariants.duplicateAirs,0);
+assert.equal(endurance.invariants.staleAirs,0);
+console.log(`MAIR Test Lab simulator: ${matrix.length}/${matrix.length} scenario's veilig · normal=${byName.normal.transitionsProcessed} transitions · endurance=${endurance.transitionsProcessed} transitions/${endurance.breaksAired} breaks PASS`);

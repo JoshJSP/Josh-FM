@@ -1,5 +1,6 @@
 // Josh FM Request Manager — smart scheduling with reliable arming and natural-queue adoption.
 (()=>{
+  if(window.JFMRequests?.version)return;
   const KEY='jfm_requests_v1',MAX_ACTIVE=8,MAX_ARMED_TRANSITIONS=3,MAX_NATURAL_MISSES=2,TRACK_URI=/^spotify:track:[A-Za-z0-9]{22}$/,$=id=>document.getElementById(id),now=()=>Date.now();
   let requests=load(),arming=false,lastObservedUri='';const events=[];
   function validUri(v){return TRACK_URI.test(String(v||''))}
@@ -28,4 +29,5 @@
   setInterval(()=>{render();if(document.visibilityState==='visible'){recoverStaleArmed().catch(()=>{});armDue().catch(()=>{})}},7000);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{ensurePanel();render()});else{ensurePanel();render()}
   window.JFMRequests={version:'requests-v5-exact-next',add,list:()=>requests.map(r=>({...r})),isRequest:t=>!!t&&requests.some(r=>(r.uri===t.uri||r.track?.id===t.id)&&(r.status==='planned'||r.status==='armed')),eta:t=>{const r=requests.find(x=>x.uri===t?.uri||x.track?.id===t?.id);return r?etaText(r):''},armDue,recoverStaleArmed,log:()=>[...events]};
+  window.MAIRRuntime?.register?.('request-manager',{version:'requests-v5-exact-next',owner:'request-transport'});
 })();

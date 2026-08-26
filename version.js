@@ -1,5 +1,5 @@
 // MAIR release metadata and cache/build reconciliation.
-window.JFM_RELEASE={version:'2.0.0-beta.6',displayVersion:'2b.0.6',build:'unknown',asset:'78',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
+window.JFM_RELEASE={version:'2.0.0-beta.8',displayVersion:'2b.0.8',build:'unknown',asset:'78',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
 window.JFM_ASSET_VERSION='78';
 (()=>{
   function addStyle(id,src){if(document.getElementById(id))return;const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=src;document.head.appendChild(l)}
@@ -45,6 +45,6 @@ window.JFM_ASSET_VERSION='78';
   navigator.serviceWorker?.addEventListener?.('message',e=>{if(e.data?.type!=='CACHE_VERSION')return;window.JFM_RELEASE.localCache=String(e.data.cache||'unknown');const server=window.JFM_RELEASE.serverCache,local=window.JFM_RELEASE.localCache;window.JFM_RELEASE.updateAvailable=!!(server&&local&&server!=='unknown'&&local!=='unknown'&&local!==server);emit()});
   window.addEventListener('jfm:diagnostics-refresh',resolveBuild);
   window.addEventListener('pageshow',()=>setTimeout(ensureAppleIcon,100));
-  loadBuild1Health();setTimeout(loadMusicIntelligence,1200);setTimeout(loadPersonalLearning,1500);setTimeout(loadProductModel,1700);setTimeout(loadProductUX,2000);setTimeout(loadDataPortability,2300);
+  loadBuild1Health();setTimeout(loadPersonalLearning,1500);setTimeout(loadProductModel,1700);setTimeout(loadProductUX,2000);setTimeout(loadDataPortability,2300);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',resolveBuild,{once:true});else resolveBuild();
 })();

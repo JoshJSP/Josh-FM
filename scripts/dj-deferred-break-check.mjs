@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 
+const moduleSources=['dj-memory.js','radio-brain.js','dj-context-builder.js','dj-quality-gate.js'].map(name=>[name,fs.readFileSync(new URL(`../${name}`,import.meta.url),'utf8')]);
 const source=fs.readFileSync(new URL('../mair-dj-v2.js',import.meta.url),'utf8');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 class Bus{constructor(){this.m=new Map()}addEventListener(n,f){if(!this.m.has(n))this.m.set(n,[]);this.m.get(n).push(f)}dispatchEvent(e){for(const f of this.m.get(e.type)||[])f(e);return true}}
@@ -9,7 +10,7 @@ class CE{constructor(type,opt={}){this.type=type;this.detail=opt.detail}}
 const el=(extra={})=>({value:'',textContent:'',dataset:{},checked:false,addEventListener(){},querySelector(){return null},cloneNode(){return el({...this})},replaceWith(){},...extra});
 const bus=new Bus(),elements={talk:el({value:'1'}),talkValue:el(),djBreakTime:el(),djText:el()};
 const document={readyState:'complete',visibilityState:'visible',getElementById:id=>elements[id]||null,addEventListener(){}};
-const store=new Map([['jfm_spotify_device_id','device-test']]),localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
+const store=new Map([['jfm_spotify_device_id','device-test']]),localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)},sessionStorage=localStorage;
 const remote={id:'A',uri:'spotify:track:A',playing:true,progress:4000};
 const metrics={pause:0,resume:0,rewind:0,speak:0,prepare:0,writer:0};
 let op=null,expectedLive=true;
@@ -24,8 +25,8 @@ const speakText=async()=>{metrics.speak++;audioStatus.cacheSize=0;return true};
 const JFMPlayback={djPause:async uri=>{assert.equal(uri,remote.uri);metrics.pause++;remote.playing=false;return true},djResume:async uri=>{assert.equal(uri,remote.uri);metrics.resume++;remote.playing=true;return true},djRewind:async uri=>{assert.equal(uri,remote.uri);metrics.rewind++;remote.progress=0;return true},health:{lastError:''}};
 const window={addEventListener:(...a)=>bus.addEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:truth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}}};
 const math=Object.create(Math);math.random=()=>0;
-const context={window,document,localStorage,CustomEvent:CE,api,fetch,prepareSpeech,speakText,setTimeout,clearTimeout,AbortController,Promise,Date,Math:math,console};Object.assign(window,{window,document,localStorage,CustomEvent:CE,api,fetch,prepareSpeech,speakText});Object.assign(context,window);vm.createContext(context);vm.runInContext(source,context,{filename:'mair-dj-v2.js'});
-function natural(ended,next){remote.id=next;remote.uri=`spotify:track:${next}`;remote.playing=true;remote.progress=300;bus.dispatchEvent(new CE('jfm:natural-next-ready',{detail:{endedTrackId:ended,newTrackId:next,auto:true,fast:true}}))}
+const context={window,document,localStorage,sessionStorage,CustomEvent:CE,api,fetch,prepareSpeech,speakText,setTimeout,clearTimeout,AbortController,Promise,Date,Math:math,console};Object.assign(window,{window,document,localStorage,sessionStorage,CustomEvent:CE,api,fetch,prepareSpeech,speakText});Object.assign(context,window);vm.createContext(context);for(const[name,moduleSource]of moduleSources)vm.runInContext(moduleSource,context,{filename:name});vm.runInContext(source,context,{filename:'mair-dj-v2.js'});
+function natural(ended,next){remote.id=next;remote.uri=`spotify:track:${next}`;remote.playing=true;remote.progress=300;bus.dispatchEvent(new CE('mair:track-transition',{detail:{id:`${ended}>${next}`,fromTrackId:ended,toTrackId:next,cause:'NATURAL_END',source:'test'}}))}
 
 natural('A','B');await sleep(15);
 natural('B','C');await sleep(35); // preparation for C is intentionally still running
@@ -33,7 +34,7 @@ natural('C','D');await sleep(40);
 let state=window.MAIRDJ.state();
 assert.equal(state.played,0,'late preparation must not fake an aired break');
 assert.equal(state.missed,0,'late preparation must not count as a missed break');
-assert.ok(state.deferred>=1,'late preparation must defer the break');
+assert.ok(state.retries?.prepareRebases>=1,'late preparation must rebase the break');
 assert.equal(metrics.pause,0,'music must not pause while the voice is not ready');
 
 await sleep(620);state=window.MAIRDJ.state();
