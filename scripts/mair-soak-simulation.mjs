@@ -3,7 +3,7 @@ const src=fs.readFileSync(new URL('../rotation-engine.js',import.meta.url),'utf8
 const localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
 const show={id:'morning',name:'MAIR Morning',musicPattern:['Power','Current','Familiar','Discovery','Power','Current'],targetMomentum:.72};
 const window={jfmDirectorMemory:()=>({likes,plays:{},discoveryWins:{},discoveryLosses:{}}),jfmIsRequest:t=>requests.has(t?.id),JFMRadioSuite:{state:()=>({lastIds:[],lastArtists:[]})},JFMStationClock:{current:()=>({show,phase:'open'})}};
-const context=vm.createContext({window,localStorage,console,Date,Math,JSON,Number,String,Array,Set,Object});vm.runInContext(src,context,{filename:'rotation-engine.js'});const rot=window.JFMRotation;assert.ok(rot?.version==='music-director-v2.1-sleep');
+const context=vm.createContext({window,localStorage,console,Date,Math,JSON,Number,String,Array,Set,Object});vm.runInContext(src,context,{filename:'rotation-engine.js'});const rot=window.JFMRotation;assert.ok(rot?.version==='music-director-v2.2-modes');
 const year=new Date().getFullYear(),tracks=[];for(let i=0;i<160;i++){const kind=i%5,id=`track-${i}`,t={id,uri:`spotify:track:${String(i).padStart(22,'0')}`,name:`Track ${i}`,artists:[`Artist ${i%40}`],popularity:48+(i%48),release:`${2017+(i%8)}-01-01`};if(kind===0){likes[id]=2;t.release=`${year-3}-01-01`}if(kind===1)t.release=`${year}-01-01`;if(kind===2)t.release=`${year-5}-01-01`;if(kind===3){t._discovery=true;t.release=`${year}-01-01`}if(kind===4)t.release='2006-01-01';if(i%37===0)requests.add(id);tracks.push(t)}
 const shows=[
  {id:'after-hours',name:'MAIR After Hours',musicPattern:['Familiar','Throwback','Discovery','Familiar'],targetMomentum:.42},

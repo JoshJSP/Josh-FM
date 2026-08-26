@@ -1,6 +1,6 @@
 // MAIR release metadata and cache/build reconciliation.
-window.JFM_RELEASE={version:'2.0.0-beta.8',displayVersion:'2b.0.8',build:'unknown',asset:'79',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
-window.JFM_ASSET_VERSION='79';
+window.JFM_RELEASE={version:'2.0.0-beta.8',displayVersion:'2b.0.8',build:'unknown',asset:'80',localCache:'unknown',serverCache:'unknown',updateAvailable:false};
+window.JFM_ASSET_VERSION='80';
 (()=>{
   function addStyle(id,src){if(document.getElementById(id))return;const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=src;document.head.appendChild(l)}
   function ensureAppleIcon(){let l=document.querySelector('link[rel="apple-touch-icon"]');if(!l){l=document.createElement('link');l.rel='apple-touch-icon';document.head.appendChild(l)}l.href='./apple-touch-icon.png';l.sizes='180x180'}
@@ -13,7 +13,8 @@ window.JFM_ASSET_VERSION='79';
     addStyle('mair-radio-home-css','./mair-radio-home.css');
     addStyle('mair-station-art-css','./mair-station-art.css?v=78');
     addStyle('mair-request-layer-fix-css','./request-layer-fix.css?v=78');
-    addStyle('mair-personalization-css','./mair-ux-v1.css?v=79');
+    addStyle('mair-personalization-css','./mair-ux-v1.css?v=80');
+    addStyle('mair-modes-css','./mair-modes.css?v=80');
     addSyncScript('mair-radio-sequencer-js','./mair-radio-sequencer.js');
     addSyncScript('mair-dj-profile-polish-js','./mair-dj-profile-polish.js');
     addSyncScript('mair-dj-memory-js','./mair-dj-memory.js');
@@ -27,7 +28,9 @@ window.JFM_ASSET_VERSION='79';
     addSyncScript('mair-soak-monitor-js','./mair-soak-monitor.js');
     addSyncScript('mair-station-director-js','./mair-station-director.js');
     addSyncScript('mair-sleep-js','./mair-sleep.js')
-    addSyncScript('mair-my-mair-js','./mair-my-mair.js?v=79')
+    addSyncScript('mair-modes-js','./mair-modes.js?v=80')
+    addSyncScript('mair-modes-ui-js','./mair-modes-ui.js?v=80')
+    addSyncScript('mair-my-mair-js','./mair-my-mair.js?v=80')
   }
   loadMairUI();
   function sanitizeSleepState(){try{const key='jfm_sleep_timer_v1',raw=localStorage.getItem(key);if(!raw)return;const x=JSON.parse(raw),expired=x?.mode==='time'&&Number(x?.at||0)<=Date.now(),unsafe=x?.mode==='after-track';if(expired||unsafe)localStorage.setItem(key,'null')}catch{try{localStorage.setItem('jfm_sleep_timer_v1','null')}catch{}}}

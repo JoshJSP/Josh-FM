@@ -8,7 +8,7 @@ const clean=v=>String(v??'').trim();
 function no(reason,extra={}){return{shouldTalk:false,breakType:'NO_BREAK',maxDurationSeconds:0,targetWordCount:0,priority:0,permittedTopics:[],prohibitedTopics:['weather','news','sport','traffic'],mustMention:[],mayMention:[],reason, fallbackType:null,...extra}}
 function recentCount(history,type,ms,now){return(history||[]).filter(x=>x.type===type&&now-Number(x.timestamp)<ms).length}
 function decide(input={}){
-  const now=Number(input.now)||Date.now(),memory=input.memory||{},history=memory.history||[],recent=memory.recentBreaks||[],cause=clean(input.transitionCause||'').toUpperCase(),manual=!!input.manual;
+  const now=Number(input.now)||Date.now(),memory=input.memory||{},history=memory.history||[],recent=memory.recentBreaks||[],cause=clean(input.transitionCause||'').toUpperCase(),manual=!!input.manual,globalMode=typeof window!=='undefined'?window.MAIRModeManager?.djContext?.()||{}:{},specialMode=clean(input.specialMode?.mode||globalMode.mode||'normal').toLowerCase(),specialLabel=clean(input.specialMode?.label||globalMode.label);
   if(input.djEnabled===false)return no('dj-disabled');
   if(input.audioLockBusy)return no('audio-lock-busy');
   if(input.recoveryActive||input.spotifyUncertain)return no('playback-uncertain');
@@ -32,7 +32,7 @@ function decide(input={}){
   if(relationship){score+=2;reason.push('defensible-music-link')}
   if(validTrack(input.nextTrack)){score+=1;reason.push('next-track-known')}
   if(facts.length&&recentCount(history,'ARTIST_FACT',2700000,now)+recentCount(history,'TRACK_FACT',2700000,now)===0){score+=2;reason.push('verified-fact')}
-  if(input.nextTrack?.discovery||input.currentTrack?.discovery){score+=1;reason.push('discovery')}
+  if(input.nextTrack?.discovery||input.currentTrack?.discovery){score+=1;reason.push('discovery')}if(['chaos','afterparty'].includes(specialMode)){score+=1;reason.push('special-mode')}if(specialMode==='roadtrip'&&specialLabel.includes('Final Stretch')){score+=1;reason.push('roadtrip-finale')}
   const recentTypes=recent.slice(0,3).map(x=>x.type),recentArtists=new Set(recent.slice(0,3).flatMap(x=>x.artists||[]).map(x=>String(x).toLowerCase()));
   const artists=[...(input.currentTrack?.artists||[]),...(input.nextTrack?.artists||[])];if(artists.some(a=>recentArtists.has(String(a).toLowerCase()))){score-=2;reason.push('recent-artist-penalty')}
   if(recentTypes[0]&&recentTypes[0]===recentTypes[1])score-=2;
