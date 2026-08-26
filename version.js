@@ -4,7 +4,8 @@ window.JFM_ASSET_VERSION='78';
 (()=>{
   function addStyle(id,src){if(document.getElementById(id))return;const l=document.createElement('link');l.id=id;l.rel='stylesheet';l.href=src;document.head.appendChild(l)}
   function ensureAppleIcon(){let l=document.querySelector('link[rel="apple-touch-icon"]');if(!l){l=document.createElement('link');l.rel='apple-touch-icon';document.head.appendChild(l)}l.href='./apple-touch-icon.png';l.sizes='180x180'}
-  function addSyncScript(id,src){if(document.getElementById(id))return;const s=document.createElement('script');s.id=id;s.src=src;s.async=false;document.head.appendChild(s)}
+  function scriptLoaded(src){const wanted=new URL(src,location.href).pathname;return[...document.scripts].some(s=>{try{return new URL(s.src,location.href).pathname===wanted}catch{return false}})}
+  function addSyncScript(id,src){if(document.getElementById(id)||scriptLoaded(src))return;const s=document.createElement('script');s.id=id;s.src=src;s.async=false;document.head.appendChild(s)}
   function loadMairUI(){
     ensureAppleIcon();
     setTimeout(ensureAppleIcon,3000);
