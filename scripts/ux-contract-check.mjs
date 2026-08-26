@@ -25,4 +25,11 @@ ok('auth and primary actions use the user error model',app.includes("notifyUserE
 ok('deployment example covers all active providers',['SPOTIFY_CLIENT_ID','OPENAI_API_KEY','GROQ_API_KEY','FISH_AUDIO_API_KEY'].every(key=>env.includes(`${key}=`)));
 ok('disconnected diagnostics has a route back to Spotify connect',ux.includes("mairfmDiagnosticsBack")&&ux.includes("activate?.('radio')")&&ux.includes('Terug naar Spotify verbinden'));
 ok('UI installs one action-listener owner',(ux.match(/function actions\(\)/g)||[]).length===1);
+ok('welcome isolates the onboarding from legacy radio cards',css.includes('.mairfm-welcome:not(.hidden)~*:not(.mairfm-connect)'));
+ok('welcome removes competing bottom navigation',css.includes('body:has(.mairfm-welcome:not(.hidden)) .mair-bottom-nav{display:none!important}'));
+ok('secondary radio features keep one deliberate owner',ux.includes('function organizeSecondaryFeatures()')&&ux.includes("actions.appendChild(sleep)")&&ux.includes("body.appendChild(card)"));
+ok('technical tools stay inside Diagnostics',['mairVoiceEngineCard','mairVoiceLabCard','mairSoakCard','mairStationDirectorCard'].every(id=>hub.includes(`moveCard('${id}'`)));
+ok('technical audio preview stays inside Diagnostics',hub.includes("moveControl('mairImagingPreview','diag-imaging-test'"));
+ok('station extras cannot overflow narrow screens',css.includes('.mairfm-station-details article.card{width:100%!important;max-width:100%!important;min-width:0!important'));
+ok('switch inputs remain keyboard accessible',css.includes('.switch input[type="checkbox"]{display:block!important')&&css.includes('input[type="checkbox"]:focus-visible+span'));
 console.log(`PASS UX contract: ${checks} checks`);
