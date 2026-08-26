@@ -18,7 +18,7 @@ ok('diagnostics has evidence statuses',['Goed','Bezig','Beperkt','Probleem','Nog
 ok('mobile-first breakpoints cover narrow phones',css.includes('@media(max-width:760px)')&&css.includes('@media(max-width:390px)'));
 ok('inactive routes cannot leak through layout overrides',css.includes('.mairfm-radio:not(.active){display:none!important}')&&css.includes('.mairfm-radio.active{display:grid'));
 ok('touch and focus accessibility contracts exist',css.includes('min-height:44px')&&css.includes(':focus-visible')&&css.includes('prefers-reduced-motion'));
-ok('UX assets load after legacy handoff',loader.includes("load('mairfmUXState','./mair-ux-state.js')")&&loader.includes("load('mairfmUXOwner','./mair-ux-v1.js')"));
+ok('UX assets load after legacy handoff',loader.includes("load('mairfmUXState',`./mair-ux-state.js?v=${asset}`)")&&loader.includes("load('mairfmUXOwner',`./mair-ux-v1.js?v=${asset}`)"));
 ok('UX assets are offline-cached',['./mair-ux-state.js','./mair-ux-v1.js','./mair-ux-v1.css'].every(x=>sw.includes(`'${x}'`)));
 ok('normal copy hides implementation terms',!(/Groq|TTS|SDK|voice provider|client ID/i.test(ux)));
 ok('auth and primary actions use the user error model',app.includes("notifyUserError('auth'")&&app.includes("notifyUserError('station'")&&!app.includes("connect().catch(e=>alert"));
