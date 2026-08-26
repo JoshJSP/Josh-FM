@@ -33,4 +33,5 @@ ok('technical audio preview stays inside Diagnostics',hub.includes("moveControl(
 ok('station extras cannot overflow narrow screens',css.includes('.mairfm-station-details article.card{width:100%!important;max-width:100%!important;min-width:0!important'));
 ok('switch inputs remain keyboard accessible',css.includes('.switch input[type="checkbox"]{display:block!important')&&css.includes('input[type="checkbox"]:focus-visible+span'));
 ok('tablet and desktop navigation cannot cover playback controls',css.includes('@media(min-width:761px)')&&css.includes('bottom:auto!important')&&css.includes('top:max(16px,env(safe-area-inset-top))!important'));
+ok('mobile shell respects Dynamic Island and home indicator safe areas',css.includes('padding:max(58px,calc(env(safe-area-inset-top) + 14px)) 16px calc(96px + env(safe-area-inset-bottom))!important'));
 console.log(`PASS UX contract: ${checks} checks`);
