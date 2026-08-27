@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const src=fs.readFileSync(new URL('../mair-spotify-coordinator-v2.js',import.meta.url),'utf8');
+const boot=fs.readFileSync(new URL('../dj-now-queue.js',import.meta.url),'utf8');
+const sw=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');
+assert.match(boot,/mair-spotify-coordinator-v2\.js/,'runtime bootstrap must load the recovery coordinator');
+assert.match(sw,/CRITICAL=\[[^\]]*mair-spotify-coordinator-v2\.js/,'recovery coordinator must be a critical PWA asset');
+assert.doesNotMatch(src,/connectSpotify|accounts\.spotify\.com|location\.assign|location\.href/,'recovery coordinator must never start OAuth');
+assert.doesNotMatch(src,/addEventListener\(['"]click|MutationObserver|stopImmediatePropagation/,'recovery coordinator must not intercept global UI input');
+
+const handlers=new Map(),controls=new Map();for(const id of ['start','play','prev','next','djNow','skipTalk','searchBtn','rebuild'])controls.set(id,{disabled:true});
+let activations=0,sdkEnsures=0,originalEnsures=0,originalRecover=0,playPause=0,patches=0,ingests=0,remoteLive=false;
+const storage=new Map([['jfm_refresh','refresh-1']]);
+const localStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)};
+const sdk={deviceId:'',player:{activateElement(){activations++}},async ensureDevice(){sdkEnsures++;sdk.deviceId='device-1';return sdk.deviceId},async reconnect(){sdk.deviceId='device-1';return sdk.deviceId}};
+const truth={trackId:'track-a',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',expectedLive:true,isPlaying:false,lastError:'geen actief device'};
+const playback={health:{reloadNeedsGesture:true},async ensureDevice(){originalEnsures++;return'device-old'},async recover(){originalRecover++;return false},async playPause(){playPause++;remoteLive=true;truth.isPlaying=true;return true},async resume(){return false},async start(){return false}};
+const window={JFMAuth:{state:{hasRefreshToken:true,hasAccessToken:false},ensure:async()=> 'access-1'},MAIRSpotifySessionReliability:{state:{hasRefreshToken:true,hasAccessToken:false,reauthRequired:false}},JFMSpotifySDK:sdk,JFMPlayback:playback,JFMPlaybackState:{get:()=>({...truth}),patch(v){patches++;Object.assign(truth,v)},ingest(v){ingests++;truth.isPlaying=!!v.is_playing;truth.lastError=''}},MAIRUXState:{refresh(){}},api:async path=>path==='/me/player'&&remoteLive?{item:{id:'track-a'},device:{id:'device-1'},is_playing:true}:null,addEventListener:(n,fn)=>handlers.set(n,[...(handlers.get(n)||[]),fn]),dispatchEvent:e=>{for(const fn of handlers.get(e.type)||[])fn(e);return true}};
+const context={window,document:{visibilityState:'visible',hidden:false,getElementById:id=>controls.get(id)||null,addEventListener:(n,fn)=>handlers.set(n,[...(handlers.get(n)||[]),fn])},localStorage,CustomEvent:class{constructor(type,init={}){this.type=type;this.detail=init.detail}},setTimeout:()=>1,setInterval:()=>1,clearInterval:()=>{},Promise,Date,String,Number,Math,console};
+vm.createContext(context);vm.runInContext(src,context,{filename:'mair-spotify-coordinator-v2.js'});
+assert.ok(window.MAIRSpotifyCoordinator,'coordinator must install');assert.equal(playback.__mairCoordinatorPatched,true,'primary playback methods must be wrapped in place');
+await playback.ensureDevice();assert.equal(sdkEnsures,1,'device action must use authoritative SDK ensureDevice');assert.equal(originalEnsures,0,'stale playback device fallback must not own recovery');assert.ok(activations>=1,'device action must activate browser audio inside the user action');assert.equal(controls.get('play').disabled,false,'successful device registration must re-enable transport');
+const ok=await playback.recover('ux-device');assert.equal(ok,true,'UX device action must finish recovery');assert.equal(originalRecover,0,'gesture-required recovery must not call watchdog path that refuses gestures');assert.equal(playPause,1,'gesture-required recovery must finish through the primary play/pause restore');assert.ok(patches>0&&ingests>0,'successful recovery must clear stale errors and ingest confirmed live state');
+window.MAIRSpotifySessionReliability.state={hasRefreshToken:false,hasAccessToken:false,reauthRequired:true};window.JFMAuth.state={hasRefreshToken:false,hasAccessToken:false};remoteLive=false;truth.isPlaying=false;const reauth=await window.MAIRSpotifyCoordinator.recoverFromGesture('reauth-test');assert.equal(reauth,false,'definitive invalid auth may stop local recovery');assert.equal(playPause,1,'reauth-required state must not fake a playback retry');
+console.log('Spotify coordinator v2: PASS');
