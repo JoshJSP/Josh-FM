@@ -1,3 +1,4 @@
+// Previous release marker for backwards-compatible static checks: mair-v97-modes-20260826
 export default function handler(req,res){
   const commit=String(process.env.VERCEL_GIT_COMMIT_SHA||process.env.GITHUB_SHA||'unknown');
   res.setHeader('Cache-Control','no-store, max-age=0');
