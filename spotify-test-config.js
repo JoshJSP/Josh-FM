@@ -1,7 +1,77 @@
-// Josh FM — editable Spotify Client ID + shared Spotify API guard.
+// Josh FM — editable Spotify Client ID + shared Spotify API/auth guard.
 (()=>{
-  const TEST_KEY='jfm_test_spotify_client_id',CLIENT_KEY='jfm_client_id',DEFAULT_CLIENT_ID='d505870719c6439d9ea3c53108330fe1',ASSET=String(window.JFM_ASSET_VERSION||'48');
+  const TEST_KEY='jfm_test_spotify_client_id',CLIENT_KEY='jfm_client_id',DEVICE_KEY='jfm_spotify_device_id',DEFAULT_CLIENT_ID='d505870719c6439d9ea3c53108330fe1',ASSET=String(window.JFM_ASSET_VERSION||'48');
   const asset=src=>`${src}${src.includes('?')?'&':'?'}v=${encodeURIComponent(ASSET)}`;
+
+  // Web Playback device IDs belong to one browser/SDK runtime. A persisted ID from
+  // an older PWA session is only stale state and must never become playback authority.
+  try{localStorage.removeItem(DEVICE_KEY)}catch{}
+
+  // Harden the existing app.js refresh flow without touching UI or click handling.
+  // Only Spotify's definitive invalid_grant may destroy the refresh credential.
+  let authRefreshError='',authRefreshStatus=0,authReauthRequired=false,authRefreshFailures=0,lastAuthRefreshAt=0;
+  function installHardenedAuth(){
+    try{
+      if(typeof ensure!=='function'||typeof timedFetch!=='function'||typeof saveToken!=='function')return false;
+      const hardenedEnsure=async function(){
+        if(token&&Date.now()<expiresAt)return token;
+        if(!refreshToken)return null;
+        if(tokenRefreshPromise)return tokenRefreshPromise;
+        const id=spotifyClientId||localStorage.getItem(CLIENT_KEY);if(!id)return null;
+        tokenRefreshCount++;lastAuthRefreshAt=Date.now();authRefreshError='';authRefreshStatus=0;authReauthRequired=false;
+        tokenRefreshPromise=(async()=>{
+          const body=new URLSearchParams({grant_type:'refresh_token',refresh_token:refreshToken,client_id:id});
+          let r;
+          try{r=await timedFetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body})}
+          catch(e){authRefreshFailures++;authRefreshError=String(e?.message||e||'Netwerkfout').slice(0,240);const err=new Error('Spotify-token vernieuwen is tijdelijk niet gelukt. MAIR probeert het later opnieuw.');err.code='AUTH_REFRESH_RECOVERABLE';throw err}
+          if(!r.ok){
+            let detail={};try{detail=await r.json()}catch{}
+            const code=String(detail?.error||''),description=String(detail?.error_description||'');authRefreshStatus=r.status;authRefreshError=(description||code||`HTTP ${r.status}`).slice(0,240);authRefreshFailures++;
+            if(code==='invalid_grant'){
+              authReauthRequired=true;clearSpotifySession();
+              const err=new Error('Spotify-sessie is verlopen. Koppel Spotify opnieuw.');err.code='AUTH_REAUTH_REQUIRED';throw err
+            }
+            const err=new Error(`Spotify-token vernieuwen is tijdelijk niet gelukt (${r.status}). MAIR probeert het later opnieuw.`);err.code='AUTH_REFRESH_RECOVERABLE';err.status=r.status;throw err
+          }
+          const data=await r.json();saveToken(data);authRefreshError='';authRefreshStatus=r.status;authRefreshFailures=0;authReauthRequired=false;return token
+        })().finally(()=>{tokenRefreshPromise=null});
+        return tokenRefreshPromise
+      };
+      ensure=hardenedEnsure;window.ensure=hardenedEnsure;
+      if(window.JFMAuth){window.JFMAuth.ensure=hardenedEnsure;window.JFMAuth.version='auth-v3-preserve-refresh'}
+      window.MAIRSpotifySessionReliability={
+        version:'spotify-session-v1',
+        ensure:hardenedEnsure,
+        get state(){return{refreshError:authRefreshError,refreshStatus:authRefreshStatus,reauthRequired:authReauthRequired,refreshFailures:authRefreshFailures,lastRefreshAt:lastAuthRefreshAt,hasRefreshToken:!!refreshToken,hasAccessToken:!!token}}
+      };
+      return true
+    }catch(e){console.warn('MAIR auth hardening kon niet laden',e);return false}
+  }
+  installHardenedAuth();
+
+  // Quiet device recovery only. No overlays, observers, capture listeners or DOM state
+  // rewrites are installed here; normal MAIR controls keep their existing ownership.
+  let deviceRepairPromise=null,lastDeviceRepairAt=0,lastDeviceRepairError='';
+  async function refreshDeviceHint(reason='automatic'){
+    const auth=window.JFMAuth?.state||{};
+    if(!(auth.hasRefreshToken||auth.hasAccessToken))return false;
+    if(deviceRepairPromise)return deviceRepairPromise;
+    if(Date.now()-lastDeviceRepairAt<2500)return false;
+    lastDeviceRepairAt=Date.now();lastDeviceRepairError='';
+    deviceRepairPromise=(async()=>{
+      const sdk=window.JFMSpotifySDK;if(!sdk)return false;
+      const live=String(sdk.deviceId||'').trim();if(live){try{localStorage.setItem(DEVICE_KEY,live)}catch{};return true}
+      try{localStorage.removeItem(DEVICE_KEY)}catch{}
+      let id='';
+      try{id=String(await sdk.ensureDevice?.()||'').trim()}catch(e){lastDeviceRepairError=String(e?.message||e||'device unavailable').slice(0,240)}
+      if(!id){try{id=String(await sdk.reconnect?.()||'').trim()}catch(e){lastDeviceRepairError=String(e?.message||e||'device reconnect failed').slice(0,240)}}
+      if(id){try{localStorage.setItem(DEVICE_KEY,id)}catch{};lastDeviceRepairError='';try{window.dispatchEvent(new CustomEvent('mair:spotify-device-recovered',{detail:{reason,deviceId:id,at:Date.now()}}))}catch{};return true}
+      return false
+    })().finally(()=>{deviceRepairPromise=null});
+    return deviceRepairPromise
+  }
+  function scheduleDeviceRefresh(reason,delay=900){setTimeout(()=>refreshDeviceHint(reason).catch(()=>false),delay)}
+
   const input=document.getElementById('clientId');if(!input)return;const label=input.closest('label');
   function selected(){return String(input.value||localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID).trim()}
   function persist(value){const id=String(value||'').trim();if(!id)return'';if(localStorage.getItem(TEST_KEY)!==id)localStorage.setItem(TEST_KEY,id);if(localStorage.getItem(CLIENT_KEY)!==id)localStorage.setItem(CLIENT_KEY,id);try{if(spotifyClientId!==id)spotifyClientId=id}catch{}return id}
@@ -24,6 +94,9 @@
   }catch(e){console.warn('Spotify guard kon niet laden',e)}
   function loadScriptOnce(selector,src,datasetKey,onerror){if(document.querySelector(selector))return;const s=document.createElement('script');s.src=asset(src);s.async=false;s.dataset[datasetKey]='1';s.onerror=onerror;document.body.appendChild(s)}
   function loadApiBudget(){if(window.JFMSpotifyApiBudget)return;loadScriptOnce('script[data-jfm-api-budget]','./spotify-api-budget.js','jfmApiBudget',()=>console.warn('Josh FM: Spotify API budget kon niet laden'))}
-  sync();loadApiBudget();setTimeout(sync,250);setTimeout(sync,1200);window.addEventListener('pageshow',()=>{sync();loadApiBudget()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadApiBudget()}});
-  window.JFMSpotifyTestConfig={version:'spotify-test-v13-central-assets',assetVersion:ASSET,defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY)};
+  sync();loadApiBudget();setTimeout(sync,250);setTimeout(sync,1200);scheduleDeviceRefresh('boot',1400);
+  window.addEventListener('pageshow',()=>{sync();loadApiBudget();scheduleDeviceRefresh('pageshow',700)});
+  window.addEventListener('online',()=>scheduleDeviceRefresh('online',700));
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadApiBudget();scheduleDeviceRefresh('visible',700)}});
+  window.JFMSpotifyTestConfig={version:'spotify-test-v14-session-reliability',assetVersion:ASSET,defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY),refreshDeviceHint,get deviceState(){return{repairing:!!deviceRepairPromise,lastRepairAt:lastDeviceRepairAt,lastRepairError:lastDeviceRepairError}}};
 })();
