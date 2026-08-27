@@ -6,6 +6,7 @@
   });
   async function boot(){
     await load('./progress-clock-v226.js','jfm-progress-v226');
+    await load('./mair-spotify-coordinator-v2.js','mair-spotify-coordinator-v2');
     await load('./dj-memory.js','mair-dj-memory-v1');
     await load('./radio-brain.js','mair-radio-brain-v1');
     await load('./dj-context-builder.js','mair-dj-context-builder-v1');
@@ -22,5 +23,5 @@
     setTimeout(()=>load('./beta-status.js','jfm-beta-status-v8'),2600);
   }
   boot();
-  window.JFMV226Bootstrap={version:'mair-test-lab-correlated-diagnostics-bootstrap',get ready(){return !!(window.MAIRDJ&&window.MAIRObservability&&window.MAIRTestSimulator&&window.MAIRTestLab&&window.JFMProgressClock&&window.MAIRAudioUnlock&&window.MAIRBackgroundGuard)}};
+  window.JFMV226Bootstrap={version:'mair-test-lab-correlated-diagnostics-bootstrap',get ready(){return !!(window.MAIRDJ&&window.MAIRObservability&&window.MAIRTestSimulator&&window.MAIRTestLab&&window.JFMProgressClock&&window.MAIRAudioUnlock&&window.MAIRBackgroundGuard&&window.MAIRSpotifyCoordinator)}};
 })();
