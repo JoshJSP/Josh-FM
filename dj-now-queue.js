@@ -13,6 +13,7 @@
     await load('./mair-test-simulator.js','mair-test-simulator-v1');
     await load('./mair-observability.js','mair-observability-v1');
     await load('./mair-dj-v2.js','mair-dj-v2');
+    await load('./mair-dj-cadence-fix.js','mair-dj-cadence-fix-v1');
     await load('./mair-audio-unlock-v1.js','mair-audio-unlock-v1');
     await load('./mair-background-guard.js','mair-background-guard-v1');
     await load('./mair-voice-check.js','mair-voice-check-v1');
