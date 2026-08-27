@@ -12,9 +12,9 @@ function authState(){
   return{hasRefresh:!!hasRefresh,hasAccess:!!hasAccess,reauthRequired,authenticated:!!(hasRefresh||hasAccess)&&!reauthRequired};
 }
 function fixError(error,auth){
+  if(auth.reauthRequired)return{severity:'error',title:'Spotify-sessie verlopen',message:'Spotify heeft de authorisatie ingetrokken of ongeldig verklaard. Koppel Spotify één keer opnieuw.',primaryAction:'reconnect',secondaryAction:'diagnostics',diagnosticsCode:'SPOTIFY_REAUTH_REQUIRED',autoDismiss:false};
   if(!error)return null;
   const out={...error};
-  if(auth.reauthRequired)return{severity:'error',title:'Spotify-sessie verlopen',message:'Spotify heeft de authorisatie ingetrokken of ongeldig verklaard. Koppel Spotify één keer opnieuw.',primaryAction:'reconnect',secondaryAction:'diagnostics',diagnosticsCode:'SPOTIFY_REAUTH_REQUIRED',autoDismiss:false};
   if(out.diagnosticsCode==='SPOTIFY_DEVICE')return{...out,message:'MAIR is nog gekoppeld met Spotify en probeert het afspeelapparaat opnieuw klaar te zetten.',primaryAction:'device',secondaryAction:'diagnostics'};
   if(out.diagnosticsCode==='PLAYBACK_STOPPED')return{...out,message:'Je Spotify-koppeling is nog geldig. MAIR probeert de muziekverbinding te herstellen.',primaryAction:'resume',secondaryAction:'diagnostics'};
   if(out.diagnosticsCode==='SPOTIFY_CONNECT'&&auth.authenticated)return{...out,title:'Spotify tijdelijk niet bereikbaar',message:'Je Spotify-koppeling blijft bewaard. MAIR probeert automatisch opnieuw verbinding te maken.',primaryAction:null,secondaryAction:'diagnostics',autoDismiss:true};
