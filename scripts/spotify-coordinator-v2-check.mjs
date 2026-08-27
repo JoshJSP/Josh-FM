@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const src=fs.readFileSync(new URL('../mair-spotify-coordinator-v2.js',import.meta.url),'utf8');
 const boot=fs.readFileSync(new URL('../dj-now-queue.js',import.meta.url),'utf8');
+const sw=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');
 assert.match(boot,/mair-spotify-coordinator-v2\.js/,'runtime bootstrap must load the recovery coordinator');
+assert.match(sw,/CRITICAL=\[[^\]]*mair-spotify-coordinator-v2\.js/,'recovery coordinator must be a critical PWA asset');
 assert.doesNotMatch(src,/connectSpotify|accounts\.spotify\.com|location\.assign|location\.href/,'recovery coordinator must never start OAuth');
 assert.doesNotMatch(src,/addEventListener\(['"]click|MutationObserver|stopImmediatePropagation/,'recovery coordinator must not intercept global UI input');
 
