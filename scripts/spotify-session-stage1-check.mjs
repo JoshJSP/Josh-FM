@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const src=fs.readFileSync(new URL('../spotify-test-config.js',import.meta.url),'utf8');
+assert.ok(src.includes("if(code==='invalid_grant')"),'invalid_grant must be the explicit reauth condition');
+assert.ok(src.includes('clearSpotifySession()'),'definitive invalid_grant must be able to clear the session');
+assert.ok(!src.includes("if(r.status===400||r.status===401)clearSpotifySession()"),'generic 400/401 must never wipe the refresh token');
+assert.ok(src.includes("err.code='AUTH_REFRESH_RECOVERABLE'"),'recoverable refresh errors need an explicit classification');
+assert.ok(src.includes("localStorage.removeItem(DEVICE_KEY)"),'stale Web Playback device IDs must be invalidated');
+assert.ok(src.includes('sdk.ensureDevice')&&src.includes('sdk.reconnect'),'device recovery must use the authoritative SDK');
+assert.ok(!src.includes('MutationObserver'),'stage one must not install a DOM-wide observer');
+assert.ok(!src.includes("document.addEventListener('click'"),'stage one must not capture global clicks');
+assert.ok(!src.includes('stopImmediatePropagation'),'stage one must not interfere with existing control ownership');
+console.log('Spotify session stage 1: PASS');
