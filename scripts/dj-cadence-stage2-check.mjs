@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(new URL(`../${p}`,import.meta.url),'utf8');
+const fix=read('mair-dj-cadence-fix.js'),boot=read('dj-now-queue.js');
+const checks=[];const expect=(ok,msg)=>checks.push([!!ok,msg]);
+expect(fix.includes("{min:5,max:7},{min:3,max:5},{min:2,max:4}"),'cadence ranges follow talk setting');
+expect(fix.includes("result.reason==='score-below-threshold'")&&fix.includes('tracks>=target')&&fix.includes('minutes>=5'),'cadence rescue only applies to score-based silence after safe minimum separation');
+expect(fix.includes("breakType:'STATION_ID'")&&fix.includes("reason:'cadence-due-safe-break'"),'overdue cadence uses a short safe station break');
+expect(fix.includes('window.MAIRAudioTransitionLock?.breakId'),'audio lock is considered busy only when a real break owns it');
+expect(fix.includes('Nog ongeveer ${rem} nummers')&&fix.includes('Radiomoment komt dichtbij'),'public DJ countdown is visible');
+expect(!fix.includes('MutationObserver')&&!fix.includes("addEventListener('click'")&&!fix.includes('stopImmediatePropagation'),'stage 2 must not install DOM-wide observers or click interception');
+expect(boot.indexOf("load('./mair-dj-v2.js'")<boot.indexOf("load('./mair-dj-cadence-fix.js'"),'cadence fix loads after authoritative DJ');
+let fail=0;for(const[ok,msg]of checks){console.log(`${ok?'PASS':'FAIL'} ${msg}`);if(!ok)fail++}if(fail)process.exit(1);console.log(`DJ cadence stage 2: ${checks.length} PASS / 0 FAIL`);
