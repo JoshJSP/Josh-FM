@@ -26,7 +26,8 @@ function patchBrain(){
   };
   brain.__mairCadencePatched=true;brain.__mairOriginalDecide=original;return true
 }
-function copy(detail=lastDetail||window.MAIRDJ?.diagnostics?.()||{}){
+function copy(detail){
+  detail=detail||lastDetail||window.MAIRDJ?.diagnostics?.()||{};
   const phase=String(detail.phase||'COUNTING').toUpperCase(),rem=remaining();
   if(phase==='SPEAKING')return{state:'ON_AIR',label:'DJ · On air',detail:'De MAIR DJ is live.'};
   if(phase==='HANDOFF'||phase==='RESTORING')return{state:'PREPARING',label:'DJ · On air voorbereiden',detail:'Muziek en DJ worden veilig overgedragen.'};

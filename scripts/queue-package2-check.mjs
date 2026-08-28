@@ -38,10 +38,127 @@ async function testRequestTransitionDeduplication(){
   context.Math.random=()=>0;Object.assign(context,{addEventListener:(type,fn)=>{const a=listeners.get(type)||[];a.push(fn);listeners.set(type,a)},dispatchEvent:e=>{for(const fn of listeners.get(e.type)||[])fn(e);return true}});context.window=context;vm.createContext(context);vm.runInContext(read('request-manager.js'),context,{filename:'request-manager.js'});
   await context.JFMRequests.add(track(9).uri);assert.equal(context.JFMRequests.list()[0].remaining,2);context.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));context.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));await sleep(0);assert.equal(context.JFMRequests.list()[0].remaining,2,'duplicate events for the same current track may not consume request ETA');context.playback.item={id:track(2).id,uri:track(2).uri,name:'Next',artists:[{name:'Artist 2'}]};context.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));context.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));await sleep(0);assert.equal(context.JFMRequests.list()[0].status,'armed');assert.equal(context.programCalls,1,'one real transition may arm a request only once')
 }
+async function testPlayedRequestAnnouncementMarker(){
+  const data=storage();
+
+  function boot(current){
+    const listeners=new Map(),queueInfo={textContent:'',style:{}};
+    const document={
+      readyState:'complete',
+      visibilityState:'visible',
+      getElementById:id=>id==='queueInfo'?queueInfo:null,
+      addEventListener:()=>{}
+    };
+    const context={
+      window:null,
+      document,
+      localStorage:data,
+      CustomEvent:FakeCustomEvent,
+      Date,
+      Promise,
+      console,
+      Math:Object.create(Math),
+      setInterval:()=>0,
+      setTimeout:(fn)=>{Promise.resolve().then(fn);return 0},
+      clearTimeout:()=>{},
+      playback:{item:current},
+      trackObj:t=>({
+        id:t.id,
+        uri:t.uri,
+        name:t.name,
+        artists:(t.artists||[]).map(a=>a.name||a)
+      }),
+      api:async path=>path.startsWith('/tracks/')?track(9,'Request Artist'):null,
+      JFMQueue:{programNext:async()=>true}
+    };
+
+    context.Math.random=()=>0;
+    Object.assign(context,{
+      addEventListener:(type,fn)=>{
+        const a=listeners.get(type)||[];
+        a.push(fn);
+        listeners.set(type,a)
+      },
+      dispatchEvent:e=>{
+        for(const fn of listeners.get(e.type)||[])fn(e);
+        return true
+      }
+    });
+
+    context.window=context;
+    vm.createContext(context);
+    vm.runInContext(read('request-manager.js'),context,{filename:'request-manager.js'});
+    return context;
+  }
+
+  const firstTrack=track(1,'Artist 1');
+  const requested=track(9,'Request Artist');
+  const first=boot({
+    id:firstTrack.id,
+    uri:firstTrack.uri,
+    name:firstTrack.name,
+    artists:[{name:'Artist 1'}]
+  });
+
+  await first.JFMRequests.add(requested.uri);
+
+  first.playback.item={
+    id:requested.id,
+    uri:requested.uri,
+    name:requested.name,
+    artists:[{name:'Request Artist'}]
+  };
+  first.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));
+  await sleep(0);
+
+  assert.equal(first.JFMRequests.list().length,0,'played request must leave active request queue');
+  assert.equal(first.JFMRequests.isRequest(requested),true,'played current request must remain identifiable');
+
+  const marker=first.JFMRequests.currentRequest(requested);
+  assert.ok(marker,'played request marker must exist');
+  assert.equal(marker.uri,requested.uri);
+  assert.ok(marker.requestId);
+  assert.ok(marker.playedAt);
+
+  const reloaded=boot({
+    id:requested.id,
+    uri:requested.uri,
+    name:requested.name,
+    artists:[{name:'Request Artist'}]
+  });
+
+  assert.equal(reloaded.JFMRequests.isRequest(requested),true,'played request marker must survive reload');
+  assert.ok(reloaded.JFMRequests.currentRequest(requested),'marker must be readable after reload');
+
+  const consumed=reloaded.JFMRequests.consumeCurrentRequest(requested);
+  assert.ok(consumed,'marker must be consumable once');
+  assert.equal(consumed.requestId,marker.requestId);
+  assert.equal(reloaded.JFMRequests.consumeCurrentRequest(requested),null,'marker must not be consumable twice');
+  assert.equal(reloaded.JFMRequests.isRequest(requested),false,'consumed marker must no longer identify track as request');
+
+  data.setItem('jfm_played_request_v1',JSON.stringify({
+    requestId:'stale-request',
+    uri:requested.uri,
+    trackId:requested.id,
+    name:requested.name,
+    artists:['Request Artist'],
+    playedAt:Date.now()-(11*60*1000)
+  }));
+
+  const stale=boot({
+    id:requested.id,
+    uri:requested.uri,
+    name:requested.name,
+    artists:[{name:'Request Artist'}]
+  });
+
+  assert.equal(stale.JFMRequests.currentRequest(requested),null,'expired marker must be ignored');
+  assert.equal(data.getItem('jfm_played_request_v1'),null,'expired marker must be deleted');
+}
 function testStaticContracts(){
   const suite=read('radio-suite.js'),station=read('station-queue.js'),requests=read('request-manager.js'),director=read('director.js'),truth=read('spotify-upcoming-truth.js'),sw=read('sw.js'),build7=read('build7.js'),styles=read('request-layer-fix.css');
   assert.ok(suite.indexOf("'./queue-core.js'")<suite.indexOf("'./request-manager.js'"));assert.ok(suite.includes("'./spotify-upcoming-truth.js'"));assert.ok(station.includes("JFMQueue.buildActive('continuity-")&&station.includes('MAIR programmeert vooruit'));assert.ok(station.includes("'jfm:reload-context-restored'")&&station.includes('resetAfterReload'));assert.ok(!station.includes('appended.has(track.id)||remote.has'));assert.ok(requests.includes('JFMQueue.programNext')&&!requests.includes("/me/player/queue?uri="));assert.ok(requests.includes("uri===lastObservedUri")&&requests.includes("trace('duplicate-trackchange'"));assert.ok(build7.includes('window.JFMRequests.add(d.uri,b)')&&build7.includes("'mair:request-confirmed'")&&build7.includes('requestConfirmCapture'));assert.ok(suite.includes("'mair:request-confirmed'"));assert.ok(director.includes('if(window.JFMSpotifyUpcomingTruth)')&&director.includes('function renderNext(){paintNext();if(!window.JFMSpotifyUpcomingTruth)'));assert.ok(truth.includes('v2-single-authoritative-owner'));assert.ok(sw.includes('mair-v97-modes-20260826')&&sw.includes("'./request-layer-fix.css'"));assert.match(styles,/\.mair-request-sheet\s*\{[^}]*z-index:\s*1300/)
 }
-const tests=[testNormalizeCommit,testReloadPersistence,testSerializedBuildsAndStationOwner,testExactRequestInsertion,testLongSessionInvariant,testRequestTransitionDeduplication,testStaticContracts];let passed=0;
+const tests=[testNormalizeCommit,testReloadPersistence,testSerializedBuildsAndStationOwner,testExactRequestInsertion,testLongSessionInvariant,testRequestTransitionDeduplication,testPlayedRequestAnnouncementMarker,testStaticContracts];let passed=0;
 for(const test of tests){try{await test();passed++;console.log('PASS',test.name)}catch(error){console.error('FAIL',test.name,'—',error?.stack||error);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`Queue package 2: ${passed}/${tests.length} PASS`);

@@ -28,6 +28,7 @@
     "reliability-behavior": "node --check mair-runtime.js && node --check transition-controller.js && node scripts/runtime-registry-behavior-check.mjs && node scripts/transition-controller-behavior-check.mjs",
     "spotify-session-stage1": "node --check spotify-test-config.js && node scripts/spotify-session-stage1-check.mjs",
     "dj-cadence-stage2": "node --check mair-dj-cadence-fix.js && node scripts/dj-cadence-stage2-check.mjs",
+    "production-boot-integration": "node scripts/production-boot-integration-check.mjs",
     "test-lab": "node --check mair-observability.js && node --check mair-test-simulator.js && node --check mair-test-lab.js && node scripts/test-lab-simulator-check.mjs && node scripts/diagnostics-correlation-check.mjs",
     "ux-1": "node --check mair-ux-state.js && node --check mair-ux-v1.js && node scripts/ux-state-behavior-check.mjs && node scripts/ux-contract-check.mjs",
     "my-mair": "node --check mair-my-mair.js && node scripts/my-mair-preferences-check.mjs",

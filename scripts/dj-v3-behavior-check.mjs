@@ -15,14 +15,14 @@ class FakeCustomEvent{constructor(type,options={}){this.type=type;this.detail=op
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:['2026-08-26T10:30:00Z']))}static now(){return Date.now()}}
 function makeElement(extra={}){return{value:'',textContent:'',dataset:{},checked:false,addEventListener(){},querySelector(){return null},cloneNode(){return makeElement({...this})},replaceWith(){},...extra}}
 
-function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTransport=true,writerSucceeds=true,writerDelay=0,prepareDelay=0,prepareFailures=0,playerFailures=0,writerText='Dit is een voorbereide MAIR DJ-break.',writerTexts=null,factsEnabled=false}={}){
+function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTransport=true,writerSucceeds=true,writerDelay=0,prepareDelay=0,prepareFailures=0,playerFailures=0,writerText='Dit is een voorbereide MAIR DJ-break.',writerTexts=null,factsEnabled=false,requestTrackId=''}={}){
   const bus=new FakeEventTarget();
   const elements={talk:makeElement({value:'1'}),facts:makeElement({checked:factsEnabled}),talkValue:makeElement(),djBreakTime:makeElement(),djText:makeElement()};
   const document={readyState:'complete',visibilityState:hidden?'hidden':'visible',getElementById:id=>elements[id]||null,addEventListener(){}};
   const storage=new Map([['jfm_spotify_device_id','device-test']]);
   const localStorage={getItem:k=>storage.has(k)?storage.get(k):null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},sessionStorage=localStorage;
   const remote={id:'A',uri:'spotify:track:A',playing:true,progress:4000};
-  const metrics={genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,speak:0,prepare:0,prepareAborted:0,writerAborted:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0};
+  const metrics={genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,speak:0,speakAborted:0,playbackActions:0,prepare:0,prepareAborted:0,writerAborted:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0,requestConsume:0};
   let operation=null,expectedLive=true;
   const playbackTruth={
     get:()=>({trackId:remote.id,uri:remote.uri,isPlaying:remote.playing,expectedLive,operation}),
@@ -41,7 +41,7 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
   const audioStatus={provider:'fish',model:'test-fish',voiceId:'voice',cacheSize:0,audioUnlocked:true,playbackMode:'html-audio'};
   const JFMDJAudio={status:audioStatus,unlock:async()=>true};
   const prepareSpeech=async(_text,_jingle,meta={})=>{metrics.prepare++;if(prepareDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,prepareDelay);meta.signal?.addEventListener('abort',()=>{clearTimeout(timer);metrics.prepareAborted++;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))},{once:true})});if(prepareFailures-->0){audioStatus.error='temporary Fish Audio failure';return false}audioStatus.error='';audioStatus.cacheSize=1;return true};
-  const speakText=async()=>{metrics.speak++;audioStatus.cacheSize=0;if(speakDelay)await sleep(speakDelay);return speakSucceeds};
+  const speakText=async(_text,_jingle,meta={})=>{metrics.speak++;audioStatus.cacheSize=0;if(speakDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,speakDelay),abort=()=>{clearTimeout(timer);metrics.speakAborted++;reject(Object.assign(new Error('voice cancelled'),{name:'AbortError'}))};if(meta.signal?.aborted)return abort();meta.signal?.addEventListener?.('abort',abort,{once:true})});return speakSucceeds};
   const JFMPlayback={
     pause:async()=>{metrics.genericPause++;remote.playing=false;return true},
     resume:async()=>{metrics.genericResume++;remote.playing=true;return true},
@@ -52,7 +52,7 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
     JFMPlayback.djResume=async uri=>{assert.equal(uri,remote.uri);metrics.djResume++;remote.playing=true;return true};
     JFMPlayback.djRewind=async uri=>{assert.equal(uri,remote.uri);metrics.djRewind++;remote.progress=0;return true};
   }
-  const window={addEventListener:(...a)=>bus.addEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:playbackTruth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}}};
+  const window={addEventListener:(...a)=>bus.addEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:playbackTruth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}},jfmIsRequest:t=>!!requestTrackId&&String(t?.id||'')===String(requestTrackId),JFMRequests:{consumeCurrentRequest:t=>{if(requestTrackId&&String(t?.id||'')===String(requestTrackId)){metrics.requestConsume++;return{requestId:'test-request',trackId:requestTrackId}}return null}}};
   const math=Object.create(Math);math.random=()=>0;
   const context={window,document,localStorage,sessionStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText,setTimeout,clearTimeout,AbortController,Promise,Date:FixedDate,Math:math,console};
   Object.assign(window,{window,document,localStorage,sessionStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText});Object.assign(context,window);
@@ -60,7 +60,7 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
   const setTrack=(id,{playing=true,progress=4000}={})=>{remote.id=id;remote.uri=`spotify:track:${id}`;remote.playing=playing;remote.progress=progress};
   let transition=0;
   const natural=(ended,newId)=>{setTrack(newId);bus.dispatchEvent(new FakeCustomEvent('mair:track-transition',{detail:{id:`t${++transition}`,fromTrackId:ended,toTrackId:newId,cause:'NATURAL_END',source:'canonical'}}))};
-  const changed=(previous,newId,sourceName='primary-next')=>{setTrack(newId);bus.dispatchEvent(new FakeCustomEvent('mair:track-transition',{detail:{id:`t${++transition}`,fromTrackId:previous,toTrackId:newId,cause:sourceName.includes('prev')?'USER_PREVIOUS':'USER_NEXT',source:sourceName}}))};
+  const changed=(previous,newId,sourceName='primary-next')=>{metrics.playbackActions++;setTrack(newId);bus.dispatchEvent(new FakeCustomEvent('mair:track-transition',{detail:{id:`t${++transition}`,fromTrackId:previous,toTrackId:newId,cause:sourceName.includes('prev')?'USER_PREVIOUS':'USER_NEXT',source:sourceName}}))};
   const setProfile=id=>{window.MAIRDJProfiles.current={id,name:id,role:'MAIR DJ'}};
   return{window,document,metrics,setTrack,setProfile,natural,changed,state:()=>window.MAIRDJ.state()};
 }
@@ -125,7 +125,10 @@ async function testStaleTTSResponseIsCancelled(){
   const h=createHarness({prepareDelay:220});h.window.MAIRDJ.armManual();await sleep(30);h.changed('A','B');await sleep(300);assert.equal(h.metrics.prepareAborted,1);assert.equal(h.metrics.djPause,0);assert.equal(h.state().prepared,null);assert.equal(h.state().phase,'COUNTING')
 }
 async function testUserOverrideDuringBreakWins(){
-  const h=createHarness({speakDelay:350});await prepareAutomaticDue(h);h.natural('D','E');await sleep(260);h.changed('E','X');await sleep(700);assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djResume,0,'DJ mag de door de gebruiker gekozen track niet vervangen');assert.equal(h.state().played,1);assert.equal(h.state().phase,'COUNTING');assert.equal(h.state().terminalBreaks.at(-1).reason,'user-override')
+  const h=createHarness({speakDelay:350});await prepareAutomaticDue(h);h.natural('D','E');await sleep(260);h.changed('E','X');await sleep(700);assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.speakAborted,1);assert.equal(h.metrics.djResume,0,'DJ mag de door de gebruiker gekozen track niet vervangen');assert.equal(h.state().played,0);assert.equal(h.state().phase,'COUNTING');assert.equal(h.state().terminalBreaks.at(-1).status,'ABORTED_USER_ACTION')
+}
+async function testSkipCancelsVoiceAtRaceBoundaries(){
+  for(const delay of [0,120,480]){const h=createHarness({speakDelay:650});await prepareAutomaticDue(h);h.natural('D','E');for(let i=0;i<30&&h.state().phase!=='SPEAKING';i++)await sleep(10);assert.equal(h.state().phase,'SPEAKING',`voice did not start for delay ${delay}`);if(delay)await sleep(delay);await h.window.MAIRDJ.cancelActive('USER_NEXT');h.changed('E',`X-${delay}`);await sleep(220);assert.equal(h.metrics.speak,1,`delay ${delay}: one voice started`);assert.equal(h.metrics.speakAborted,1,`delay ${delay}: active voice stopped once`);assert.equal(h.metrics.playbackActions,1,`delay ${delay}: exactly one playback action`);assert.equal(h.metrics.djResume,0,`delay ${delay}: no stale DJ resume`);assert.equal(h.state().played,0,`delay ${delay}: cancelled voice is not committed as aired`);assert.equal(h.state().terminalBreaks.at(-1).status,'ABORTED_USER_ACTION',`delay ${delay}: terminal cancel state`);assert.equal(new Set(h.state().terminalBreaks.map(x=>x.breakId)).size,h.state().terminalBreaks.length,`delay ${delay}: one terminal state per break`)}
 }
 async function testPauseIntentDuringBreakWins(){
   const h=createHarness({speakDelay:350});await prepareAutomaticDue(h);h.natural('D','E');await sleep(260);assert.equal(h.window.MAIRDJ.userOverride('PLAY_PAUSE'),true);await sleep(700);assert.equal(h.metrics.djResume,0,'een expliciete pauzeactie tijdens de DJ-break mag niet worden teruggedraaid');assert.equal(h.state().terminalBreaks.at(-1).reason,'user-override')
@@ -135,6 +138,13 @@ async function testMalformedWriterRegeneratesOnce(){
 }
 async function testTrustedMetadataFactAirsAndCommitsOnce(){
   const h=createHarness({factsEnabled:true,writerText:'Track C staat op een release uit 2026. Nu gaat de muziek door.'});h.natural('A','B');await sleep(20);h.natural('B','C');await sleep(100);assert.equal(h.state().phase,'ARMED');assert.equal(h.state().brain.breakType,'TRACK_FACT');h.natural('C','D');await sleep(700);assert.equal(h.state().played,1);assert.equal(h.state().memory.usedFacts,1,'fact ID is committed only after air')
+}
+async function testRequestMarkerConsumedOnlyAfterSuccessfulRequestAir(){
+const success=createHarness({requestTrackId:'E',writerText:'Deze is aangevraagd: Artist met Track E.'});await prepareAutomaticDue(success);assert.equal(success.state().brain.breakType,'REQUEST','request must create explicit REQUEST break');assert.equal(success.metrics.requestConsume,0,'request marker must survive preparation');success.natural('D','E');await sleep(700);assert.equal(success.state().played,1);assert.equal(success.metrics.requestConsume,1,'successful REQUEST air consumes marker exactly once');
+
+const failed=createHarness({requestTrackId:'E',speakSucceeds:false,writerText:'Deze is aangevraagd: Artist met Track E.'});await prepareAutomaticDue(failed);assert.equal(failed.state().brain.breakType,'REQUEST');failed.natural('D','E');await sleep(800);assert.equal(failed.state().played,0);assert.equal(failed.metrics.requestConsume,0,'failed REQUEST air must preserve marker');
+
+const ordinary=createHarness();await prepareAutomaticDue(ordinary);ordinary.natural('D','E');await sleep(700);assert.equal(ordinary.state().played,1);assert.equal(ordinary.metrics.requestConsume,0,'ordinary completed break must not consume request marker')
 }
 async function testTransientSpotifyContextRetriesBeforeDroppingBreak(){
   const h=createHarness({playerFailures:2});assert.equal(h.window.MAIRDJ.armManual(),true);await sleep(650);assert.equal(h.state().phase,'ARMED',`temporary Spotify context failures should heal: ${JSON.stringify(h.state())}`);assert.equal(h.state().retries.spotifyContext,2);assert.ok(h.metrics.writer>=1,'writer wordt pas na herstelde Spotify-context aangeroepen');h.natural('A','B');await sleep(700);assert.equal(h.state().played,1)
@@ -164,10 +174,12 @@ const tests=[
   ['stale writer response is cancelled on track change',testStaleWriterResponseIsCancelled],
   ['stale TTS response is cancelled on track change',testStaleTTSResponseIsCancelled],
   ['user override during DJ break wins over stale resume',testUserOverrideDuringBreakWins],
+  ['skip cancels voice at beginning/middle/end with one playback action',testSkipCancelsVoiceAtRaceBoundaries],
   ['pause intent during DJ break suppresses automatic resume',testPauseIntentDuringBreakWins],
   ['malformed writer output regenerates exactly once',testMalformedWriterRegeneratesOnce],
   ['trusted Spotify metadata fact airs and commits once',testTrustedMetadataFactAirsAndCommitsOnce],
-  ['transient Spotify context failure retries safely',testTransientSpotifyContextRetriesBeforeDroppingBreak],
+  ['request marker consumes only after successful REQUEST air',testRequestMarkerConsumedOnlyAfterSuccessfulRequestAir],
+['transient Spotify context failure retries safely',testTransientSpotifyContextRetriesBeforeDroppingBreak],
   ['transient TTS preparation retries once',testTransientTTSPreparationRetriesOnce],
   ['track change cancels Spotify context backoff',testTrackChangeCancelsSpotifyContextBackoff],
   ['bfcache reload aborts old prepared break',testBfcacheReloadAbortsPreparedBreak],

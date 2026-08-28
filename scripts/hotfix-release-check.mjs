@@ -24,7 +24,7 @@ const checks=[
  ['dj-rewind-resume',dj.includes('rewindCurrent(uri)')&&dj.includes('await resumeMusic(uri)')],
  ['dj-auto-scheduler',dj.includes('count++')&&dj.includes('remaining()')&&dj.includes("window.addEventListener('mair:track-transition'")&&dj.includes("detail.cause==='NATURAL_END'")&&!dj.includes('schedulePendingRetry')],
  ['dj-manual-next',dj.includes('manualArmed')&&dj.includes('armManual')&&dj.includes("dataset[flag]='v3'")],
- ['dj-real-audio-completion',dj.includes('const ok=await window.speakText(pack.text,false,{breakId:pack.breakId})')&&dj.includes("setPhase('SPEAKING'")&&!dj.includes('const audio=new Audio()')],
+ ['dj-real-audio-completion',dj.includes('const ok=await window.speakText(pack.text,false,{breakId:pack.breakId,signal:pack.voiceController?.signal})')&&dj.includes("setPhase('SPEAKING'")&&!dj.includes('const audio=new Audio()')],
  ['dj-single-attempt-failsafe',dj.includes('lastNaturalSig')&&dj.includes("miss('break-missed',error)")&&dj.includes('restoreMusic(uri,{rewind:false})')&&!dj.includes('retryTimer')],
  ['legacy-auto-scheduler-retired',resume.includes('__mairLegacyDJSchedulerDisabled=true')&&resume.includes('legacyAutomaticBreaks:false')],
  ['legacy-handoff-retired',legacy.includes('legacy-shim-to-mair-dj-v2')&&!legacy.includes('/me/player/pause')],

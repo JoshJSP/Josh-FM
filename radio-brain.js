@@ -1,8 +1,8 @@
 (()=>{
 'use strict';
 const VERSION='1.0.0';
-const TYPES=['INTRO','OUTRO','BACK_ANNOUNCE','FORWARD_ANNOUNCE','ARTIST_FACT','TRACK_FACT','TWO_SONG_LINK','STATION_ID','TIME_CHECK','HOUR_OPENER','HOUR_CLOSER','SESSION_LINK'];
-const CONFIG={INTRO:[14,10],OUTRO:[12,9],BACK_ANNOUNCE:[16,10],FORWARD_ANNOUNCE:[17,11],ARTIST_FACT:[28,15],TRACK_FACT:[28,15],TWO_SONG_LINK:[24,14],STATION_ID:[8,5],TIME_CHECK:[14,10],HOUR_OPENER:[32,18],HOUR_CLOSER:[26,15],SESSION_LINK:[24,14]};
+const TYPES=['INTRO','OUTRO','BACK_ANNOUNCE','FORWARD_ANNOUNCE','REQUEST','ARTIST_FACT','TRACK_FACT','TWO_SONG_LINK','STATION_ID','TIME_CHECK','HOUR_OPENER','HOUR_CLOSER','SESSION_LINK'];
+const CONFIG={INTRO:[14,10],OUTRO:[12,9],BACK_ANNOUNCE:[16,10],FORWARD_ANNOUNCE:[17,11],REQUEST:[16,10],ARTIST_FACT:[28,15],TRACK_FACT:[28,15],TWO_SONG_LINK:[24,14],STATION_ID:[8,5],TIME_CHECK:[14,10],HOUR_OPENER:[32,18],HOUR_CLOSER:[26,15],SESSION_LINK:[24,14]};
 const validTrack=t=>!!String(t?.id||t?.uri||'').trim();
 const clean=v=>String(v??'').trim();
 function no(reason,extra={}){return{shouldTalk:false,breakType:'NO_BREAK',maxDurationSeconds:0,targetWordCount:0,priority:0,permittedTopics:[],prohibitedTopics:['weather','news','sport','traffic'],mustMention:[],mayMention:[],reason, fallbackType:null,...extra}}
@@ -37,6 +37,7 @@ function decide(input={}){
   const artists=[...(input.currentTrack?.artists||[]),...(input.nextTrack?.artists||[])];if(artists.some(a=>recentArtists.has(String(a).toLowerCase()))){score-=2;reason.push('recent-artist-penalty')}
   if(recentTypes[0]&&recentTypes[0]===recentTypes[1])score-=2;
   const threshold=talk==='LESS'?7:talk==='MORE'?4:6;if(!manual&&score<threshold)return no('score-below-threshold',{score,threshold});
+  if(input.nextTrack?.request||input.currentTrack?.request){const requestTrack=input.nextTrack?.request?input.nextTrack:input.currentTrack,[target,maxDuration]=CONFIG.REQUEST;return{shouldTalk:true,breakType:'REQUEST',maxDurationSeconds:maxDuration,targetWordCount:target,priority:10,permittedTopics:['music','request'],prohibitedTopics:['weather','news','sport','traffic','unverified-facts','technical-details'],mustMention:[],mayMention:[...(requestTrack?.artists||[]),requestTrack?.name].filter(Boolean).slice(0,4),reason:input.nextTrack?.request?'next-track-request':'current-track-request',fallbackType:'REQUEST',score:10,threshold:0,hourKey}}
   const hourAlready=history.some(x=>x.hourKey===hourKey||x.type==='HOUR_OPENER'&&now-Number(x.timestamp)<3000000);
   if(!hourAlready&&minute<=8&&tracks>=2)type='HOUR_OPENER';
   else if(minute>=52&&recentCount(history,'HOUR_CLOSER',3000000,now)===0&&tracks>=3)type='HOUR_CLOSER';

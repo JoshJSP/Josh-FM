@@ -163,6 +163,7 @@
   async function skip(delta){
     activateNow();return withBusy(async()=>{
       try{
+        const cause=delta>0?'USER_NEXT':'USER_PREVIOUS';if(window.MAIRDJ?.busy&&typeof window.MAIRDJ?.cancelActive==='function')await window.MAIRDJ.cancelActive(cause);
         if(delta>0){markTransitionAction('NEXT');await advance({record:true,source:'primary-next'});info('Josh FM speelt.');return true}
         const{p,id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');markTransitionAction('PREVIOUS',{fromTrackId:before});const fallbackUri=stationNeighbor(state,-1);let position=Number(state?.progress_ms||0);if(!position)try{position=Number((await p.getCurrentState())?.position||0)}catch{}
         await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'});if(position>3000){await wait(180);try{await p.previousTrack()}catch{await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'})}}let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,8);

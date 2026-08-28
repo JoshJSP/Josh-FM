@@ -8,7 +8,7 @@ ok(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'AR
 ok(dj.includes("fetch('/api/dj-writer'")&&dj.includes('window.prepareSpeech')&&dj.includes('window.speakText'),'DJ must use writer + prepared central voice route');
 ok(dj.indexOf('window.prepareSpeech')<dj.indexOf('await pauseMusic(uri)'),'Voice must be prepared before Spotify pause');
 ok(dj.includes("window.addEventListener('mair:track-transition'")&&dj.includes("detail.cause==='NATURAL_END'")&&dj.includes('async function naturalTransition'),'Canonical natural transitions must be the only automatic DJ cadence trigger');
-ok(dj.includes('function nonNaturalTransition')&&dj.includes('transition-${String(detail.cause'),'Non-natural transitions may only invalidate stale DJ state or register a user override');
+ok(dj.includes('function nonNaturalTransition')&&dj.includes('transition-${cause.toLowerCase()')&&dj.includes('cancelActive(cause)'),'Non-natural transitions may only invalidate stale DJ state or execute the explicit voice-cancel transaction');
 ok(!dj.includes('schedulePendingRetry')&&!dj.includes('retryTimer')&&!dj.includes('retryAfter'),'DJ must never retry a failed handoff on the same track');
 ok(dj.includes('lastNaturalSig')&&dj.includes('if(sig===lastNaturalSig)return false'),'Duplicate natural-transition guard missing');
 ok(dj.includes('writerRequest(body,timeoutMs=14000,externalSignal=null)')&&dj.includes("provider:'local-fallback'")&&dj.includes('scoreQuality'),'DJ writer must have cancellation/timeout, quality validation and safe Dutch fallback');

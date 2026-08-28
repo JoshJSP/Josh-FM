@@ -7,7 +7,7 @@ const has=(src,...needles)=>needles.every(n=>src.includes(n));
 
 const clock=read('station-clock.js');
 const rotation=read('rotation-engine.js');
-const memory=read('mair-dj-memory.js');
+const memory=read('dj-memory.js');
 const imaging=read('mair-imaging.js');
 const liveNews=read('mair-live-news.js');
 const bulletin=read('mair-news-bulletin.js');
@@ -43,7 +43,7 @@ check('music director uses personal learning',has(rotation,'likes','discoveryWin
 check('music director explains choices',has(rotation,'function reason','_why=reason'));
 check('Sleep uses low momentum',has(rotation,"station==='sleep'?-.24","station==='sleep'?.28"));
 
-check('persistent DJ memory active',has(memory,"mair_dj_memory_v2","MAX_AGE=72*60*60*1000","avoidOpeners","recentArtists","isTooSimilar"));
+check('authoritative DJ memory active',has(memory,"OWNER='authoritative-dj-memory'","snapshot","observeTrack","metric","commit","function list()"));
 check('DJ runtime consumes persistent memory',has(dj,'window.MAIRDJMemory','memory()?.snapshot','memory()?.commit'));
 check('DJ writer receives anti-repeat context',has(writer,'recentBreaks','usedFactIds','Vermijd recente openingen'));
 
@@ -86,7 +86,7 @@ check('diagnostics exposes radio brain and correlated breaks',has(testLab,'RADIO
 check('diagnostic/test UI is centralized',has(diagnostics,'MAIRDiagnosticsHub',"moveCard('mairTraceCard'","moveCard('mairTestLabCard'"));
 check('DJ runtime preserves automatic cadence',has(dj,'v4.0-radio-brain-1.0','rebasePreparation','prepareRebases','mair:track-transition','NATURAL_END'));
 
-const versionRuntime=['./mair-dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-news-bulletin.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
+const versionRuntime=['./dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-news-bulletin.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
 const cachedRuntime=[...versionRuntime,'./spotify-api-budget.js','./spotify-upcoming-truth.js'];
 check('version loader wires UI radio experience modules',versionRuntime.every(x=>version.includes(x))&&version.includes("JFM_ASSET_VERSION='80'"));
 check('service worker caches all radio experience modules',cachedRuntime.every(x=>sw.includes(x))&&sw.includes('mair-v97-modes-20260826'));
