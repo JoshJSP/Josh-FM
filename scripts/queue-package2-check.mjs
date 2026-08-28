@@ -38,10 +38,34 @@ async function testRequestTransitionDeduplication(){
   context.Math.random=()=>0;Object.assign(context,{addEventListener:(type,fn)=>{const a=listeners.get(type)||[];a.push(fn);listeners.set(type,a)},dispatchEvent:e=>{for(const fn of listeners.get(e.type)||[])fn(e);return true}});context.window=context;vm.createContext(context);vm.runInContext(read('request-manager.js'),context,{filename:'request-manager.js'});
   await context.JFMRequests.add(track(9).uri);assert.equal(context.JFMRequests.list()[0].remaining,2);context.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));context.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));await sleep(0);assert.equal(context.JFMRequests.list()[0].remaining,2,'duplicate events for the same current track may not consume request ETA');context.playback.item={id:track(2).id,uri:track(2).uri,name:'Next',artists:[{name:'Artist 2'}]};context.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));context.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));await sleep(0);assert.equal(context.JFMRequests.list()[0].status,'armed');assert.equal(context.programCalls,1,'one real transition may arm a request only once')
 }
+async function testPlayedRequestAnnouncementMarker(){
+  const listeners=new Map(),data=storage(),queueInfo={textContent:'',style:{}},document={readyState:'complete',visibilityState:'visible',getElementById:id=>id==='queueInfo'?queueInfo:null,addEventListener:()=>{}},context={window:null,document,localStorage:data,CustomEvent:FakeCustomEvent,Date,Promise,console,Math:Object.create(Math),setInterval:()=>0,setTimeout:(fn)=>{Promise.resolve().then(fn);return 0},clearTimeout:()=>{},playback:{item:{id:track(1).id,uri:track(1).uri,name:'Current',artists:[{name:'Artist 1'}]}},trackObj:t=>({id:t.id,uri:t.uri,name:t.name,artists:(t.artists||[]).map(a=>a.name||a)}),api:async path=>path.startsWith('/tracks/')?track(9,'Request Artist'):null,JFMQueue:{programNext:async()=>true}};
+  context.Math.random=()=>0;
+  Object.assign(context,{addEventListener:(type,fn)=>{const a=listeners.get(type)||[];a.push(fn);listeners.set(type,a)},dispatchEvent:e=>{for(const fn of listeners.get(e.type)||[])fn(e);return true}});
+  context.window=context;
+  vm.createContext(context);
+  vm.runInContext(read('request-manager.js'),context,{filename:'request-manager.js'});
+
+  await context.JFMRequests.add(track(9).uri);
+  context.playback.item={id:track(9).id,uri:track(9).uri,name:'Request',artists:[{name:'Request Artist'}]};
+  context.dispatchEvent(new FakeCustomEvent('jfm:trackchange'));
+  await sleep(0);
+
+  assert.equal(context.JFMRequests.list().length,0,'played request must leave active queue');
+  assert.equal(context.JFMRequests.isRequest(context.playback.item),true,'played request marker must remain visible to DJ');
+
+  const marker=context.JFMRequests.currentRequest(context.playback.item);
+  assert.ok(marker,'played request marker must exist');
+
+  const consumed=context.JFMRequests.consumeCurrentRequest(context.playback.item);
+  assert.ok(consumed,'request marker must be consumable once');
+  assert.equal(context.JFMRequests.consumeCurrentRequest(context.playback.item),null,'request marker must only consume once');
+  assert.equal(context.JFMRequests.isRequest(context.playback.item),false,'consumed request must no longer be marked');
+}
 function testStaticContracts(){
   const suite=read('radio-suite.js'),station=read('station-queue.js'),requests=read('request-manager.js'),director=read('director.js'),truth=read('spotify-upcoming-truth.js'),sw=read('sw.js'),build7=read('build7.js'),styles=read('request-layer-fix.css');
   assert.ok(suite.indexOf("'./queue-core.js'")<suite.indexOf("'./request-manager.js'"));assert.ok(suite.includes("'./spotify-upcoming-truth.js'"));assert.ok(station.includes("JFMQueue.buildActive('continuity-")&&station.includes('MAIR programmeert vooruit'));assert.ok(station.includes("'jfm:reload-context-restored'")&&station.includes('resetAfterReload'));assert.ok(!station.includes('appended.has(track.id)||remote.has'));assert.ok(requests.includes('JFMQueue.programNext')&&!requests.includes("/me/player/queue?uri="));assert.ok(requests.includes("uri===lastObservedUri")&&requests.includes("trace('duplicate-trackchange'"));assert.ok(build7.includes('window.JFMRequests.add(d.uri,b)')&&build7.includes("'mair:request-confirmed'")&&build7.includes('requestConfirmCapture'));assert.ok(suite.includes("'mair:request-confirmed'"));assert.ok(director.includes('if(window.JFMSpotifyUpcomingTruth)')&&director.includes('function renderNext(){paintNext();if(!window.JFMSpotifyUpcomingTruth)'));assert.ok(truth.includes('v2-single-authoritative-owner'));assert.ok(sw.includes('mair-v92-hourly-news-20260826')&&sw.includes("'./request-layer-fix.css'")&&sw.includes("'./mair-reload-audibility.js'")&&sw.includes("'./mair-news-bulletin.js'"));assert.match(styles,/\.mair-request-sheet\s*\{[^}]*z-index:\s*1300/)
 }
-const tests=[testNormalizeCommit,testReloadPersistence,testSerializedBuildsAndStationOwner,testExactRequestInsertion,testLongSessionInvariant,testRequestTransitionDeduplication,testStaticContracts];let passed=0;
+const tests=[testNormalizeCommit,testReloadPersistence,testSerializedBuildsAndStationOwner,testExactRequestInsertion,testLongSessionInvariant,testRequestTransitionDeduplication,testPlayedRequestAnnouncementMarker,testStaticContracts];let passed=0;
 for(const test of tests){try{await test();passed++;console.log('PASS',test.name)}catch(error){console.error('FAIL',test.name,'—',error?.stack||error);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`Queue package 2: ${passed}/${tests.length} PASS`);

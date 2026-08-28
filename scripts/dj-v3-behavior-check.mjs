@@ -13,14 +13,14 @@ class FakeEventTarget{
 class FakeCustomEvent{constructor(type,options={}){this.type=type;this.detail=options.detail}}
 function makeElement(extra={}){return{value:'',textContent:'',dataset:{},checked:false,addEventListener(){},querySelector(){return null},cloneNode(){return makeElement({...this})},replaceWith(){},...extra}}
 
-function createHarness({speakSucceeds=true,hidden=false,sdkTransport=true,writerSucceeds=true,writerText='Dit is een voorbereide MAIR DJ-break.'}={}){
+function createHarness({speakSucceeds=true,hidden=false,sdkTransport=true,writerSucceeds=true,writerText='Dit is een voorbereide MAIR DJ-break.',requestTrackId=''}={}){
   const bus=new FakeEventTarget();
   const elements={talk:makeElement({value:'1'}),talkValue:makeElement(),djBreakTime:makeElement(),djText:makeElement()};
   const document={readyState:'complete',visibilityState:hidden?'hidden':'visible',getElementById:id=>elements[id]||null,addEventListener(){}};
   const storage=new Map([['jfm_spotify_device_id','device-test']]);
   const localStorage={getItem:k=>storage.has(k)?storage.get(k):null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)};
   const remote={id:'A',uri:'spotify:track:A',playing:true,progress:4000};
-  const metrics={genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,speak:0,prepare:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0};
+  const metrics={genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,speak:0,prepare:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0,requestConsume:0};
   let operation=null,expectedLive=true;
   const playbackTruth={
     get:()=>({trackId:remote.id,uri:remote.uri,isPlaying:remote.playing,expectedLive,operation}),
@@ -50,7 +50,7 @@ function createHarness({speakSucceeds=true,hidden=false,sdkTransport=true,writer
     JFMPlayback.djResume=async uri=>{assert.equal(uri,remote.uri);metrics.djResume++;remote.playing=true;return true};
     JFMPlayback.djRewind=async uri=>{assert.equal(uri,remote.uri);metrics.djRewind++;remote.progress=0;return true};
   }
-  const window={addEventListener:(...a)=>bus.addEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:playbackTruth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}}};
+  const window={addEventListener:(...a)=>bus.addEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:playbackTruth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}},jfmIsRequest:t=>!!requestTrackId&&String(t?.id||'')===String(requestTrackId),JFMRequests:{consumeCurrentRequest:t=>{if(requestTrackId&&String(t?.id||'')===String(requestTrackId)){metrics.requestConsume++;return{trackId:requestTrackId}}return null}}};
   const math=Object.create(Math);math.random=()=>0;
   const context={window,document,localStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText,setTimeout,clearTimeout,AbortController,Promise,Date,Math:math,console};
   Object.assign(window,{window,document,localStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText});Object.assign(context,window);
@@ -112,6 +112,22 @@ async function testChangedNextTrackRearmsBeforePause(){
 async function testChangedVoiceProfileRearmsPreparedBreak(){
   const h=createHarness();await prepareAutomaticDue(h);h.setProfile('maya');h.natural('C','D');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.equal(h.state().remaining,0,'profile change must not erase the owed automatic break')
 }
+async function testRequestMarkerConsumedOnlyAfterSuccessfulAir(){
+  const ok=createHarness({requestTrackId:'D',writerText:'Hier is je verzoek: Artist met Track D.'});
+  await prepareAutomaticDue(ok);
+  assert.equal(ok.metrics.requestConsume,0,'request marker must survive preparation');
+  ok.natural('C','D');
+  await sleep(700);
+  assert.equal(ok.metrics.speak,1,'request break must air');
+  assert.equal(ok.metrics.requestConsume,1,'successful request break consumes marker exactly once');
+
+  const fail=createHarness({requestTrackId:'D',speakSucceeds:false,writerText:'Hier is je verzoek: Artist met Track D.'});
+  await prepareAutomaticDue(fail);
+  fail.natural('C','D');
+  await sleep(700);
+  assert.equal(fail.metrics.speak,1,'failed request voice was attempted');
+  assert.equal(fail.metrics.requestConsume,0,'failed request break must keep marker for a later attempt');
+}
 const tests=[
   ['automatic break uses SDK-first critical path',testSuccessfulAutomaticBreak],
   ['duplicate natural event is idempotent',testDuplicateNaturalEventCannotDoubleAir],
@@ -124,6 +140,7 @@ const tests=[
   ['writer failure uses safe Dutch fallback',testWriterFailureUsesSafeDutchFallback],
   ['changed next track rearms DJ copy before pause',testChangedNextTrackRearmsBeforePause],
   ['changed DJ profile rearms prepared break',testChangedVoiceProfileRearmsPreparedBreak],
+  ['request marker consumes only after successful air',testRequestMarkerConsumedOnlyAfterSuccessfulAir],
 ];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(e){console.error('FAIL',name,'—',e?.stack||e);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`MAIR DJ v3 behavioral simulation: ${passed}/${tests.length} PASS`);
