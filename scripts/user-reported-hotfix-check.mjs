@@ -25,7 +25,7 @@ assert.doesNotMatch(queue,/if\(candidates\.length<10\)\{const relaxed=generated\
 
 assert.match(news,/COOLDOWN=27\*60\*1000/);assert.match(news,/p!=='half'/);assert.match(news,/LAST_SLOT='mair_news_last_slot_v1'/);assert.match(news,/LAST_TITLE='mair_news_last_title_v1'/);assert.match(news,/function candidate\(\)\{return candidates\(\)\[0\]\|\|null\}/);assert.doesNotMatch(news,/headlines\|\|\[\]\)\.filter\(fresh\)\[0\]/,'headline selector must not fall back to the same used headline');
 
-assert.match(dj,/v4\.0-radio-brain-1\.0/);assert.match(dj,/function rebasePreparation/);assert.match(dj,/prepareRebases/);assert.match(dj,/automatic-preparation-late/);assert.match(dj,/break-identity-cancellation-v2/);assert.doesNotMatch(dj,/miss\('automatic-break-not-ready'\)/);assert.match(dj,/radio-brain-separated-v1/);
+assert.match(dj,/v4\.1-audible-handoff-evidence/);assert.match(dj,/function rebasePreparation/);assert.match(dj,/prepareRebases/);assert.match(dj,/automatic-preparation-late/);assert.match(dj,/break-identity-cancellation-v3/);assert.doesNotMatch(dj,/miss\('automatic-break-not-ready'\)/);assert.match(dj,/radio-brain-separated-v1/);
 assert.match(dj,/tracksSinceLastBreak,progress=Number\(observed\?\?count\?\?0\)/,'DJ countdown must preserve a legitimate zero and use the current plan target');
 assert.doesNotMatch(dj,/DJ over \$\{rem\}/,'normal UI must not promise an exact DJ break countdown');
 assert.doesNotMatch(easy,/over \$\{remaining\} nummer/,'Radio UI must not promise a dynamic Radio Brain decision as an exact countdown');

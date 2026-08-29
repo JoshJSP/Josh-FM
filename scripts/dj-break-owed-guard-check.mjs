@@ -17,7 +17,7 @@ const window={
 const context={window,document,CustomEvent:CE,setTimeout,clearTimeout,setInterval:()=>0,Date,Promise,console};Object.assign(window,{window,document,CustomEvent:CE});vm.createContext(context);vm.runInContext(src,context,{filename:'mair-dj-break-owed-guard.js'});
 assert.equal(window.MAIRDJBreakOwedGuard?.version,'mair-dj-break-owed-guard-v1');
 current={...current,pendingAir:true,prepared:null,phase:'COUNTING'};bus.dispatchEvent(new CE('mair:dj-v2-state',{detail:current}));await sleep(360);assert.equal(metrics.prepare,1,'due break without prepared audio must self-heal preparation');
-current={...current,pendingAir:false,lastMissReason:'break-missed',lastMissAt:12345};bus.dispatchEvent(new CE('mair:dj-v2-state',{detail:current}));await sleep(360);assert.equal(metrics.arm,1,'an aired-handoff failure must re-arm the owed break');
-bus.dispatchEvent(new CE('mair:dj-v2-state',{detail:current}));await sleep(360);assert.equal(metrics.arm,1,'same missed break must never be armed twice');
-document.visibilityState='hidden';current={...current,lastMissAt:12346};bus.dispatchEvent(new CE('mair:dj-v2-state',{detail:current}));await sleep(360);assert.equal(metrics.arm,1,'background state must not trigger an audible recovery');
-console.log('MAIR DJ break owed guard: PASS — due preparation self-heals and failed handoff re-arms exactly once');
+current={...current,pendingAir:false,lastMissReason:'break-missed',lastMissAt:12345};bus.dispatchEvent(new CE('mair:dj-v2-state',{detail:current}));await sleep(360);assert.equal(metrics.arm,0,'an aired-handoff failure must be safely skipped instead of creating a retry loop');
+bus.dispatchEvent(new CE('mair:dj-v2-state',{detail:current}));await sleep(360);assert.equal(metrics.arm,0,'same missed break must remain terminal');
+document.visibilityState='hidden';current={...current,lastMissAt:12346};bus.dispatchEvent(new CE('mair:dj-v2-state',{detail:current}));await sleep(360);assert.equal(metrics.arm,0,'background state must not trigger an audible retry');
+console.log('MAIR DJ break owed guard: PASS — due preparation self-heals and failed handoff is safely terminal');

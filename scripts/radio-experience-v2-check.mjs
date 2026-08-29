@@ -84,7 +84,7 @@ check('Spotify upcoming queue is no longer 1.6s polling',has(upcoming,'WATCHDOG_
 
 check('diagnostics exposes radio brain and correlated breaks',has(testLab,'RADIO BRAIN','BREAK DECISION','BREAK ID','RETRIES','TIMINGS'));
 check('diagnostic/test UI is centralized',has(diagnostics,'MAIRDiagnosticsHub',"moveCard('mairTraceCard'","moveCard('mairTestLabCard'"));
-check('DJ runtime preserves automatic cadence',has(dj,'v4.0-radio-brain-1.0','rebasePreparation','prepareRebases','mair:track-transition','NATURAL_END'));
+check('DJ runtime preserves automatic cadence',has(dj,'v4.1-audible-handoff-evidence','rebasePreparation','prepareRebases','mair:track-transition','NATURAL_END'));
 
 const versionRuntime=['./dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-news-bulletin.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
 const cachedRuntime=[...versionRuntime,'./spotify-api-budget.js','./spotify-upcoming-truth.js'];

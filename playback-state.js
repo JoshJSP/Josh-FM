@@ -64,9 +64,9 @@
   function setExpectedLive(on,intent=on?'play':'pause'){
     return patch({expectedLive:!!on,intent:String(intent||'idle')},'intent');
   }
-  function begin(type,{expectedTrackId='',expectedUri='',timeoutMs=6500}={}){
+  function begin(type,{expectedTrackId='',expectedUri='',correlationId='',timeoutMs=6500}={}){
     const id=++operationSeq,startedAt=now();
-    state.operation={id,type,expectedTrackId,expectedUri,startedAt,expiresAt:startedAt+timeoutMs};
+    state.operation={id,type,expectedTrackId,expectedUri,correlationId:String(correlationId||''),startedAt,expiresAt:startedAt+timeoutMs};
     state.intent=type;state.updatedAt=startedAt;state.revision++;
     persist();emit('operation-begin');return id
   }

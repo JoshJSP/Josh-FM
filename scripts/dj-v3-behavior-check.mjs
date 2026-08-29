@@ -9,6 +9,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 class FakeEventTarget{
   constructor(){this.listeners=new Map()}
   addEventListener(name,fn){if(!this.listeners.has(name))this.listeners.set(name,[]);this.listeners.get(name).push(fn)}
+  removeEventListener(name,fn){const rows=this.listeners.get(name)||[],index=rows.indexOf(fn);if(index>=0)rows.splice(index,1)}
   dispatchEvent(event){for(const fn of this.listeners.get(event.type)||[])fn(event);return true}
 }
 class FakeCustomEvent{constructor(type,options={}){this.type=type;this.detail=options.detail}}
@@ -26,7 +27,7 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
   let operation=null,expectedLive=true;
   const playbackTruth={
     get:()=>({trackId:remote.id,uri:remote.uri,isPlaying:remote.playing,expectedLive,operation}),
-    begin:(type,data={})=>{metrics.begin++;operation={id:metrics.begin,type,...data};return operation.id},
+    begin:(type,data={})=>{metrics.begin++;operation={id:metrics.begin,type,...data};metrics.lastOperation={...operation};return operation.id},
     end:()=>{metrics.end++;operation=null},
     setExpectedLive:on=>{expectedLive=!!on},
   };
@@ -41,7 +42,7 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
   const audioStatus={provider:'fish',model:'test-fish',voiceId:'voice',cacheSize:0,audioUnlocked:true,playbackMode:'html-audio'};
   const JFMDJAudio={status:audioStatus,unlock:async()=>true};
   const prepareSpeech=async(_text,_jingle,meta={})=>{metrics.prepare++;if(prepareDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,prepareDelay);meta.signal?.addEventListener('abort',()=>{clearTimeout(timer);metrics.prepareAborted++;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))},{once:true})});if(prepareFailures-->0){audioStatus.error='temporary Fish Audio failure';return false}audioStatus.error='';audioStatus.cacheSize=1;return true};
-  const speakText=async(_text,_jingle,meta={})=>{metrics.speak++;audioStatus.cacheSize=0;if(speakDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,speakDelay),abort=()=>{clearTimeout(timer);metrics.speakAborted++;reject(Object.assign(new Error('voice cancelled'),{name:'AbortError'}))};if(meta.signal?.aborted)return abort();meta.signal?.addEventListener?.('abort',abort,{once:true})});return speakSucceeds};
+  const speakText=async(_text,_jingle,meta={})=>{metrics.speak++;audioStatus.cacheSize=0;if(!speakSucceeds)return false;const startedAt=Date.now();bus.dispatchEvent(new FakeCustomEvent('mair:dj-speaking',{detail:{active:true,breakId:String(meta.breakId||''),provider:'fish',route:'test-audio',playbackStartedAt:startedAt,success:true}}));if(speakDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,speakDelay),abort=()=>{clearTimeout(timer);metrics.speakAborted++;bus.dispatchEvent(new FakeCustomEvent('mair:dj-speaking',{detail:{active:false,breakId:String(meta.breakId||''),provider:'fish',route:'test-audio',playbackStartedAt:startedAt,playbackEndedAt:Date.now(),success:false,error:'voice cancelled'}}));reject(Object.assign(new Error('voice cancelled'),{name:'AbortError'}))};if(meta.signal?.aborted)return abort();meta.signal?.addEventListener?.('abort',abort,{once:true})});bus.dispatchEvent(new FakeCustomEvent('mair:dj-speaking',{detail:{active:false,breakId:String(meta.breakId||''),provider:'fish',route:'test-audio',playbackStartedAt:startedAt,playbackEndedAt:Date.now(),success:true}}));return true};
   const JFMPlayback={
     pause:async()=>{metrics.genericPause++;remote.playing=false;return true},
     resume:async()=>{metrics.genericResume++;remote.playing=true;return true},
@@ -52,7 +53,7 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
     JFMPlayback.djResume=async uri=>{assert.equal(uri,remote.uri);metrics.djResume++;remote.playing=true;return true};
     JFMPlayback.djRewind=async uri=>{assert.equal(uri,remote.uri);metrics.djRewind++;remote.progress=0;return true};
   }
-  const window={addEventListener:(...a)=>bus.addEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:playbackTruth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}},jfmIsRequest:t=>!!requestTrackId&&String(t?.id||'')===String(requestTrackId),JFMRequests:{consumeCurrentRequest:t=>{if(requestTrackId&&String(t?.id||'')===String(requestTrackId)){metrics.requestConsume++;return{requestId:'test-request',trackId:requestTrackId}}return null}}};
+  const window={addEventListener:(...a)=>bus.addEventListener(...a),removeEventListener:(...a)=>bus.removeEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:playbackTruth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}},jfmIsRequest:t=>!!requestTrackId&&String(t?.id||'')===String(requestTrackId),JFMRequests:{consumeCurrentRequest:t=>{if(requestTrackId&&String(t?.id||'')===String(requestTrackId)){metrics.requestConsume++;return{requestId:'test-request',trackId:requestTrackId}}return null}}};
   const math=Object.create(Math);math.random=()=>0;
   const context={window,document,localStorage,sessionStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText,setTimeout,clearTimeout,AbortController,Promise,Date:FixedDate,Math:math,console};
   Object.assign(window,{window,document,localStorage,sessionStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText});Object.assign(context,window);
@@ -158,6 +159,15 @@ async function testTrackChangeCancelsSpotifyContextBackoff(){
 async function testBfcacheReloadAbortsPreparedBreak(){
   const h=createHarness({writerDelay:220});assert.equal(h.window.MAIRDJ.armManual(),true);await sleep(30);h.window.dispatchEvent({type:'pageshow',persisted:true});await sleep(320);assert.equal(h.metrics.writerAborted,1,'bfcache/reload moet de oude writer annuleren');assert.equal(h.metrics.djPause,0);assert.equal(h.state().prepared,null);assert.equal(h.state().terminalBreaks.at(-1).status,'ABORTED_RELOAD')
 }
+async function testCompleteVoiceCheckUsesOneAudibleBreakId(){
+  const h=createHarness(),rows=await h.window.MAIRDJ.runVoiceCheck();
+  assert.equal(rows.some(x=>x.status==='fail'),false,JSON.stringify(rows));
+  const ids=new Set(rows.map(x=>x.breakId));assert.equal(ids.size,1,'alle Voice Check-stappen moeten exact één breakId gebruiken');
+  const id=[...ids][0];assert.ok(id.includes('voice-check'));
+  assert.equal(h.metrics.lastOperation?.correlationId,id,'Spotify handoff-operation moet dezelfde breakId dragen');
+  for(const name of ['DJ Writer','Fish/TTS generatie','Spotify pause bevestigd','DJ playback START bewezen','DJ playback END bewezen','Spotify resume bevestigd','Volgende playback-state gezond'])assert.ok(rows.some(x=>x.name===name&&x.status==='pass'),`${name} ontbreekt`);
+  const handoff=h.state().lastHandoff;assert.equal(handoff.breakId,id);assert.ok(handoff.playbackStartedAt>0);assert.ok(handoff.playbackEndedAt>=handoff.playbackStartedAt);assert.ok(handoff.resumeAt>=handoff.playbackEndedAt);assert.equal(handoff.terminalStatus,'VOICE_CHECK_PASS')
+}
 const tests=[
   ['automatic break uses SDK-first critical path',testSuccessfulAutomaticBreak],
   ['duplicate natural event is idempotent',testDuplicateNaturalEventCannotDoubleAir],
@@ -183,6 +193,7 @@ const tests=[
   ['transient TTS preparation retries once',testTransientTTSPreparationRetriesOnce],
   ['track change cancels Spotify context backoff',testTrackChangeCancelsSpotifyContextBackoff],
   ['bfcache reload aborts old prepared break',testBfcacheReloadAbortsPreparedBreak],
+  ['Complete Voice Check correlates real playback with one breakId',testCompleteVoiceCheckUsesOneAudibleBreakId],
 ];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(e){console.error('FAIL',name,'—',e?.stack||e);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`MAIR DJ v3 behavioral simulation: ${passed}/${tests.length} PASS`);
