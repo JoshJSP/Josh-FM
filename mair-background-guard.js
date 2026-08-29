@@ -1,7 +1,7 @@
 // MAIR iOS/PWA background playback guard — music always wins when the PWA is hidden.
 (()=>{
   'use strict';
-  if(window.MAIRBackgroundGuard?.version?.startsWith('mair-background-guard-v2'))return;
+  if(window.MAIRBackgroundGuard)return;
   let hiddenAt=0,wasPlaying=false,trackId='',recovering=false,lastReason='boot',backgroundSkipArmed=false,cancelling=false;
   const state=()=>window.JFMPlaybackState?.get?.()||{};
   const remote=async()=>{try{return await api('/me/player')}catch{return null}};
@@ -93,6 +93,22 @@
     }catch(e){emit('visible-recovery-error',{awayMs,error:String(e?.message||e)})}
     finally{recovering=false}
   }
+
+  // Critical iOS rule: while hidden, never let playback-primary turn a natural
+  // track end into a new Web API play command. The station context is already
+  // preloaded in Spotify; forcing play without a user gesture can be blocked by
+  // mobile autoplay rules and leave the PWA silent at the track boundary.
+  window.addEventListener('jfm:natural-track-end',event=>{
+    if(!isHidden())return;
+    const detail=event?.detail||{},s=snapshot('hidden-natural-end');
+    if(s.isPlaying||s.expectedLive||wasPlaying){
+      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-natural-passive')}catch{}
+      try{navigator.mediaSession.playbackState='playing'}catch{}
+    }
+    emit('hidden-natural-passive',{endedTrackId:String(detail.trackId||detail.endedTrackId||'')});
+    event.stopImmediatePropagation();
+  },true);
+
   document.addEventListener('visibilitychange',()=>{
     if(document.visibilityState==='hidden')onHidden();else onVisible().catch(()=>{});
   });
@@ -108,5 +124,5 @@
   window.addEventListener('mair:dj-v2-state',()=>{
     if(isHidden())cancelUnsafeHandoff('hidden-dj-state');
   });
-  window.MAIRBackgroundGuard={version:'mair-background-guard-v2-music-first',snapshot,armBackgroundDjSkip,cancelUnsafeHandoff,get status(){return{hiddenAt,wasPlaying,trackId,recovering,lastReason,backgroundSkipArmed,cancelling}}};
+  window.MAIRBackgroundGuard={version:'mair-background-guard-v3-passive-natural-end',snapshot,armBackgroundDjSkip,cancelUnsafeHandoff,get status(){return{hiddenAt,wasPlaying,trackId,recovering,lastReason,backgroundSkipArmed,cancelling}}};
 })();
