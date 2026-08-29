@@ -3,106 +3,15 @@
 'use strict';
 if(window.__mairCarSleepIntegration)return;
 window.__mairCarSleepIntegration=true;
-
 const $=id=>document.getElementById(id);
-const asset=(tag,attrs)=>new Promise((resolve,reject)=>{
-  const marker=attrs.id&&document.getElementById(attrs.id);
-  if(marker){resolve(marker);return}
-  const el=document.createElement(tag);
-  Object.entries(attrs).forEach(([k,v])=>{if(k==='text')el.textContent=v;else el.setAttribute(k,v)});
-  el.onload=()=>resolve(el);el.onerror=()=>reject(new Error(`Kon ${attrs.href||attrs.src||tag} niet laden`));
-  document.head.appendChild(el);
-});
-const loadScript=(src,id)=>asset('script',{src,id});
-const loadStyle=(href,id)=>asset('link',{rel:'stylesheet',href,id});
-
-function queuePreview(){
-  try{
-    const now=window.JFMPlaybackState?.get?.()||{};
-    const uri=String(now.uri||'');
-    const tracks=window.JFMQueue?.current?.()||[];
-    const start=Math.max(0,tracks.findIndex(t=>String(t?.uri||'')===uri)+1);
-    return tracks.slice(start,start+2).map(t=>({
-      title:String(t?.name||t?.title||'—'),
-      artist:String(t?.artists?.[0]?.name||t?.artist||'')
-    }));
-  }catch{return[]}
-}
-
-function syncCar(){
-  const car=window.MAIRCarModePrototype;if(!car)return;
-  try{car.setQueue(queuePreview())}catch{}
-  try{
-    const mode=String($('modeLabel')?.textContent||$('modeMini')?.textContent||'MAIR Mix').trim();
-    car.setMix(mode||'MAIR Mix');
-  }catch{}
-  try{
-    const raw=String($('djBreakTime')?.textContent||'').trim();
-    car.setDJBreak(raw&&raw!=='nog niet'?raw:'—');
-  }catch{}
-}
-
-function ensureLauncher(){
-  const radio=$('tab-radio');
-  if(!radio||$('mairCarModeOpen'))return;
-  const b=document.createElement('button');
-  b.id='mairCarModeOpen';
-  b.type='button';
-  b.className='mair-sleep-launch mair-car-launch';
-  b.innerHTML='🚗 Car Mode <span>Groot horizontaal Wave-scherm</span>';
-  b.addEventListener('click',()=>{
-    syncCar();
-    window.MAIRCarModePrototype?.open?.();
-    try{screen.orientation?.lock?.('landscape').catch?.(()=>{})}catch{}
-  });
-  const anchor=$('mairSleepOpen')||$('djNow')?.closest('.grid2');
-  if(anchor)anchor.insertAdjacentElement('afterend',b);else radio.appendChild(b);
-}
-
-function bindCarActions(){
-  window.addEventListener('mair:car-action',e=>{
-    const action=e.detail?.action;
-    if(action==='favorite-current'){$('loveTrack')?.click();return}
-    if(action==='live')return;
-    if(action==='recent'){
-      window.MAIRCarModePrototype?.close?.();
-      document.querySelector('[data-tab="radio"]')?.click();
-      return;
-    }
-    if(action==='mixer'){
-      window.MAIRCarModePrototype?.close?.();
-      document.querySelector('[data-tab="radio"]')?.click();
-      document.querySelector('[data-mode="chill"]')?.scrollIntoView?.({behavior:'smooth',block:'center'});
-    }
-  });
-}
-
-async function boot(){
-  try{
-    await Promise.all([
-      loadStyle('prototypes/mair-car-mode-wave.css','mairCarModeCss'),
-      loadStyle('prototypes/mair-sleep-landscape.css','mairSleepLandscapeCss')
-    ]);
-    await loadScript('mair-sleep.js','mairSleepRuntime');
-    await loadScript('prototypes/mair-sleep-landscape.js','mairSleepLandscapeRuntime');
-    await loadScript('prototypes/mair-car-mode-wave.js','mairCarModeRuntime');
-    ensureLauncher();
-    syncCar();
-    bindCarActions();
-    ['jfm:trackchange','jfm:queue-change','jfm:playback-state','mair:channelchange','mair:sleep'].forEach(name=>window.addEventListener(name,()=>{syncCar();ensureLauncher()}));
-    setInterval(()=>{syncCar();ensureLauncher()},2000);
-    window.MAIRCarSleepIntegration={
-      version:'2026-08-29',
-      openCar:()=>{syncCar();window.MAIRCarModePrototype?.open?.()},
-      openSleep:()=>window.MAIRSleep?.open?.(),
-      status:()=>({car:window.MAIRCarModePrototype?.status?.()||null,sleep:window.MAIRSleep?.status?.()||null,landscape:window.MAIRSleepLandscapePrototype?.status?.()||null})
-    };
-    window.dispatchEvent(new CustomEvent('mair:car-sleep-ready'));
-  }catch(error){
-    console.error('[MAIR car/sleep integration]',error);
-  }
-}
-
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
-else boot();
+const asset=(tag,attrs)=>new Promise((resolve,reject)=>{const marker=attrs.id&&document.getElementById(attrs.id);if(marker){resolve(marker);return}const el=document.createElement(tag);Object.entries(attrs).forEach(([k,v])=>{if(k==='text')el.textContent=v;else el.setAttribute(k,v)});el.onload=()=>resolve(el);el.onerror=()=>reject(new Error(`Kon ${attrs.href||attrs.src||tag} niet laden`));document.head.appendChild(el)});
+const loadScript=(src,id)=>asset('script',{src,id}),loadStyle=(href,id)=>asset('link',{rel:'stylesheet',href,id});
+function currentArtwork(){for(const node of [document.querySelector('#artImg'),document.querySelector('#cover img'),document.querySelector('#artwork img'),document.querySelector('.now-playing img'),document.querySelector('[data-now-playing-artwork]')].filter(Boolean)){const src=String(node.currentSrc||node.src||'').trim();if(src)return src}return'mair-icon-512.png'}
+function syncCar(){try{window.MAIRCarModePrototype?.render?.()}catch{}}
+async function setSpotifyVolume(value){const n=Math.max(0,Math.min(100,Number(value)||0));try{if(window.jfmSpotifyPlayer?.setVolume){await window.jfmSpotifyPlayer.setVolume(n/100);return true}}catch{}return false}
+function ensureSleepPresentation(){const o=$('mairSleepOverlay'),now=o?.querySelector('.mair-sleep-now');if(!o||!now)return false;if(!$('mairSleepArtwork')){const img=document.createElement('img');img.id='mairSleepArtwork';img.className='mair-sleep-artwork';img.alt='Artwork van huidig nummer';now.insertAdjacentElement('afterbegin',img)}if(!$('mairSleepTimerAdjust')){const b=document.createElement('button');b.id='mairSleepTimerAdjust';b.type='button';b.className='mair-sleep-adjust';b.textContent='☾ Timer aanpassen';b.onclick=()=>o.classList.toggle('mair-sleep-adjusting');o.querySelector('.mair-sleep-status')?.insertAdjacentElement('afterend',b)}if(!$('mairSleepVolume')){const row=document.createElement('label');row.className='mair-sleep-volume';row.innerHTML='<span>🔊</span><input id="mairSleepVolume" type="range" min="0" max="100" value="35" aria-label="Sleep volume"><output id="mairSleepVolumeValue">35</output>';now.insertAdjacentElement('afterend',row);const input=$('mairSleepVolume');input?.addEventListener('input',()=>{const n=Math.max(0,Math.min(100,Number(input.value)||0));if($('mairSleepVolumeValue'))$('mairSleepVolumeValue').value=String(n)});input?.addEventListener('change',()=>setSpotifyVolume(input.value))}syncSleepPresentation();return true}
+function syncSleepPresentation(){const art=$('mairSleepArtwork');if(art){const src=currentArtwork();if(src&&art.getAttribute('src')!==src)art.setAttribute('src',src)}const o=$('mairSleepOverlay');if(!o)return;const active=!!window.MAIRSleep?.status?.()?.active;o.classList.toggle('mair-sleep-has-timer',active)}
+function ensureLauncher(){const radio=$('tab-radio');if(!radio||$('mairCarModeOpen'))return;const b=document.createElement('button');b.id='mairCarModeOpen';b.type='button';b.className='mair-sleep-launch mair-car-launch';b.innerHTML='🚗 Car Mode <span>Groot horizontaal Wave-scherm</span>';b.addEventListener('click',()=>{syncCar();window.MAIRCarModePrototype?.open?.();try{screen.orientation?.lock?.('landscape').catch?.(()=>{})}catch{}});const anchor=$('mairSleepOpen')||$('djNow')?.closest('.grid2');if(anchor)anchor.insertAdjacentElement('afterend',b);else radio.appendChild(b)}
+async function boot(){try{await Promise.all([loadStyle('prototypes/mair-car-mode-wave.css','mairCarModeCss'),loadStyle('prototypes/mair-sleep-landscape.css','mairSleepLandscapeCss')]);await loadScript('mair-sleep.js','mairSleepRuntime');await loadScript('prototypes/mair-sleep-landscape.js','mairSleepLandscapeRuntime');await loadScript('prototypes/mair-car-mode-wave.js','mairCarModeRuntime');ensureLauncher();ensureSleepPresentation();syncCar();['jfm:trackchange','jfm:playback-state','mair:channelchange','mair:sleep'].forEach(name=>window.addEventListener(name,()=>{syncCar();ensureLauncher();ensureSleepPresentation();syncSleepPresentation()}));setInterval(()=>{ensureLauncher();ensureSleepPresentation();syncSleepPresentation()},1500);window.MAIRCarSleepIntegration={version:'2026-08-29-v2',openCar:()=>{syncCar();window.MAIRCarModePrototype?.open?.()},openSleep:()=>window.MAIRSleep?.open?.(),status:()=>({car:window.MAIRCarModePrototype?.status?.()||null,sleep:window.MAIRSleep?.status?.()||null,landscape:window.MAIRSleepLandscapePrototype?.status?.()||null})};window.dispatchEvent(new CustomEvent('mair:car-sleep-ready'))}catch(error){console.error('[MAIR car/sleep integration]',error)}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
