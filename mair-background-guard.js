@@ -2,10 +2,11 @@
 (()=>{
   'use strict';
   if(window.MAIRBackgroundGuard)return;
-  let hiddenAt=0,wasPlaying=false,trackId='',recovering=false,lastReason='boot',backgroundSkipArmed=false,cancelling=false;
+  let hiddenAt=0,wasPlaying=false,trackId='',recovering=false,lastReason='boot',backgroundSkipArmed=false,cancelling=false,nativeDeviceId='',nativeHandoff=false;
   const state=()=>window.JFMPlaybackState?.get?.()||{};
   const remote=async()=>{try{return await api('/me/player')}catch{return null}};
   const isHidden=()=>document.visibilityState==='hidden'||document.body?.getAttribute('data-mair-background')==='1';
+  const sdkDeviceId=()=>String(window.JFMSpotifySDK?.deviceId||localStorage.getItem('jfm_spotify_device_id')||'').trim();
   function snapshot(reason='snapshot'){
     const s=state();
     wasPlaying=!!s.isPlaying||!!s.expectedLive;
@@ -13,7 +14,30 @@
     lastReason=reason;
     return s;
   }
-  function emit(reason,extra={}){try{window.dispatchEvent(new CustomEvent('mair:background-state',{detail:{reason,hiddenAt,wasPlaying,trackId,recovering,backgroundSkipArmed,...extra}}))}catch{}}
+  function emit(reason,extra={}){try{window.dispatchEvent(new CustomEvent('mair:background-state',{detail:{reason,hiddenAt,wasPlaying,trackId,recovering,backgroundSkipArmed,nativeDeviceId,nativeHandoff,...extra}}))}catch{}}
+  async function findNativeSpotifyDevice(){
+    try{
+      const data=await api('/me/player/devices');
+      const devices=Array.isArray(data?.devices)?data.devices:[];
+      const webId=sdkDeviceId();
+      const candidates=devices.filter(d=>d?.id&&d.id!==webId&&!d.is_restricted);
+      const preferred=candidates.find(d=>String(d.type||'').toLowerCase()==='smartphone')||candidates.find(d=>/iphone|phone|spotify/i.test(String(d.name||'')))||null;
+      nativeDeviceId=String(preferred?.id||'');
+      return preferred;
+    }catch(e){emit('native-device-error',{error:String(e?.message||e)});return null}
+  }
+  async function handoffToNative(reason='background-hidden'){
+    if(!isHidden()||!wasPlaying)return false;
+    const device=await findNativeSpotifyDevice();
+    if(!device?.id){emit('native-device-missing',{reason});return false}
+    try{
+      await api('/me/player',{method:'PUT',body:{device_ids:[device.id],play:true}});
+      nativeHandoff=true;nativeDeviceId=String(device.id);
+      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-native-spotify')}catch{}
+      emit('native-handoff-ok',{reason,deviceName:String(device.name||''),deviceType:String(device.type||'')});
+      return true;
+    }catch(e){nativeHandoff=false;emit('native-handoff-error',{reason,error:String(e?.message||e)});return false}
+  }
   function armBackgroundDjSkip(reason='background'){
     if(!isHidden())return false;
     try{
@@ -30,13 +54,13 @@
     const s=state(),expected=!!s.expectedLive||wasPlaying,uri=String(s.uri||'');
     if(!expected)return false;
     try{
-      if(typeof window.JFMPlayback?.djResume==='function'){
+      const live=await remote();
+      if(live?.is_playing){try{window.JFMPlaybackState?.ingest?.(live,'background-fail-open-playing')}catch{};return true}
+      if(!isHidden()&&typeof window.JFMPlayback?.djResume==='function'){
         const ok=await window.JFMPlayback.djResume(uri).catch(()=>false);
         if(ok){emit('background-dj-resumed',{reason,route:'djResume'});return true}
       }
-      const live=await remote();
-      if(live?.is_playing){try{window.JFMPlaybackState?.ingest?.(live,'background-fail-open-playing')}catch{};return true}
-      if(typeof window.JFMPlayback?.resume==='function'){
+      if(!isHidden()&&typeof window.JFMPlayback?.resume==='function'){
         const ok=await window.JFMPlayback.resume().catch(()=>false);
         if(ok){emit('background-dj-resumed',{reason,route:'resume'});return true}
       }
@@ -64,9 +88,8 @@
       try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-preserve')}catch{}
       try{navigator.mediaSession.playbackState='playing'}catch{}
       try{window.JFMPWA?.reassertMediaSession?.(false)}catch{}
-      // Never let a browser-owned DJ handoff pause Spotify while iOS can suspend JS.
-      // If a handoff is already in progress, cancel it and fail open to music.
       if(!cancelUnsafeHandoff('visibility-hidden'))armBackgroundDjSkip('visibility-hidden');
+      Promise.resolve().then(()=>handoffToNative('visibility-hidden')).catch(()=>{});
     }
     emit('hidden',{isPlaying:!!s.isPlaying,expectedLive:!!s.expectedLive});
   }
@@ -81,23 +104,22 @@
       await new Promise(r=>setTimeout(r,180));
       const live=await remote();
       if(live?.is_playing){
-        try{window.JFMPlaybackState?.ingest?.(live,'background-return-playing')}catch{}
+        try{window.JFMPlaybackState?.ingest?.(live,nativeHandoff?'background-return-native':'background-return-playing')}catch{}
         try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-return-playing')}catch{}
-        emit('visible-still-playing',{awayMs});
+        emit(nativeHandoff?'visible-native-still-playing':'visible-still-playing',{awayMs});
+        nativeHandoff=false;
         return;
       }
-      // Foreground recovery is emergency-only. Normal hidden track-to-track playback
-      // should be owned by Spotify's already-loaded context, not by this guard.
       const ok=await window.JFMPlayback?.recover?.('foreground-return');
       emit(ok?'visible-recovered':'visible-recovery-failed',{awayMs});
+      nativeHandoff=false;
     }catch(e){emit('visible-recovery-error',{awayMs,error:String(e?.message||e)})}
     finally{recovering=false}
   }
 
-  // Critical iOS rule: while hidden, never let playback-primary turn a natural
-  // track end into a new Web API play command. The station context is already
-  // preloaded in Spotify; forcing play without a user gesture can be blocked by
-  // mobile autoplay rules and leave the PWA silent at the track boundary.
+  // While hidden, never let playback-primary turn a natural track end into a new
+  // Web API play command. Native Spotify (preferred) or Spotify's preloaded context
+  // owns the transition, because iOS may suspend browser JavaScript at this point.
   window.addEventListener('jfm:natural-track-end',event=>{
     if(!isHidden())return;
     const detail=event?.detail||{},s=snapshot('hidden-natural-end');
@@ -114,15 +136,12 @@
   });
   window.addEventListener('pagehide',onHidden);
   window.addEventListener('pageshow',()=>{if(document.visibilityState==='visible')onVisible().catch(()=>{})});
-  // The skip flag is consumed by a natural transition. Re-arm it after every hidden
-  // transition so a long background session can pass multiple tracks without DJ pauses.
   window.addEventListener('mair:track-transition',()=>{
     if(!isHidden())return;
     setTimeout(()=>armBackgroundDjSkip('hidden-track-transition'),0);
   });
-  // Last line of defence: if another module starts a handoff while hidden, abort it.
   window.addEventListener('mair:dj-v2-state',()=>{
     if(isHidden())cancelUnsafeHandoff('hidden-dj-state');
   });
-  window.MAIRBackgroundGuard={version:'mair-background-guard-v3-passive-natural-end',snapshot,armBackgroundDjSkip,cancelUnsafeHandoff,get status(){return{hiddenAt,wasPlaying,trackId,recovering,lastReason,backgroundSkipArmed,cancelling}}};
+  window.MAIRBackgroundGuard={version:'mair-background-guard-v4-native-spotify-handoff',snapshot,armBackgroundDjSkip,cancelUnsafeHandoff,handoffToNative,get status(){return{hiddenAt,wasPlaying,trackId,recovering,lastReason,backgroundSkipArmed,cancelling,nativeDeviceId,nativeHandoff}}};
 })();
