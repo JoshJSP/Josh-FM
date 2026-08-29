@@ -40,7 +40,7 @@
       ensure=hardenedEnsure;window.ensure=hardenedEnsure;
       if(window.JFMAuth){window.JFMAuth.ensure=hardenedEnsure;window.JFMAuth.version='auth-v3-preserve-refresh'}
       window.MAIRSpotifySessionReliability={
-        version:'spotify-session-v1',
+        version:'spotify-session-v2-pkce-durable',
         ensure:hardenedEnsure,
         get state(){return{refreshError:authRefreshError,refreshStatus:authRefreshStatus,reauthRequired:authReauthRequired,refreshFailures:authRefreshFailures,lastRefreshAt:lastAuthRefreshAt,hasRefreshToken:!!refreshToken,hasAccessToken:!!token}}
       };
@@ -77,8 +77,18 @@
   function persist(value){const id=String(value||'').trim();if(!id)return'';if(localStorage.getItem(TEST_KEY)!==id)localStorage.setItem(TEST_KEY,id);if(localStorage.getItem(CLIENT_KEY)!==id)localStorage.setItem(CLIENT_KEY,id);try{if(spotifyClientId!==id)spotifyClientId=id}catch{}return id}
   function expose(){if(label?.classList.contains('hidden'))label.classList.remove('hidden');const saved=localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID;if(input.value!==saved)input.value=saved;if(input.placeholder!=='Eigen Spotify Client ID voor deze test')input.placeholder='Eigen Spotify Client ID voor deze test';if(input.autocomplete!=='off')input.autocomplete='off';if(input.readOnly)input.readOnly=false}
   function sync(){expose();persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID)}
+  function restorePkceRoundTrip(){
+    try{
+      const verifier=localStorage.getItem('jfm_pkce_verifier_v2')||localStorage.getItem('jfm_pkce_verifier')||'';
+      const state=localStorage.getItem('jfm_pkce_state_v2')||localStorage.getItem('jfm_pkce_state')||'';
+      if(verifier&&!sessionStorage.getItem('jfm_verifier'))sessionStorage.setItem('jfm_verifier',verifier);
+      if(state&&!sessionStorage.getItem('jfm_state'))sessionStorage.setItem('jfm_state',state);
+    }catch{}
+  }
+  function clearPkceRoundTrip(){try{['jfm_pkce_verifier_v2','jfm_pkce_state_v2','jfm_pkce_verifier','jfm_pkce_state'].forEach(k=>localStorage.removeItem(k))}catch{}}
+  restorePkceRoundTrip();
   input.addEventListener('input',()=>{const id=String(input.value||'').trim();if(id)persist(id)});input.addEventListener('change',()=>{const id=String(input.value||'').trim();if(id)persist(id)});
-  try{if(typeof callback==='function'){const originalCallback=callback;callback=async function(...args){persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);return originalCallback.apply(this,args)}}}catch{}
+  try{if(typeof callback==='function'){const originalCallback=callback;callback=async function(...args){persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);restorePkceRoundTrip();const out=await originalCallback.apply(this,args);if(new URLSearchParams(location.search).get('code'))clearPkceRoundTrip();return out}}}catch{}
   try{connect=async function(){const id=persist(selected());if(!id)return alert('Vul eerst je Spotify Client ID in.');const verifier=rand(),state=rand(20);sessionStorage.setItem('jfm_verifier',verifier);sessionStorage.setItem('jfm_state',state);try{localStorage.setItem('jfm_pkce_verifier_v2',verifier);localStorage.setItem('jfm_pkce_state_v2',state)}catch{}const challenge=b64url(await sha256(verifier));const p=new URLSearchParams({response_type:'code',client_id:id,scope:SCOPES,redirect_uri:redirectUri(),state,code_challenge_method:'S256',code_challenge:challenge});location.href='https://accounts.spotify.com/authorize?'+p}}catch{}
   try{
     if(typeof api==='function'){
@@ -95,8 +105,8 @@
   function loadScriptOnce(selector,src,datasetKey,onerror){if(document.querySelector(selector))return;const s=document.createElement('script');s.src=asset(src);s.async=false;s.dataset[datasetKey]='1';s.onerror=onerror;document.body.appendChild(s)}
   function loadApiBudget(){if(window.JFMSpotifyApiBudget)return;loadScriptOnce('script[data-jfm-api-budget]','./spotify-api-budget.js','jfmApiBudget',()=>console.warn('Josh FM: Spotify API budget kon niet laden'))}
   sync();loadApiBudget();setTimeout(sync,250);setTimeout(sync,1200);scheduleDeviceRefresh('boot',1400);
-  window.addEventListener('pageshow',()=>{sync();loadApiBudget();scheduleDeviceRefresh('pageshow',700)});
+  window.addEventListener('pageshow',()=>{restorePkceRoundTrip();sync();loadApiBudget();scheduleDeviceRefresh('pageshow',700)});
   window.addEventListener('online',()=>scheduleDeviceRefresh('online',700));
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){sync();loadApiBudget();scheduleDeviceRefresh('visible',700)}});
-  window.JFMSpotifyTestConfig={version:'spotify-test-v14-session-reliability',assetVersion:ASSET,defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY),refreshDeviceHint,get deviceState(){return{repairing:!!deviceRepairPromise,lastRepairAt:lastDeviceRepairAt,lastRepairError:lastDeviceRepairError}}};
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){restorePkceRoundTrip();sync();loadApiBudget();scheduleDeviceRefresh('visible',700)}});
+  window.JFMSpotifyTestConfig={version:'spotify-test-v15-pkce-durable',assetVersion:ASSET,defaultClientId:DEFAULT_CLIENT_ID,selected:()=>localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID,clear:()=>localStorage.removeItem(TEST_KEY),refreshDeviceHint,get deviceState(){return{repairing:!!deviceRepairPromise,lastRepairAt:lastDeviceRepairAt,lastRepairError:lastDeviceRepairError}}};
 })();
