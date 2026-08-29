@@ -1,0 +1,246 @@
+/*
+ * MAIRFM Sleep — landscape bedside presentation prototype.
+ * Extends the existing #mairSleepOverlay from mair-sleep.js.
+ * No timer/playback logic lives here.
+ */
+
+@media (orientation: landscape) and (min-width: 700px) {
+  #mairSleepOverlay.mair-sleep-landscape-v2 {
+    overflow: hidden;
+    padding:
+      max(10px, env(safe-area-inset-top))
+      max(20px, env(safe-area-inset-right))
+      max(10px, env(safe-area-inset-bottom))
+      max(20px, env(safe-area-inset-left));
+    background:
+      radial-gradient(circle at 49% 48%, rgba(122, 55, 210, 0.16), transparent 26%),
+      radial-gradient(circle at 10% 12%, rgba(54, 66, 119, 0.15), transparent 30%),
+      linear-gradient(120deg, #060812 0%, #090711 52%, #05050a 100%);
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2::before {
+    content: "";
+    position: absolute;
+    left: 44%;
+    top: 51%;
+    width: min(26vw, 270px);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 38% 34%, rgba(222, 197, 255, 0.95), rgba(162, 91, 242, 0.7) 28%, rgba(78, 35, 130, 0.38) 62%, rgba(55, 24, 89, 0.08) 73%, transparent 75%);
+    filter: blur(0.2px) drop-shadow(0 0 28px rgba(143, 72, 226, 0.22));
+    opacity: 0.42;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2::after {
+    content: "";
+    position: absolute;
+    left: 26%;
+    right: 22%;
+    top: 54%;
+    height: 100px;
+    pointer-events: none;
+    opacity: 0.28;
+    background:
+      linear-gradient(174deg, transparent 0 45%, rgba(154, 77, 255, 0.55) 46% 47%, transparent 48% 100%),
+      linear-gradient(186deg, transparent 0 52%, rgba(111, 62, 185, 0.38) 53% 54%, transparent 55% 100%);
+    filter: blur(1px);
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-wrap {
+    position: relative;
+    z-index: 1;
+    box-sizing: border-box;
+    max-width: none;
+    width: 100%;
+    height: calc(100dvh - max(20px, env(safe-area-inset-top)) - max(20px, env(safe-area-inset-bottom)));
+    min-height: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(210px, .82fr) minmax(310px, 1.22fr) minmax(260px, .9fr);
+    grid-template-rows: 58px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "head head head"
+      "clock status now"
+      "date controls actions";
+    column-gap: clamp(18px, 3vw, 42px);
+    row-gap: 10px;
+    align-items: center;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-head {
+    grid-area: head;
+    align-self: start;
+    padding: 2px 0 0;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-head .kicker {
+    color: #b988ff;
+    letter-spacing: .16em;
+    font-size: 10px;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-head b {
+    font-size: 15px;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-close {
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgba(255,255,255,.09);
+    background: rgba(14,15,23,.62);
+    color: #c1bacb;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-clock {
+    grid-area: clock;
+    align-self: center;
+    justify-self: center;
+    margin: 0;
+    font-size: clamp(58px, 9.5vw, 116px);
+    font-weight: 730;
+    letter-spacing: -.065em;
+    text-align: center;
+    text-shadow: 0 6px 38px rgba(0,0,0,.3);
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-date {
+    grid-area: date;
+    align-self: start;
+    justify-self: center;
+    margin: -12px 0 0;
+    color: #716d7a;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-status {
+    grid-area: status;
+    align-self: center;
+    margin: 0;
+    text-align: center;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-status::before {
+    content: "SLEEP MODE ACTIEF";
+    display: block;
+    margin-bottom: 7px;
+    color: #ae78fa;
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .15em;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-status b {
+    font-size: clamp(54px, 8vw, 100px);
+    line-height: .94;
+    letter-spacing: -.055em;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-status span {
+    max-width: 320px;
+    margin: 10px auto 0;
+    color: #9a94a3;
+    font-size: 13px;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-now {
+    grid-area: now;
+    align-self: center;
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(22,18,34,.72), rgba(12,12,19,.66));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 16px 50px rgba(0,0,0,.16);
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-now small {
+    color: #a76bf2;
+    letter-spacing: .13em;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-now b {
+    margin-top: 9px;
+    font-size: clamp(18px, 2.3vw, 27px);
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-now span {
+    color: #908b98;
+    font-size: 13px;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-grid {
+    grid-area: controls;
+    align-self: start;
+    width: min(100%, 440px);
+    justify-self: center;
+    grid-template-columns: repeat(4, minmax(58px, 1fr));
+    gap: 8px;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-grid button {
+    min-height: 46px;
+    padding: 9px 8px;
+    border-color: rgba(255,255,255,.075);
+    border-radius: 14px;
+    background: rgba(16,16,25,.72);
+    color: #d8d3df;
+    font-size: 12px;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-station,
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-after {
+    display: none;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-cancel {
+    grid-area: actions;
+    align-self: start;
+    width: 100%;
+    min-height: 46px;
+    margin: 0;
+    border: 1px solid rgba(255,132,154,.12);
+    border-radius: 14px;
+    background: rgba(43,18,28,.28);
+    color: #d69ca9;
+    font-size: 12px;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-error {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    width: min(520px, 50vw);
+    min-height: 0;
+    margin: 0;
+    color: #f0a9b9;
+    font-size: 11px;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-note {
+    display: none;
+  }
+
+  #mairSleepOverlay.mair-sleep-landscape-v2.mair-sleep-dim {
+    filter: brightness(.58) saturate(.8);
+  }
+}
+
+@media (orientation: landscape) and (min-width: 700px) and (max-height: 390px) {
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-wrap {
+    grid-template-columns: minmax(180px,.75fr) minmax(280px,1.15fr) minmax(230px,.85fr);
+    grid-template-rows: 48px minmax(0,1fr) auto;
+    column-gap: 14px;
+  }
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-clock { font-size: clamp(48px,8vw,82px); }
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-status b { font-size: clamp(48px,7.2vw,78px); }
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-now { padding: 13px; border-radius: 18px; }
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-grid button,
+  #mairSleepOverlay.mair-sleep-landscape-v2 .mair-sleep-cancel { min-height: 42px; }
+}
