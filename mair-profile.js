@@ -1,0 +1,37 @@
+(()=>{
+'use strict';
+if(window.MAIRProfile)return;
+const $=id=>document.getElementById(id),PROFILE_KEY='mair_profile_v1';
+const read=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||'null');return v&&typeof v==='object'?v:fallback}catch{return fallback}};
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function ensureCss(){if(document.getElementById('mairProfileCss'))return;const l=document.createElement('link');l.id='mairProfileCss';l.rel='stylesheet';l.href='./mair-profile.css?v=2';document.head.appendChild(l)}
+function suite(){try{return window.JFMRadioSuite?.state?.()||read('jfm_radio_suite',{})}catch{return read('jfm_radio_suite',{})}}
+function telemetry(){return read('jfm_top40_telemetry_v1',{})}
+function profile(){return{displayName:'Josh Kramer',role:'MAIR-Ontwikkelaar',tagline:'Jij bouwt. Jij luistert. Jij bepaalt.',...read(PROFILE_KEY,{})}}
+function saveProfile(next){const p={...profile(),...next};try{localStorage.setItem(PROFILE_KEY,JSON.stringify(p))}catch{}return p}
+function initials(name){return String(name||'JK').trim().split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'JK'}
+function duration(minutes){const t=Math.max(0,Math.round(Number(minutes)||0)),h=Math.floor(t/60),m=t%60;return h?`${h}u ${m}m`:`${m}m`}
+function score(e={}){return Number(e.listenMs||0)/60000+Number(e.completed||0)*4+Number(e.starts||0)*1.5+Number(e.likes||0)*5+Number(e.requests||0)*5}
+function stamp(e={}){return Number(e.lastPlayedAt||e.lastSeenAt||e.updatedAt||e.lastAt||e.at||0)}
+function favoriteData(){const entries=Object.values(telemetry()).filter(e=>e&&typeof e==='object');const artists=new Map();for(const e of entries){const s=score(e);for(const a of (e.artists||[]).map(String).filter(Boolean))artists.set(a,(artists.get(a)||0)+s)}const topArtists=[...artists.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]);const recent=[...entries].sort((a,b)=>(stamp(b)-stamp(a))||(score(b)-score(a))).slice(0,5);return{topArtists,recent}}
+function dna(s={}){try{return window.MAIRMyMair?.radioDna?.(s)?.label||'Persoonlijke mix'}catch{return'Persoonlijke mix'}}
+function recentHtml(track){const name=track?.name||'MAIR track',artist=(track?.artists||[]).join(', ')||'MAIR';const image=track?.image||track?.imageUrl||track?.albumImage||'';return `<div class="mair-profile-track"><div class="mair-profile-cover">${image?`<img src="${esc(image)}" alt="">`:esc(name.slice(0,2).toUpperCase())}</div><b>${esc(name)}</b><small>${esc(artist)}</small></div>`}
+function row(icon,title,copy,action=''){return `<div class="mair-profile-row"${action?` data-profile-action="${action}"`:''}><span class="mair-profile-row-icon">${icon}</span><span><b>${esc(title)}</b><small>${esc(copy)}</small></span><em>›</em></div>`}
+function render(){ensureCss();const pane=$('tab-settings');if(!pane)return null;pane.classList.add('mair-profile-tab');$('mairfmSettingsShortcut')?.remove();let page=$('mairProfilePage');if(!page){page=document.createElement('div');page.id='mairProfilePage';pane.appendChild(page)}const p=profile(),s=suite(),f=favoriteData(),minutes=Number(s.minutes||0),goal=1200,progress=Math.max(0,Math.min(100,Math.round(minutes/goal*100)));const favArtists=f.topArtists.length?f.topArtists.join(', '):'Nog in opbouw';const period='Wordt geleerd door MAIRFM';const mood=dna(s);page.innerHTML=`
+<div class="mair-profile-top"><h1>Mijn profiel</h1></div>
+<section class="mair-profile-card mair-profile-hero">
+  <div class="mair-profile-person"><div class="mair-profile-avatar">${esc(initials(p.displayName))}</div><div><div class="mair-profile-name">${esc(p.displayName)}</div><div class="mair-profile-role">${esc(p.role)} <span class="mair-profile-role-badge">♛</span></div><div class="mair-profile-tagline">${esc(p.tagline)}</div><div class="mair-profile-owner-note">Owner profile</div></div><button class="mair-profile-edit" id="mairProfileEdit" type="button">Profiel bewerken ✎</button></div>
+  <div class="mair-profile-stats"><div class="mair-profile-stat"><i>◖◗</i><b>${esc(duration(minutes))}</b><span>Luistertijd</span></div><div class="mair-profile-stat"><i>◉</i><b>${Number(s.tracks||0)}</b><span>Nummers gehoord</span></div><div class="mair-profile-stat"><i>♡</i><b>${Number(s.likes||0)}</b><span>Favorieten</span></div><div class="mair-profile-stat"><i>◎</i><b>${Number(s.discoveries||0)}</b><span>Ontdekkingen</span></div></div>
+</section>
+<section class="mair-profile-card"><div class="mair-profile-section-title"><i>◎</i><span><b>Luisterdoelen</b><small>Jouw maandelijkse doelen</small></span></div><div class="mair-profile-goal"><div class="mair-profile-goal-head"><span><b>Luister 20 uur deze maand</b><br><small>${esc(duration(minutes))} / 20u</small></span><span>${progress}%</span></div><div class="mair-profile-progress"><span style="width:${progress}%"></span></div></div></section>
+<section class="mair-profile-card"><div class="mair-profile-section-title"><i>☷</i><span><b>Persoonlijke voorkeuren</b><small>Jouw muziek, jouw MAIR</small></span></div><div class="mair-profile-list">${row('♫','Favoriete artiesten',favArtists)}${row('◷','Favoriete periodes',period)}${row('☆','Radio-DNA',mood)}${row('＋','Ontdekkingsniveau',`${Number(s.discoveries||0)} ontdekkingen`)}</div></section>
+<section class="mair-profile-card"><div class="mair-profile-section-title"><i>⌁</i><span><b>Recente activiteit</b><small>Onlangs geluisterd</small></span></div>${f.recent.length?`<div class="mair-profile-activity">${f.recent.map(recentHtml).join('')}</div>`:'<div class="mair-profile-empty">Luister verder om hier je recente muziek te zien.</div>'}</section>
+<section class="mair-profile-card mair-profile-account"><div class="mair-profile-section-title"><i>●</i><span><b>Account</b><small>Spotify en lokale profielgegevens</small></span></div><div class="mair-profile-list">${row('◉','Spotify','Gekoppeld aan MAIRFM')}${row('⌁','Privacy','Luisterdata blijft lokaal op dit apparaat')}${row('↪','Spotify ontkoppelen','Verbreek de huidige Spotify-sessie','logout')}</div></section>
+<div class="mair-profile-footer-note">MAIRFM · Jouw muziek. Als echte radio.</div>`;
+$('mairProfileEdit')?.addEventListener('click',()=>{const name=prompt('Naam op je MAIR-profiel',p.displayName);if(name&&name.trim()){saveProfile({displayName:name.trim()});render()}});
+page.querySelector('[data-profile-action="logout"]')?.addEventListener('click',()=>{$('logout')?.click()});return page}
+function syncNav(){const btn=document.querySelector('.mair-bottom-nav [data-mair-tab="settings"]');if(btn)btn.setAttribute('aria-label','Profiel');$('mairfmSettingsShortcut')?.remove()}
+function boot(){render();syncNav();window.addEventListener('pageshow',()=>{render();syncNav()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});for(const e of ['jfm:trackchange','mair:taste-feedback','mair:request-confirmed','mair:station-selected'])window.addEventListener(e,()=>setTimeout(render,120));setInterval(()=>{if($('tab-settings')?.classList.contains('active'))render()},15000)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+window.MAIRProfile={version:'mair-profile-v1-settings-tab',render,profile,saveProfile};
+})();
