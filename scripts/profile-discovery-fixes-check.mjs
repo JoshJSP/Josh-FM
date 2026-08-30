@@ -20,10 +20,10 @@ function storage(initial={}){
   return{get length(){return values.size},key:i=>[...values.keys()][i]??null,getItem:key=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(String(key),String(value)),removeItem:key=>values.delete(key),clear:()=>values.clear()};
 }
 
-function profileRuntime({monthlyMinutes=0,allTimeMinutes=0,authState,stored={}}={}){
+function profileRuntime({allTimeMinutes=0,authState,stored={}}={}){
   const local=storage(stored),session=storage();
   const document={readyState:'complete',hidden:false,getElementById:()=>null,querySelector:()=>null,createElement:()=>({}),head:{appendChild(){}},addEventListener(){}};
-  const window={MAIRModeManager:{recap:period=>period==='monthly'?{minutes:monthlyMinutes}:{}},JFMRadioSuite:{state:()=>({minutes:allTimeMinutes})},addEventListener(){},dispatchEvent(){}};
+  const window={MAIRModeManager:{recap:()=>({})},JFMRadioSuite:{state:()=>({minutes:allTimeMinutes})},addEventListener(){},dispatchEvent(){}};
   if(authState!==undefined)window.JFMAuth={state:authState};
   const context={window,document,localStorage:local,sessionStorage:session,CustomEvent:class{},location:{reload(){}},prompt:()=>null,confirm:()=>false,setTimeout:()=>0,setInterval:()=>0,clearTimeout(){},console};
   vm.runInNewContext(profileSource,context,{filename:'mair-profile.js'});
@@ -64,8 +64,9 @@ assert.equal(cache,'mair-v130-public-dj-enabled-diagnostics-isolated-20260830');
 assert.ok(versionApiSource.includes(`cache:'${cache}'`),'API-cache wijkt af van service worker');
 for(const stale of ['mair-v91-radio-brain-20260826','mair-v98-core-20260829',"JFM_ASSET_VERSION='80'"])assert.ok(!predeploySource.includes(stale),`Predeploy bevat verouderde verwachting: ${stale}`);
 
-const profile=profileRuntime({monthlyMinutes:600,allTimeMinutes:6000,authState:{hasRefreshToken:true,hasAccessToken:false}});
-assert.deepEqual({...profile.monthlyGoal()},{minutes:600,goal:1200,progress:50});
+const profile=profileRuntime({allTimeMinutes:6000,authState:{hasRefreshToken:true,hasAccessToken:false}});
+assert.ok(!profileSource.includes('Luisterdoelen')&&!profileSource.includes('Luister 20 uur deze maand'),'Luisterdoel staat nog in Profiel');
+assert.ok(!profileSource.includes('monthlyGoal'),'Verwijderde luisterdoel-logica is blijven staan');
 assert.equal(profile.spotifyConnected(),true);
 assert.equal(profileRuntime({authState:{hasRefreshToken:false,hasAccessToken:false}}).spotifyConnected(),false);
 assert.equal(profileRuntime({stored:{jfm_refresh:'stored-refresh'}}).spotifyConnected(),true);
@@ -115,7 +116,7 @@ switched.advance(10000);
 assert.equal(switched.suite.discoveries().length,1,'Dezelfde Discovery werd dubbel geteld');
 
 console.log('PASS release consistency');
-console.log('PASS profile monthly goal and Spotify status');
+console.log('PASS profile cleanup and Spotify status');
 console.log('PASS isolated advanced diagnostics and retired-control safety');
 console.log('PASS Discovery queue marking');
 console.log('PASS Discovery active-listening threshold, pause, reset and dedupe');
