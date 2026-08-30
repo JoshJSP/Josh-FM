@@ -4,7 +4,7 @@ if(window.MAIRProfile)return;
 const $=id=>document.getElementById(id),PROFILE_KEY='mair_profile_v1';
 const read=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||'null');return v&&typeof v==='object'?v:fallback}catch{return fallback}};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function ensureCss(){if(document.getElementById('mairProfileCss'))return;const l=document.createElement('link');l.id='mairProfileCss';l.rel='stylesheet';l.href='./mair-profile.css?v=5';document.head.appendChild(l)}
+function ensureCss(){if(document.getElementById('mairProfileCss'))return;const l=document.createElement('link');l.id='mairProfileCss';l.rel='stylesheet';l.href='./mair-profile.css?v=6';document.head.appendChild(l)}
 function suite(){try{return window.JFMRadioSuite?.state?.()||read('jfm_radio_suite',{})}catch{return read('jfm_radio_suite',{})}}
 function telemetry(){return read('jfm_top40_telemetry_v1',{})}
 function profile(){return{displayName:'Josh Kramer',role:'MAIR-Ontwikkelaar',tagline:'Jij bouwt. Jij luistert. Jij bepaalt.',...read(PROFILE_KEY,{})}}
@@ -13,8 +13,9 @@ function initials(name){return String(name||'JK').trim().split(/\s+/).filter(Boo
 function duration(minutes){const t=Math.max(0,Math.round(Number(minutes)||0)),h=Math.floor(t/60),m=t%60;return h?`${h}u ${m}m`:`${m}m`}
 function score(e={}){return Number(e.listenMs||0)/60000+Number(e.completed||0)*4+Number(e.starts||0)*1.5+Number(e.likes||0)*5+Number(e.requests||0)*5}
 function stamp(e={}){return Number(e.lastPlayedAt||e.lastSeenAt||e.updatedAt||e.lastAt||e.at||0)}
-function trackKey(e={}){const id=e.id||e.trackId||e.spotifyId||e.uri||e.spotifyUri;if(id)return String(id).toLowerCase();const name=String(e.name||e.title||'').trim().toLowerCase(),artists=(e.artists||[e.artist]).filter(Boolean).map(String).join('|').trim().toLowerCase();return `${name}::${artists}`}
-function favoriteData(){const entries=Object.values(telemetry()).filter(e=>e&&typeof e==='object');const artists=new Map();for(const e of entries){const s=score(e);for(const a of (e.artists||[]).map(String).filter(Boolean))artists.set(a,(artists.get(a)||0)+s)}const topArtists=[...artists.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]);const seen=new Set(),recent=[];for(const e of [...entries].sort((a,b)=>(stamp(b)-stamp(a))||(score(b)-score(a)))){const key=trackKey(e);if(!key||seen.has(key))continue;seen.add(key);recent.push(e);if(recent.length>=5)break}return{topArtists,recent}}
+function norm(v){return String(v||'').trim().toLowerCase().replace(/\s+/g,' ')}
+function titleArtistKey(e={}){const name=norm(e.name||e.title),artists=(e.artists||[e.artist]).filter(Boolean).map(norm).sort().join('|');return `${name}::${artists}`}
+function favoriteData(){const entries=Object.values(telemetry()).filter(e=>e&&typeof e==='object');const artists=new Map();for(const e of entries){const s=score(e);for(const a of (e.artists||[]).map(String).filter(Boolean))artists.set(a,(artists.get(a)||0)+s)}const topArtists=[...artists.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]);const seen=new Set(),recent=[];for(const e of [...entries].sort((a,b)=>(stamp(b)-stamp(a))||(score(b)-score(a)))){const key=titleArtistKey(e);if(!key||key==='::'||seen.has(key))continue;seen.add(key);recent.push(e);if(recent.length>=5)break}return{topArtists,recent}}
 function dna(s={}){try{return window.MAIRMyMair?.radioDna?.(s)?.label||'Persoonlijke mix'}catch{return'Persoonlijke mix'}}
 function weekly(){try{return window.MAIRModeManager?.recap?.('weekly')||{}}catch{return{}}}
 function recentHtml(track){const name=track?.name||track?.title||'MAIR track',artist=(track?.artists||[track?.artist]).filter(Boolean).join(', ')||'MAIR';const image=track?.image||track?.imageUrl||track?.albumImage||'';return `<div class="mair-profile-track"><div class="mair-profile-cover">${image?`<img src="${esc(image)}" alt="">`:esc(name.slice(0,2).toUpperCase())}</div><b>${esc(name)}</b><small>${esc(artist)}</small></div>`}
@@ -36,5 +37,5 @@ const logout=page.querySelector('[data-profile-action="logout"]');const doLogout
 function syncNav(){const btn=document.querySelector('.mair-bottom-nav [data-mair-tab="settings"]');if(btn)btn.setAttribute('aria-label','Profiel');$('mairfmSettingsShortcut')?.remove()}
 function boot(){render();syncNav();window.addEventListener('pageshow',()=>{render();syncNav()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});for(const e of ['jfm:trackchange','mair:taste-feedback','mair:request-confirmed','mair:station-selected','mair:mode-analytics'])window.addEventListener(e,()=>setTimeout(render,120));setInterval(()=>{if($('tab-settings')?.classList.contains('active'))render()},15000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-window.MAIRProfile={version:'mair-profile-v3-ux-polish',render,profile,saveProfile};
+window.MAIRProfile={version:'mair-profile-v4-hard-dedupe',render,profile,saveProfile};
 })();
