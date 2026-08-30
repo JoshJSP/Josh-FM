@@ -18,7 +18,7 @@ for(const file of runtimeAssets){
  if(!sw.includes(`./${file}`))throw Error('Actuele MAIR runtime asset ontbreekt in PWA CORE-cache: '+file);
 }
 if(!sw.includes("'./channel-click-fix.js'"))throw Error('Autoritatieve stationcontroller ontbreekt in PWA CORE-cache');
-if(!/const CACHE='mair-v130-public-dj-enabled-diagnostics-isolated-20260830'/.test(sw))throw Error('PWA cacheversie klopt niet met de huidige MAIRFM-release');
+if(!/const CACHE='mair-v131-background-autonext-recovery-20260830'/.test(sw))throw Error('PWA cacheversie klopt niet met de huidige MAIRFM-release');
 if(!sw.includes("'./mair-background-guard.js'"))throw Error('Background guard ontbreekt in PWA CORE-cache');
 if(!background.includes("recover?.('foreground-return')")||!primary.includes('if(backgrounded()||reloadNeedsGesture)return false'))throw Error('Foreground-only background recovery guard ontbreekt');
 if(!dj.includes('ensureVoiceReady')||dj.indexOf('await ensureVoiceReady()')>dj.indexOf('await pauseMusic(uri)'))throw Error('DJ voice-ready gate moet vóór Spotify-pauze staan');

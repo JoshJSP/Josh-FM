@@ -182,8 +182,27 @@
     }catch(e){return rememberError(e,'Automatisch doorgaan mislukt: ')}finally{endGuardBusy=false;setTimeout(()=>{if(lastNaturalEnd===endedId)lastNaturalEnd=''},1800)}
   }
 
+  function endedPlayback(state,currentTruth=truth()?.get?.()){
+    if(!state?.item||state.is_playing)return null;
+    const remoteId=String(state.item.id||''),truthId=String(currentTruth?.trackId||''),sameTruth=!truthId||truthId===remoteId;
+    const duration=Math.max(0,Number(state.item.duration_ms||0),sameTruth?Number(currentTruth?.durationMs||0):0);
+    const position=Math.max(0,Number(state.progress_ms||0),sameTruth?Number(currentTruth?.progressMs||0):0);
+    if(!remoteId||duration<=0||position<Math.max(0,duration-3500))return null;
+    return{trackId:remoteId,uri:String(state.item.uri||currentTruth?.uri||''),durationMs:duration,positionMs:position,source:'primary-ended-recovery'}
+  }
+
+  async function watchdog(){
+    if(reloadNeedsGesture||busy||endGuardBusy||djOwnsTransport())return false;
+    const t=truth()?.get?.();if(!t?.expectedLive)return false;
+    try{
+      const sdk=await player()?.getCurrentState?.(),track=sdk?.track_window?.current_track,duration=Number(track?.duration_ms||0),position=Number(sdk?.position||0);
+      if(track?.id&&sdk.paused&&duration>0&&position>=Math.max(0,duration-3500))return handleNaturalEnd({trackId:String(track.id),uri:String(track.uri||''),durationMs:duration,positionMs:position,source:'primary-sdk-watchdog'});
+    }catch{}
+    return recover('watchdog')
+  }
+
   async function playUri(uri){activateNow();if(!uri)return resume();return withBusy(async()=>{let actionId='';try{actionId=markTransitionAction('STATION_CHANGE',{expectedTrackId:String(uri).split(':').pop(),source:'playback-primary-play-uri'});const{id}=await ensureActive();await playContextDirect(uri,id,'primary-uri');recoveryFailures=0;recoveryCooldownUntil=0;return true}catch(e){window.MAIRTransitionController?.cancel?.(actionId,'play-uri-failed');return rememberError(e,'Track starten mislukt: ')}})}
-  async function recover(reason='watchdog'){if(backgrounded()||reloadNeedsGesture)return false;if(Date.now()<recoveryCooldownUntil||busy||endGuardBusy||djOwnsTransport())return false;const t=truth()?.get?.();if(!t?.expectedLive)return false;const reloadPending=!!reloadIntent;if(!reloadPending&&truth()?.shouldRecover&&!truth().shouldRecover())return !!t.isPlaying;try{const{state:s}=reloadPending?await restoreReloadPlayback():await ensureActive({preserve:true});if(djOwnsTransport())return false;if(s?.is_playing){ingest(s,reloadPending?'primary-reload-restored':'primary-recovery-already');recoveryFailures=0;recoveryCooldownUntil=0;return true}if(djOwnsTransport())return false;const ok=await resume();if(ok){recoveryFailures=0;recoveryCooldownUntil=0;recoveries++;info('Spotify-verbinding hersteld.')}return ok}catch(e){if(e?.code==='RELOAD_GESTURE')return false;recoveryFailures++;if(recoveryFailures>=3){recoveryCooldownUntil=Date.now()+30000;recoveryFailures=0;info('Spotify-herstel wacht 30 seconden na meerdere fouten.',true)}return rememberError(e,'Playback-herstel mislukt: ')}}
+  async function recover(reason='watchdog'){if(backgrounded()||reloadNeedsGesture)return false;if(Date.now()<recoveryCooldownUntil||busy||endGuardBusy||djOwnsTransport())return false;const t=truth()?.get?.();if(!t?.expectedLive)return false;const reloadPending=!!reloadIntent,forceSync=/^(foreground-return|pageshow|visible|online)$/.test(String(reason));if(!reloadPending&&!forceSync&&truth()?.shouldRecover&&!truth().shouldRecover())return !!t.isPlaying;try{const{state:s}=reloadPending?await restoreReloadPlayback():await ensureActive({preserve:true});if(djOwnsTransport())return false;const ended=endedPlayback(s,t);if(ended)return handleNaturalEnd({...ended,source:`${ended.source}:${reason}`});if(s?.is_playing){ingest(s,reloadPending?'primary-reload-restored':'primary-recovery-already');recoveryFailures=0;recoveryCooldownUntil=0;return true}if(djOwnsTransport())return false;const ok=await resume();if(ok){recoveryFailures=0;recoveryCooldownUntil=0;recoveries++;info('Spotify-verbinding hersteld.')}return ok}catch(e){if(e?.code==='RELOAD_GESTURE')return false;recoveryFailures++;if(recoveryFailures>=3){recoveryCooldownUntil=Date.now()+30000;recoveryFailures=0;info('Spotify-herstel wacht 30 seconden na meerdere fouten.',true)}return rememberError(e,'Playback-herstel mislukt: ')}}
 
   function actionFor(id){return id==='start'?start:id==='play'?playPause:id==='next'?()=>skip(1):id==='prev'?()=>skip(-1):null}
   function controlsOwned(){return['start','play','next','prev'].every(id=>$(id)?.dataset?.jfmOwner==='primary')}
@@ -192,9 +211,9 @@
   window.addEventListener('jfm:natural-track-end',e=>handleNaturalEnd(e.detail||{}).catch(()=>{}));
 
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
-  window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),450)});setInterval(()=>recover('watchdog'),12000);
+  window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),450)});setInterval(()=>watchdog(),12000);
 
-  window.JFMPlayback={primary:true,version:'primary-v15-reload-gesture-safe',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now())}}};
+  window.JFMPlayback={primary:true,version:'primary-v16-background-autonext',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now())}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
-  window.MAIRRuntime?.register?.('playback-primary',{version:'primary-v15-reload-gesture-safe',owner:'transport'});
+  window.MAIRRuntime?.register?.('playback-primary',{version:'primary-v16-background-autonext',owner:'transport'});
 })();

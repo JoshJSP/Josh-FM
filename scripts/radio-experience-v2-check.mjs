@@ -89,8 +89,8 @@ check('DJ runtime preserves automatic cadence',has(dj,'v4.1-audible-handoff-evid
 const versionRuntime=['./dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-news-bulletin.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
 const cachedRuntime=[...versionRuntime,'./spotify-api-budget.js','./spotify-upcoming-truth.js'];
 check('version loader wires UI radio experience modules',versionRuntime.every(x=>version.includes(x))&&version.includes("JFM_ASSET_VERSION='81'"));
-check('service worker caches all radio experience modules',cachedRuntime.every(x=>sw.includes(x))&&sw.includes('mair-v130-public-dj-enabled-diagnostics-isolated-20260830'));
-check('server release endpoint matches release cache',apiVersion.includes('mair-v130-public-dj-enabled-diagnostics-isolated-20260830'));
+check('service worker caches all radio experience modules',cachedRuntime.every(x=>sw.includes(x))&&sw.includes('mair-v131-background-autonext-recovery-20260830'));
+check('server release endpoint matches release cache',apiVersion.includes('mair-v131-background-autonext-recovery-20260830'));
 check('runtime facade remains explicit',has(runtime,"const owners=","playback:'playback-primary + mair-reload-audibility'","dj:'mair-dj-v2'"));
 
 const failed=checks.filter(x=>!x.ok);

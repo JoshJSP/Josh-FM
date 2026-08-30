@@ -94,10 +94,9 @@
     finally{recovering=false}
   }
 
-  // Critical iOS rule: while hidden, never let playback-primary turn a natural
-  // track end into a new Web API play command. The station context is already
-  // preloaded in Spotify; forcing play without a user gesture can be blocked by
-  // mobile autoplay rules and leave the PWA silent at the track boundary.
+  // Observe hidden natural ends, but never consume them. playback-primary is the
+  // single transition owner and first accepts Spotify's already-advanced context;
+  // only when that did not advance does it use the prepared station fallback.
   window.addEventListener('jfm:natural-track-end',event=>{
     if(!isHidden())return;
     const detail=event?.detail||{},s=snapshot('hidden-natural-end');
@@ -105,9 +104,8 @@
       try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-natural-passive')}catch{}
       try{navigator.mediaSession.playbackState='playing'}catch{}
     }
-    emit('hidden-natural-passive',{endedTrackId:String(detail.trackId||detail.endedTrackId||'')});
-    event.stopImmediatePropagation();
-  },true);
+    emit('hidden-natural-observed',{endedTrackId:String(detail.trackId||detail.endedTrackId||'')});
+  });
 
   document.addEventListener('visibilitychange',()=>{
     if(document.visibilityState==='hidden')onHidden();else onVisible().catch(()=>{});
@@ -124,5 +122,5 @@
   window.addEventListener('mair:dj-v2-state',()=>{
     if(isHidden())cancelUnsafeHandoff('hidden-dj-state');
   });
-  window.MAIRBackgroundGuard={version:'mair-background-guard-v3-passive-natural-end',snapshot,armBackgroundDjSkip,cancelUnsafeHandoff,get status(){return{hiddenAt,wasPlaying,trackId,recovering,lastReason,backgroundSkipArmed,cancelling}}};
+  window.MAIRBackgroundGuard={version:'mair-background-guard-v4-central-natural-end',snapshot,armBackgroundDjSkip,cancelUnsafeHandoff,get status(){return{hiddenAt,wasPlaying,trackId,recovering,lastReason,backgroundSkipArmed,cancelling}}};
 })();

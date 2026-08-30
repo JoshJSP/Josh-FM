@@ -27,7 +27,7 @@ ok(dj.includes("miss('break-missed',error)")&&!dj.includes('failed-break-dropped
 ok(dj.includes('async function liveSnapshot(')&&dj.includes('async function snapshot(')&&dj.includes("api('/me/player/queue'")&&dj.includes('snapshot(controller.signal,breakId)'),'DJ must separate critical live snapshot from preparation queue lookup');
 ok(dj.includes('transport.djPause')&&dj.includes('transport.djResume')&&dj.includes('transport.djRewind'),'DJ must prefer SDK-first primary transport helpers');
 ok(primary.includes('player()?.activateElement')&&primary.includes('djPauseDirect')&&primary.includes('djResumeDirect')&&primary.includes('djRewindDirect'),'Primary playback must own SDK-first DJ transport');
-ok(primary.includes('primary-v15-reload-gesture-safe'),'Primary reload gesture-safe transport version missing');
+ok(primary.includes('primary-v16-background-autonext'),'Primary background auto-next transport version missing');
 ok(!dj.includes('new Audio(')&&!dj.includes('AudioContext'),'DJ scheduler must not own an audio engine');
 ok(resume.includes('duplicateIOSBridge:false')&&!resume.includes('new Audio(')&&!resume.includes("s.src='./ios-dj-audio.js"),'Duplicate iOS voice bridge must remain disabled');
 ok(voice.includes('const mediaAudio=new Audio()')&&voice.includes('const AC=window.AudioContext||window.webkitAudioContext'),'Central Fish Audio engine missing');

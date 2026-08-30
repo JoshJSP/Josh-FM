@@ -60,7 +60,7 @@ assert.equal(pkg.version,'2.0.0-beta.9');
 assert.match(versionSource,/version:'2\.0\.0-beta\.9'/);
 assert.match(versionSource,/displayVersion:'2b\.0\.9'/);
 assert.match(versionSource,/JFM_ASSET_VERSION='81'/);
-assert.equal(cache,'mair-v130-public-dj-enabled-diagnostics-isolated-20260830');
+assert.equal(cache,'mair-v131-background-autonext-recovery-20260830');
 assert.ok(versionApiSource.includes(`cache:'${cache}'`),'API-cache wijkt af van service worker');
 for(const stale of ['mair-v91-radio-brain-20260826','mair-v98-core-20260829',"JFM_ASSET_VERSION='80'"])assert.ok(!predeploySource.includes(stale),`Predeploy bevat verouderde verwachting: ${stale}`);
 
