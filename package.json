@@ -3,6 +3,9 @@
   "version": "2.0.0-beta.9",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@vercel/functions": "latest"
+  },
   "scripts": {
     "dev": "vercel dev",
     "test": "npm run predeploy",
