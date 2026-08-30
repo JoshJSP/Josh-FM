@@ -56,7 +56,7 @@
       await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:position}});
       const remote=await api('/me/player/queue'),next=(remote?.queue||[]).find(t=>t?.uri!==currentUri);
       if(next?.uri!==track.uri)throw Error('Spotify bevestigde het request niet als eerstvolgende track.');
-      window.MAIRTransitionController?.mark?.('REQUEST',{fromTrackId:String(state.item.id||''),expectedTrackId:String(track.id||track.uri.split(':').pop()||''),source:reason,ttlMs:10*60*1000});
+      if(String(reason).toLowerCase().includes('request'))window.MAIRTransitionController?.mark?.('REQUEST',{fromTrackId:String(state.item.id||''),expectedTrackId:String(track.id||track.uri.split(':').pop()||''),source:reason,ttlMs:10*60*1000});
       trace('program-next',{reason,uri:track.uri,currentUri,position,context:uris.length});
       try{window.JFMSpotifyUpcomingTruth?.sync?.(true)}catch{};return true
     })

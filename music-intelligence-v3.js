@@ -32,7 +32,7 @@
     const out=head?[head,...spread]:spread;if(id==='top40')return out.slice(0,40);return out.slice(0,50)
   }
   let lastSig='',applying=false;
-  function reconcile(){if(applying||!Array.isArray(window.queue)||window.queue.length<2)return;const id=channel(),s=id+'|'+window.queue.map(t=>t?.id).join(',');if(s===lastSig)return;lastSig=s;const next=optimize(window.queue,id);if(next.length<Math.min(5,window.queue.length))return;const changed=next.map(t=>t.id).join(',')!==window.queue.map(t=>t?.id).join(',');if(!changed)return;applying=true;window.queue=next;try{window.__jfmStationQueueSig='';window.jfmRenderNext?.();window.JFMProgramDirector?.invalidateUpcoming?.('music-intelligence-v3');window.JFMProgramDirector?.render?.()}finally{applying=false}}
+  function reconcile(){if(applying||!Array.isArray(window.queue)||window.queue.length<2||window.JFMProgramDirector?.directWithContext)return;const id=channel(),s=id+'|'+window.queue.map(t=>t?.id).join(',');if(s===lastSig)return;lastSig=s;const next=optimize(window.queue,id);if(next.length<Math.min(5,window.queue.length))return;const changed=next.map(t=>t.id).join(',')!==window.queue.map(t=>t?.id).join(',');if(!changed)return;applying=true;window.queue=next;try{window.__jfmStationQueueSig='';window.jfmRenderNext?.()}finally{applying=false}}
   function rerank(){lastSig='';reconcile()}
   window.addEventListener('jfm:trackchange',e=>{const id=e?.detail?.trackId;const t=(window.queue||[]).find(x=>x?.id===id);if(t)remember(t);setTimeout(reconcile,100)});
   setInterval(reconcile,900);setTimeout(reconcile,800);

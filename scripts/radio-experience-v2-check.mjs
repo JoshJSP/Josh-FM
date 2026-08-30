@@ -36,8 +36,8 @@ check('special shows exist',has(clock,"weekend-warmup","new-music","saturday-nig
 check('show clock assigns DJs',has(clock,"djId:'josh'","djId:'maya'","djId:'max'","djId:'noah'"));
 check('show clock exposes radio moments',has(clock,"Top of hour","Half-hour show ID","jfm:clock-moment","jfm:show-change"));
 
-check('music director 2.2 modes active',has(rotation,"music-director-v2.2-modes","cooldownPenalty","transitionPenalty","clockFit","momentum","modeScore"));
-check('music director separates tracks and artists',has(rotation,'TRACK_COOLDOWN_PLAYS=18','ARTIST_WINDOW=7','lastArtists'));
+check('MAIR Director horizon active',has(rotation,"mair-director-v3-horizon","HORIZON_TRACKS=10","cooldownPenalty","transitionPenalty","clockFit","momentum","modeScore"));
+check('music director separates tracks and artists',has(rotation,'TRACK_COOLDOWN_PLAYS=24','ARTIST_WINDOW=10','lastArtists'));
 check('music director respects requests',has(rotation,"return'Request'","JFMRequests","jfmIsRequest"));
 check('music director uses personal learning',has(rotation,'likes','discoveryWins','discoveryLosses','jfm_skips'));
 check('music director explains choices',has(rotation,'function reason','_why=reason'));
@@ -89,8 +89,8 @@ check('DJ runtime preserves automatic cadence',has(dj,'v4.1-audible-handoff-evid
 const versionRuntime=['./dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-news-bulletin.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
 const cachedRuntime=[...versionRuntime,'./spotify-api-budget.js','./spotify-upcoming-truth.js'];
 check('version loader wires UI radio experience modules',versionRuntime.every(x=>version.includes(x))&&version.includes("JFM_ASSET_VERSION='81'"));
-check('service worker caches all radio experience modules',cachedRuntime.every(x=>sw.includes(x))&&sw.includes('mair-v131-background-autonext-recovery-20260830'));
-check('server release endpoint matches release cache',apiVersion.includes('mair-v131-background-autonext-recovery-20260830'));
+check('service worker caches all radio experience modules',cachedRuntime.every(x=>sw.includes(x))&&sw.includes('mair-v132-director-horizon-20260830'));
+check('server release endpoint matches release cache',apiVersion.includes('mair-v132-director-horizon-20260830'));
 check('runtime facade remains explicit',has(runtime,"const owners=","playback:'playback-primary + mair-reload-audibility'","dj:'mair-dj-v2'"));
 
 const failed=checks.filter(x=>!x.ok);
