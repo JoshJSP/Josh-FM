@@ -1,0 +1,13 @@
+// MAIRFM — traffic-aware Journey notifications for Car Mode.
+(()=>{
+'use strict';
+if(window.MAIRTrafficJourneyToast)return;
+let baseline=null,lastShown=0,timer=null;
+const THRESHOLD=5*60,COOLDOWN=4*60*1000;
+function overlay(){return document.getElementById('mairCarWaveOverlay')}
+function clear(){document.getElementById('mairTrafficJourneyToast')?.remove();if(timer){clearTimeout(timer);timer=null}}
+function show(delta){const host=overlay();if(!host||!host.classList.contains('is-open'))return;clear();const minutes=Math.max(1,Math.round(Math.abs(delta)/60)),slower=delta>0,node=document.createElement('div');node.id='mairTrafficJourneyToast';node.className='mair-traffic-journey-toast';node.setAttribute('role','status');node.setAttribute('aria-live','polite');node.innerHTML=`<b>${slower?`+${minutes} min verkeer`:`${minutes} min sneller`}</b><span>Journey aangepast</span>`;host.appendChild(node);requestAnimationFrame(()=>node.classList.add('show'));timer=setTimeout(()=>{node.classList.remove('show');setTimeout(()=>node.remove(),250)},4000)}
+function update(ctx){if(!ctx?.active||!Number.isFinite(Number(ctx.remainingTravelTime))){baseline=null;return}const now=Date.now(),eta=now+Number(ctx.remainingTravelTime)*1000;if(!baseline){baseline={eta,at:now};return}const expected=baseline.eta,delta=(eta-expected)/1000;if(Math.abs(delta)>=THRESHOLD&&now-lastShown>=COOLDOWN){show(delta);lastShown=now;baseline={eta,at:now};return}if(Math.abs(delta)<90)baseline={eta,at:now}}
+function style(){if(document.getElementById('mairTrafficJourneyToastStyle'))return;const el=document.createElement('style');el.id='mairTrafficJourneyToastStyle';el.textContent='.mair-traffic-journey-toast{position:absolute;z-index:40;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translate(-50%,-16px);display:flex;align-items:center;gap:9px;max-width:calc(100% - 32px);padding:10px 14px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(12,12,15,.94);box-shadow:0 12px 32px rgba(0,0,0,.35);color:#fff;opacity:0;transition:opacity .2s ease,transform .2s ease;pointer-events:none;white-space:nowrap}.mair-traffic-journey-toast.show{opacity:1;transform:translate(-50%,0)}.mair-traffic-journey-toast b{font-size:13px}.mair-traffic-journey-toast span{font-size:12px;color:#b9bbc2}@media(max-height:500px){.mair-traffic-journey-toast{top:8px;padding:8px 12px}}';document.head.appendChild(el)}
+style();window.addEventListener('mair:journey-context',e=>update(e.detail));window.addEventListener('mair:car-mode',e=>{if(!e.detail?.open)clear()});if(window.MAIRJourneyContext)update(window.MAIRJourneyContext);window.MAIRTrafficJourneyToast={version:'2026-08-30-v1',update,clear};
+})();
