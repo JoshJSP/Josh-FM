@@ -1,51 +1,37 @@
-// MAIR discovery layer — proportional MY MAIR discovery with resilient Spotify fallback.
+// MAIR Discovery — the slider controls how adventurous the Discovery station may be.
 (()=>{
 'use strict';
 const slider=document.getElementById('discovery'),label=document.getElementById('discoveryValue');if(!slider||!label)return;
-const SET_SIZE=50,DIAG='jfm_discovery_diag_v6',wait=ms=>new Promise(r=>setTimeout(r,ms));
-const stored=Number(localStorage.getItem('jfm_discovery'));
-slider.value=Number.isFinite(stored)?Math.max(0,Math.min(100,stored)):30;
-function targetCount(pct=Number(slider.value)||0){return Math.max(0,Math.min(SET_SIZE,Math.round(SET_SIZE*pct/100)))}
-function paint(){const pct=Math.max(0,Math.min(100,Number(slider.value)||0)),wanted=targetCount(pct);label.textContent=`${pct}% · ±${wanted}/${SET_SIZE} nieuw`;label.title='Geldt voor MY MAIR: ongeveer dit deel van een nieuwe radioset bestaat uit ontdekkingen.'}
-paint();
-slider.addEventListener('input',()=>{paint();localStorage.setItem('jfm_discovery',slider.value)});
-slider.addEventListener('change',()=>{localStorage.setItem('jfm_discovery',slider.value);if(typeof queue!=='undefined')queue=[];try{window.dispatchEvent(new CustomEvent('mair:discovery-change',{detail:{percent:Number(slider.value)||0,target:targetCount()}}))}catch{}});
-const originalBuild=window.buildSet||buildSet;
-async function boundedFetch(url,opt={},ms=12000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{...opt,signal:c.signal})}finally{clearTimeout(timer)}}
-function mem(){try{return JSON.parse(localStorage.getItem('jfm_director_memory')||'{"plays":{},"likes":{},"requests":{}}')}catch{return{plays:{},likes:{},requests:{}}}}
-function skips(){try{return typeof skipMap==='function'?skipMap():JSON.parse(localStorage.getItem('jfm_skips')||'{}')}catch{return{}}}
-function seedScore(t,m,sm){return(m.likes?.[t.id]||0)*5-(sm[t.id]||0)*4-(m.plays?.[t.id]||0)*.12+Math.random()*2}
+const KEY='jfm_discovery',CACHE_KEY='jfm_discovery_station_cache_v1',CHANNEL_KEY='jfm_music_channel_v1',NOW=()=>new Date().getFullYear();
+const clamp=v=>Math.max(0,Math.min(100,Number(v)||0));
+const stored=Number(localStorage.getItem(KEY));slider.value=String(Number.isFinite(stored)?clamp(stored):50);
+function levelName(v=slider.value){v=clamp(v);if(v<=15)return'Veilig';if(v<=35)return'Vertrouwd';if(v<=65)return'Gebalanceerd';if(v<=85)return'Avontuurlijk';return'Verrassing'}
+function paint(){const v=clamp(slider.value);label.textContent=`${v}% · ${levelName(v)}`;label.title='Geldt alleen voor MAIR Discovery: hoger betekent verder buiten je vertrouwde muzieksmaak.'}
+function stationId(){try{return window.JFMMusicChoice?.channel||localStorage.getItem(CHANNEL_KEY)||'mix'}catch{return localStorage.getItem(CHANNEL_KEY)||'mix'}}
+function isDiscoveryStation(){return stationId()==='new'}
+function readJson(key,fallback){try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback))}catch{return fallback}}
+function telemetry(){return readJson('jfm_top40_telemetry_v1',{})}
+function favoriteArtists(){const scores=new Map();for(const e of Object.values(telemetry())){if(!e||typeof e!=='object')continue;const s=Number(e.listenMs||0)/60000+Number(e.completed||0)*4+Number(e.starts||0)+Number(e.likes||0)*6;for(const a of (e.artists||[]).map(String).filter(Boolean))scores.set(a,(scores.get(a)||0)+s)}return[...scores.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0])}
+function queryPlan(v=slider.value){const y=NOW(),a=favoriteArtists(),value=clamp(v);if(value<=15)return[...(a.slice(0,2).map(x=>`artist:${x} year:${y}`)),`year:${y} pop`].slice(0,3);if(value<=35)return[...(a.slice(0,1).map(x=>`artist:${x} year:${y}`)),`year:${y} pop`,`year:${y} dance pop`].slice(0,3);if(value<=65)return[`year:${y} pop`,`year:${y} indie pop`,`year:${y} r&b`];if(value<=85)return[`year:${y} indie`,`year:${y} alternative`,`year:${y} electronic`];return[`year:${y} alternative`,`year:${y} indie`,`year:${y} electronic`]}
+function cache(){const x=readJson(CACHE_KEY,{});return x&&typeof x==='object'?x:{}}
+function saveCache(x){try{localStorage.setItem(CACHE_KEY,JSON.stringify(x))}catch{}}
+function toTrack(t){return{id:t.id,uri:t.uri,name:t.name||'',artists:(t.artists||[]).map(a=>a?.name||a).filter(Boolean),album:t.album?.name||'',release:t.album?.release_date||'',image:t.album?.images?.[1]?.url||t.album?.images?.[0]?.url||'',url:t.external_urls?.spotify||'',duration:t.duration_ms||0,popularity:Number(t.popularity||0),_discovery:true}}
+async function search(q){const c=cache(),k=String(q),hit=c[k];if(hit?.at&&Date.now()-Number(hit.at)<30*60*1000&&Array.isArray(hit.items)&&hit.items.length)return hit.items;try{const d=await api('/search?type=track&limit=50&q='+encodeURIComponent(q)),items=(d?.tracks?.items||[]).filter(t=>t?.id&&t?.uri).map(toTrack);if(items.length){c[k]={at:Date.now(),items};saveCache(c)}return items}catch{return[]}}
 const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
-const sig=t=>`${norm(t?.name)}|${norm((t?.artists||[]).map?.(a=>a?.name||a)?.join?.(',')||'')}`;
-function diag(state){const v={...state,at:Date.now(),version:'proportional-discovery-v6'};try{localStorage.setItem(DIAG,JSON.stringify(v))}catch{}window.JFMDiscoveryDiagnostic=v}
-function acceptable(t,base,found,sm){if(!t?.id||!t?.uri)return false;if((sm[t.id]||0)>=2)return false;const k=sig(t);return!base.some(b=>b.id===t.id||sig(b)===k)&&!found.some(f=>f.id===t.id||sig(f)===k)}
-function rateLimited(e){return/rate limit|rustiger|429|wacht .*secon|cooldown/i.test(String(e?.message||e))}
-function sharedCooldown(){try{return Math.max(0,Number(window.JFMSpotifyGuard?.state?.cooldownUntil||0)-Date.now())}catch{return 0}}
-async function awaitCooldown(stats,info){const ms=sharedCooldown();if(ms<=0)return true;stats.waited=true;if(info)info.textContent=`MY MAIR wacht ${Math.ceil(ms/1000)} sec op Spotify; je huidige muziek blijft spelen…`;if(ms>65000)return false;await wait(ms+200);return sharedCooldown()<=0}
-function searchBudget(wanted){if(wanted<=0)return 0;if(wanted<=5)return 5;if(wanted<=15)return 8;if(wanted<=25)return 11;if(wanted<=40)return 14;return 18}
-async function search(q,stats,limit=20,info=null){if(!q?.trim()||stats.searches>=stats.maxSearches||stats.rateLimited)return[];if(!(await awaitCooldown(stats,info))){stats.rateLimited=true;stats.lastError='Spotify cooldown';return[]}stats.searches++;try{const d=await api('/search?type=track&limit='+Math.max(1,Math.min(50,limit))+'&q='+encodeURIComponent(q));const items=d?.tracks?.items||[];stats.results+=items.length;return items}catch(e){stats.errors++;stats.lastError=String(e?.message||e);if(rateLimited(e)){if(await awaitCooldown(stats,info))return search(q,stats,limit,info);stats.rateLimited=true}return[]}}
-function addCandidates(items,reason,base,found,sm,wanted){for(const t of items||[]){if(found.length>=wanted)break;if(!acceptable(t,base,found,sm))continue;const x=trackObj(t);x._discovery=true;x._discoveryReason=reason||'Past bij je luisterprofiel.';found.push(x)}}
-function proportionalMix(familiar,discoveries,max=SET_SIZE){const f=[...familiar],d=[...discoveries],out=[];const total=Math.min(max,f.length+d.length),targetD=Math.min(d.length,total),targetF=Math.min(f.length,total-targetD);let usedD=0,usedF=0;for(let i=0;i<total;i++){const expectedD=(i+1)*(targetD/Math.max(1,total));const chooseD=d.length&&(usedD<targetD)&&(usedD<expectedD||!f.length||usedF>=targetF);if(chooseD){out.push(d.shift());usedD++}else if(f.length&&usedF<targetF){out.push(f.shift());usedF++}else if(d.length){out.push(d.shift());usedD++}}return out}
-function seedArtists(ranked){return[...new Set(ranked.slice(0,24).flatMap(t=>t.artists||[]).map(String).filter(Boolean))]}
-function broadQueries(ranked){const years=ranked.map(t=>Number(String(t?.release||'').slice(0,4))).filter(Boolean),avg=years.length?Math.round(years.reduce((a,b)=>a+b,0)/years.length):new Date().getFullYear()-3,now=new Date().getFullYear();return[`year:${Math.max(1990,avg-3)}-${Math.min(now,avg+3)} pop`,`year:${Math.max(2000,now-5)}-${now} indie pop`,`year:${Math.max(2000,now-4)}-${now} dance pop`,'alternative pop','modern pop']}
-window.buildSet=buildSet=async function(){
-  const base=await originalBuild(),pct=Math.max(0,Math.min(100,Number(slider.value)||0)),info=document.getElementById('queueInfo');
-  if(!base?.length||pct<=0){diag({percent:pct,wanted:0,found:0,actualPercent:0,searches:0,maxSearches:0,results:0,errors:0,rateLimited:false});return base}
-  const wanted=targetCount(pct),m=mem(),sm=skips(),ranked=[...base].sort((a,b)=>seedScore(b,m,sm)-seedScore(a,m,sm)),seedRows=ranked.slice(0,20).map(t=>({name:t.name,artists:t.artists,release:t.release})),found=[];
-  const stats={percent:pct,wanted,found:0,actualPercent:0,searches:0,maxSearches:searchBudget(wanted),results:0,errors:0,rateLimited:false,waited:false,lastError:'',aiIdeas:0};
-  if(!(await awaitCooldown(stats,info))){stats.rateLimited=true;diag(stats);if(info)info.textContent=`${base.length} tracks klaar · Discovery kon nu niet vernieuwen door Spotify-limiet.`;return base}
-  if(info)info.textContent=`MY MAIR zoekt ${wanted} ontdekking${wanted===1?'':'en'} voor je ${pct}% mix…`;
-  let ideas=[];
-  try{const r=await boundedFetch('/api/discover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({seeds:seedRows,count:Math.min(20,Math.max(6,wanted)),mode:settings?.mode||'normal'})});if(r.ok){const d=await r.json().catch(()=>({}));ideas=Array.isArray(d.tracks)?d.tracks.slice(0,20):[];stats.aiIdeas=ideas.length}}catch(e){stats.errors++;stats.lastError=e?.name==='AbortError'?'Discovery API timeout':String(e?.message||e)}
-  for(const idea of ideas){if(found.length>=wanted||stats.searches>=stats.maxSearches||stats.rateLimited)break;const title=String(idea?.title||'').trim(),artist=String(idea?.artist||'').trim();if(!title&&!artist)continue;const q=title&&artist?`track:${title} artist:${artist}`:[title,artist].filter(Boolean).join(' ');addCandidates(await search(q,stats,12,info),idea?.reason||'AI-match op basis van je luisterprofiel.',base,found,sm,wanted)}
-  const artists=seedArtists(ranked);
-  for(const name of artists){if(found.length>=wanted||stats.searches>=stats.maxSearches||stats.rateLimited)break;addCandidates(await search(`artist:${name}`,stats,30,info),'Een minder bekende match rond een artiest die al bij je smaak past.',base,found,sm,wanted)}
-  for(const q of broadQueries(ranked)){if(found.length>=wanted||stats.searches>=stats.maxSearches||stats.rateLimited)break;addCandidates(await search(q,stats,35,info),'Nieuwe muziek buiten je vaste rotatie, passend bij je luisterprofiel.',base,found,sm,wanted)}
-  const actualDiscovery=Math.min(wanted,found.length),familiarNeeded=Math.max(0,SET_SIZE-actualDiscovery),familiar=ranked.slice(0,familiarNeeded),discoveries=found.slice(0,actualDiscovery);queue=proportionalMix(familiar,discoveries,SET_SIZE);
-  if(queue.length<SET_SIZE){const used=new Set(queue.map(t=>t.id));for(const t of ranked){if(queue.length>=SET_SIZE)break;if(!used.has(t.id)){used.add(t.id);queue.push(t)}}}
-  stats.found=actualDiscovery;stats.actualPercent=Math.round((actualDiscovery/Math.max(1,queue.length))*100);diag(stats);
-  if(info){const shortfall=actualDiscovery<wanted?` · doel ${pct}%, gehaald ${stats.actualPercent}%`:` · ${stats.actualPercent}% echt nieuw`;info.textContent=`${queue.length} tracks klaar · ${actualDiscovery} ontdekking${actualDiscovery===1?'':'en'}${shortfall}.`}
-  return queue
-};
-window.JFMDiscovery={version:'proportional-discovery-v6',targetCount,searchBudget,diagnostic:()=>{try{return JSON.parse(localStorage.getItem(DIAG)||'null')}catch{return null}}};
+function sig(t){return`${norm(t?.name)}|${(t?.artists||[]).map(norm).sort().join('|')}`}
+function dedupe(list){const ids=new Set(),sigs=new Set(),out=[];for(const t of list||[]){if(!t?.id||!t?.uri)continue;const k=sig(t);if(ids.has(t.id)||sigs.has(k))continue;ids.add(t.id);sigs.add(k);out.push(t)}return out}
+function tasteScore(t){try{return Number(window.JFMTasteModel?.score?.(t)||0)}catch{return 0}}
+function adventureScore(t,v){const a=clamp(v)/100,pop=Number(t.popularity||0),targetPop=78-a*58,popFit=20-Math.abs(pop-targetPop)/3.5,taste=tasteScore(t)*(1-a)*1.25,fresh=String(t.release||'').startsWith(String(NOW()))?8:2,random=Math.random()*(2+a*15);return fresh+popFit+taste+random}
+let buildToken=0,busy=false,timer=null;
+async function rebuildDiscoveryStation(force=false){if(!isDiscoveryStation())return false;if(busy&&!force)return false;const token=++buildToken;busy=true;const v=clamp(slider.value),info=document.getElementById('queueInfo');try{if(info)info.textContent=`MAIR Discovery · ${levelName(v)} · nieuwe muziek zoeken…`;const existing=(typeof queue!=='undefined'&&Array.isArray(queue)?queue:[]).map(t=>({...t,_discovery:true})),found=[...existing];for(const q of queryPlan(v)){if(token!==buildToken||!isDiscoveryStation())return false;found.push(...await search(q))}if(token!==buildToken||!isDiscoveryStation())return false;let ranked=dedupe(found).filter(t=>{const y=Number(String(t.release||'').slice(0,4));return!y||y>=NOW()-1}).map(t=>({...t,_discovery:true,_discoveryReason:`MAIR Discovery · ${levelName(v)}`})).sort((a,b)=>adventureScore(b,v)-adventureScore(a,v));if(ranked.length<5)return false;const currentId=(()=>{try{return playback?.item?.id||''}catch{return''}})(),currentTrack=currentId?existing.find(t=>t.id===currentId):null;if(currentTrack)ranked=[currentTrack,...ranked.filter(t=>t.id!==currentId)];queue=ranked.slice(0,50);try{window.__jfmStationQueueSig=''}catch{};try{window.jfmRenderNext?.();window.JFMProgramDirector?.render?.()}catch{}if(info)info.textContent=`${queue.length} tracks klaar · MAIR Discovery · ${v}% ${levelName(v)}.`;try{window.dispatchEvent(new CustomEvent('mair:discovery-station-refreshed',{detail:{percent:v,level:levelName(v),tracks:queue.length}}))}catch{}return true}finally{busy=false}}
+function scheduleRebuild(ms=900){clearTimeout(timer);timer=setTimeout(()=>{if(isDiscoveryStation())rebuildDiscoveryStation().catch(()=>{})},ms)}
+function ensureBridge(){if(window.MAIRProfileDiscoveryBridge||document.getElementById('mair-profile-discovery-bridge-js'))return;const s=document.createElement('script');s.id='mair-profile-discovery-bridge-js';s.src='./mair-profile-discovery-bridge.js?v=2';s.async=false;document.body.appendChild(s)}
+paint();localStorage.setItem(KEY,slider.value);
+slider.addEventListener('input',()=>{paint();localStorage.setItem(KEY,String(clamp(slider.value)))});
+slider.addEventListener('change',()=>{paint();localStorage.setItem(KEY,String(clamp(slider.value)));try{window.dispatchEvent(new CustomEvent('mair:discovery-change',{detail:{percent:clamp(slider.value),level:levelName()}}))}catch{}if(isDiscoveryStation())scheduleRebuild(180)});
+for(const e of ['mair:station-selected','mair:channelchange'])window.addEventListener(e,()=>scheduleRebuild(1000));
+document.addEventListener('click',e=>{if(e.target.closest?.('[data-mair-station="new"],[data-jfm-channel="new"]'))scheduleRebuild(1300)},true);
+window.addEventListener('pageshow',()=>scheduleRebuild(1200));
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{ensureBridge();scheduleRebuild(1200)},{once:true});else{ensureBridge();scheduleRebuild(1200)}
+window.JFMDiscovery={version:'discovery-station-adventure-v7',value:()=>clamp(slider.value),level:()=>levelName(slider.value),queryPlan,rebuild:rebuildDiscoveryStation,isDiscoveryStation};
 })();
