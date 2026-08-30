@@ -12,8 +12,8 @@ must(policy.includes("party:{label:'MAIR PARTY'")&&policy.includes("chill:{label
 must(controller.includes("boundedFetch('/api/category-filter'"),'controller must call the bounded category classifier before activating queue');
 must(controller.includes('AbortController')&&controller.includes("boundedFetch('/api/nl-charts"),'station enrichment requests must have a client timeout');
 must(controller.includes('policy()?.confidence?.(id)||.90')&&controller.includes('Number(x?.confidence)>=min'),'client must enforce station-specific confidence');
-must(policy.includes('releaseYear(t)===year()'),'new must enforce current release year');
-must(policy.includes('releaseYear(t)>0&&releaseYear(t)<=2016'),'throwback must enforce hard year boundary');
+must(policy.includes('releaseYear(t)>=year()-2'),'new must enforce the current recent-release window');
+must(policy.includes('releaseYear(t)>=1980&&releaseYear(t)<=2004'),'throwback must enforce the documented 80s-through-early-00s boundary');
 must(policy.includes('releaseYear(t)>=2000&&releaseYear(t)<=2009'),'00s must enforce decade');
 must(policy.includes('releaseYear(t)>=2010&&releaseYear(t)<=2019'),'10s must enforce decade');
 must(!controller.includes('nlArtists')&&!policy.includes('nlArtists'),'controller must not classify Dutch language by artist whitelist');

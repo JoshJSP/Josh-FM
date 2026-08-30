@@ -13,7 +13,7 @@ assert.doesNotMatch(userControls,/Sleeptimer|data-mair-sleep|MAIRSleepTimer/,'Se
 assert.match(userControls,/Car Mode/);assert.match(userControls,/settings-only/);
 
 for(const [name,src] of [['music-choice',choice],['station-policy',policy],['classifier',classifier],['category-purity',purity]])assert.match(src,/sleep/,`${name} must include the SLEEP channel`);
-assert.match(policy,/sleep:\{label:'MAIR SLEEP'.*minConfidence:\.94/s);assert.match(classifier,/sleep:'Accepteer alleen als dit overtuigend geschikt is om bij in slaap te vallen/);
+assert.match(policy,/sleep:\{label:'MAIR SLEEP'.*minConfidence:\.95/s);assert.match(classifier,/sleep:'Accepteer alleen als dit overtuigend geschikt is om bij in slaap te vallen/);
 assert.match(policy,/acoustic covers/);assert.match(policy,/soft acoustic covers/);assert.match(policy,/unplugged pop/);assert.doesNotMatch(policy,/deep sleep music|ambient sleep music|sleep music/,'Sleep search must be song-first, not ambient/noise-first');
 assert.match(classifier,/Wijs ALTIJD af: white noise, brown noise, pink noise/);assert.match(classifier,/rustige akoestische radio-playlist/);
 assert.match(purity,/channel==='sleep'\)return filtered/);assert.match(purity,/channel!=='sleep'/);
@@ -44,5 +44,5 @@ assert.doesNotMatch(version,/addSyncScript\('mair-foundation-js'/);assert.doesNo
 assert.match(budget,/POLL_MS=30000/);assert.match(budget,/api-budget-v2-rate-limit-aware/);assert.match(budget,/cooldownUntil/);assert.match(budget,/match\(\/over\\s\+\(\\d\+\)\\s\*sec\/i\)/);
 assert.match(upcoming,/WATCHDOG_MS=15000/);assert.match(upcoming,/FORCE_DEDUPE_MS=1200/);assert.match(upcoming,/v2-single-authoritative-owner-rate-limit-aware/);assert.doesNotMatch(upcoming,/setInterval\(\(\)=>sync\(false\),1600\)/,'Spotify queue truth may not poll every 1.6 seconds');
 
-assert.match(version,/mair-sleep\.js/);assert.match(version,/mair-news-bulletin\.js/);assert.match(version,/mair-dj-break-owed-guard\.js/);assert.match(version,/mair-dj-transition-fallback\.js/);assert.match(version,/mair-radio-sequencer\.js/);assert.match(version,/JFM_ASSET_VERSION='80'/);assert.match(sw,/mair-v97-modes-20260826/);assert.match(sw,/\.\/mair-sleep\.js/);assert.match(sw,/\.\/mair-dj-break-owed-guard\.js/);assert.match(sw,/\.\/mair-dj-transition-fallback\.js/);assert.match(sw,/\.\/mair-radio-sequencer\.js/);
+assert.match(version,/mair-sleep\.js/);assert.match(version,/mair-news-bulletin\.js/);assert.match(version,/mair-dj-break-owed-guard\.js/);assert.match(version,/mair-dj-transition-fallback\.js/);assert.match(version,/mair-radio-sequencer\.js/);assert.match(version,/JFM_ASSET_VERSION='81'/);assert.match(sw,/mair-v130-public-dj-enabled-diagnostics-isolated-20260830/);assert.match(sw,/\.\/mair-sleep\.js/);assert.match(sw,/\.\/mair-dj-break-owed-guard\.js/);assert.match(sw,/\.\/mair-dj-transition-fallback\.js/);assert.match(sw,/\.\/mair-radio-sequencer\.js/);
 console.log('MAIR user-reported hotfix gate: PASS — automatic DJ fallback transitions, station-wide varied sequencing, Sleep acoustic station/cover, settings cleanup, diagnostics centralization, repeat locks and Spotify rate-limit mitigation');

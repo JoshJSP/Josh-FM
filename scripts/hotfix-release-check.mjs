@@ -12,9 +12,9 @@ const resume=read('dj-resume.js');
 const easy=read('mair-easy-use-v1.js');
 const progress=read('progress-clock-v226.js');
 const checks=[
- ['discovery-v5',/playback-first-discovery-v5/.test(discovery)],
- ['discovery-retry',/awaitCooldown/.test(discovery)&&/setTimeout\(\(\)=>buildSet\(\)/.test(discovery)],
- ['max-five-searches',/MAX_SEARCHES=5/.test(discovery)],
+ ['discovery-v7',/discovery-station-adventure-v7/.test(discovery)],
+ ['discovery-stale-build-guard',discovery.includes('buildToken')&&discovery.includes('token!==buildToken')&&discovery.includes('busy')],
+ ['max-three-searches',discovery.includes('function queryPlan')&&discovery.includes('.slice(0,3)')&&discovery.includes('for(const q of queryPlan(v))')],
  ['authoritative-categories',/MAIRStationController/.test(channels)&&/mair-station-controller-v4(?:\.\d+)?/.test(channels)&&/MAIRStationPolicy/.test(channels)&&/authoritative-stations-v\d+-nl-editorial/.test(channels)],
  ['popular-category-pools',/buildPool/.test(channels)&&/limit=10&q=/.test(channels)&&!/limit=25&q=/.test(channels)&&!/popularity/.test(policy)],
  ['dutch-filter',/semanticQualityFilter/.test(channels)&&/\/api\/category-filter/.test(channels)&&/policy\(\)\?\.confidence\?\.\(id\)/.test(channels)&&/minConfidence:.95/.test(policy)&&/language:'nl'/.test(policy)&&/hoofdzakelijk Nederlands/.test(classifier)&&!/nlArtists/.test(channels)],
