@@ -13,6 +13,8 @@ const versionSource=read('version.js');
 const versionApiSource=read('api/version.js');
 const swSource=read('sw.js');
 const build7Source=read('build7.js');
+const brandConfigSource=read('brand-config.js');
+const djQueueSource=read('dj-now-queue.js');
 const predeploySource=read('scripts/predeploy-check-build1.mjs');
 const pkg=JSON.parse(read('package.json'));
 
@@ -78,9 +80,18 @@ assert.match(diagnosticsSource,/document\.body\.appendChild\(sheet\)/,'Diagnosti
 assert.ok(!diagnosticsSource.includes('MutationObserver'),'Diagnostiek gebruikt nog agressieve DOM-observatie');
 assert.match(appSource,/const control=\$\(id\);if\(control\)control\.disabled=!ok/,'Optionele controls worden niet veilig behandeld');
 assert.match(appSource,/\$\('skipTalk'\)\?\.addEventListener/,'Verwijderde skipTalk-control is niet null-safe');
-assert.match(build7Source,/window\.MAIR_PUBLIC_DJ_ENABLED=true/,'Publieke DJ is niet expliciet geactiveerd');
-assert.ok(!build7Source.includes('mair-public-dj-off-js'),'De publieke DJ-uit-schakelaar wordt nog geladen');
-assert.ok(!swSource.includes("'./mair-public-dj-off.js'"),'De oude DJ-uit-schakelaar blijft in de PWA-cache');
+// De DJ staat sinds 2026-09-01 standaard UIT achter een centrale feature flag.
+// Deze drie asserties bewaakten de omgekeerde, inmiddels vervallen productregel
+// ("publieke DJ moet expliciet aan staan") en bewaken nu de nieuwe regel.
+assert.match(brandConfigSource,/window\.MAIR_DJ_ENABLED=djOverride==='1'/,'MAIR_DJ_ENABLED is geen expliciete opt-in meer');
+assert.ok(!/window\.MAIR_DJ_ENABLED\s*=\s*true/.test(brandConfigSource),'De DJ-vlag staat hard aan in plaats van standaard uit');
+assert.match(build7Source,/window\.MAIR_PUBLIC_DJ_ENABLED=djOn/,'build7 zet de publieke DJ-status niet af van de centrale vlag');
+assert.ok(!/window\.MAIR_PUBLIC_DJ_ENABLED=true/.test(build7Source),'build7 activeert de publieke DJ nog hard');
+assert.match(djQueueSource,/if\(window\.MAIR_DJ_ENABLED===true\)await loadDJ\(\)/,'mair-dj-v2 wordt niet achter de vlag geladen');
+assert.match(djQueueSource,/await load\('\.\/mair-dj-v2\.js'/,'De DJ-orchestrator staat niet meer in de conditionele tak');
+for(const runtimeModule of ['progress-clock-v226.js','mair-observability.js','mair-audio-unlock-v1.js','mair-background-guard.js'])
+  assert.match(djQueueSource,new RegExp(`loadRuntime\\(\\)[\\s\\S]*${runtimeModule.replace(/\./g,'\\.')}`),`${runtimeModule} hoort altijd te laden, ook zonder DJ`);
+assert.ok(swSource.includes("'./mair-public-dj-off.js'"),'De DJ-uit-laag hoort in de PWA-cache te staan');
 
 const discoveryRun=discoveryRuntime();
 assert.equal(await discoveryRun.discovery.rebuild(true),true);
