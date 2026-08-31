@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const read=file=>fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
+const js=read('ios-now-playing.js'),swift=read('ios/App/App/MAIRNowPlayingPlugin.swift'),scene=read('ios/App/App/SceneDelegate.swift'),project=read('ios/App/App.xcodeproj/project.pbxproj'),suite=read('radio-suite.js'),sw=read('sw.js'),plist=read('ios/App/App/Info.plist');
+assert.match(js,/isNativePlatform/);assert.match(js,/getPlatform\?\.\(\)==='ios'/);assert.match(js,/JFMPlayback/);assert.match(js,/remoteBusy/);assert.match(js,/setActionHandler\(action,null\)/);assert.doesNotMatch(js,/Spotify\.Player|\/me\/player/);
+for(const value of ['title','artist','album','artwork','duration','elapsed','isPlaying'])assert.ok(js.includes(value),`JS metadata mist ${value}`);
+for(const value of ['MPNowPlayingInfoCenter','MPRemoteCommandCenter','MPMediaItemPropertyTitle','MPMediaItemPropertyArtist','MPMediaItemPropertyArtwork','MPNowPlayingInfoPropertyElapsedPlaybackTime'])assert.ok(swift.includes(value),`Swift mist ${value}`);
+for(const command of ['playCommand','pauseCommand','nextTrackCommand','previousTrackCommand'])assert.ok(swift.includes(command),`Swift mist ${command}`);
+assert.doesNotMatch(swift,/AVAudioSession/,'bridge mag de bestaande Spotify-audiosessie niet wijzigen');
+assert.match(scene,/MAIRBridgeViewController/);assert.match(project,/MAIRNowPlayingPlugin\.swift in Sources/);assert.match(suite,/\.\/ios-now-playing\.js/);assert.match(sw,/\.\/ios-now-playing\.js/);assert.match(plist,/<string>audio<\/string>/);
+console.log('MAIR iOS Now Playing: PASS — native metadata, artwork, remote commands, single transport owner en webfallback');

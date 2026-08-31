@@ -1,0 +1,16 @@
+// Native iOS Now Playing adapter. Web/PWA keeps pwa-platform.js as its fallback owner.
+(()=>{
+'use strict';
+if(window.MAIRIOSNowPlaying)return;
+let plugin=null,native=false,last='',timer=null,remoteBusy=false;
+function isNativeIOS(){try{return window.Capacitor?.isNativePlatform?.()&&window.Capacitor?.getPlatform?.()==='ios'}catch{return false}}
+function normalize(item){if(!item?.id)return null;return{id:String(item.id),title:String(item.name||'MAIR'),artist:(item.artists||[]).map(a=>a?.name||a).filter(Boolean).join(', ')||'MAIR',album:String(item.album?.name||''),artwork:String(item.album?.images?.[0]?.url||''),duration:Number(item.duration_ms||0)}}
+function current(){try{const raw=window.playback?.item||window.playback?.track_window?.current_track,t=normalize(raw);if(t)return t}catch{}try{const s=window.JFMPlaybackState?.get?.()||{},q=Array.isArray(window.queue)?window.queue:[],raw=q.find(x=>x?.id===s.trackId);if(raw)return{id:String(raw.id),title:String(raw.name||'MAIR'),artist:(raw.artists||[]).map(a=>a?.name||a).filter(Boolean).join(', ')||'MAIR',album:String(raw.album||''),artwork:String(raw.image||''),duration:Number(raw.duration||s.durationMs||0)}}catch{}return null}
+function clearWebRemoteActions(){if(!navigator.mediaSession?.setActionHandler)return;for(const action of ['play','pause','nexttrack','previoustrack'])try{navigator.mediaSession.setActionHandler(action,null)}catch{}}
+async function update(force=false){if(!native||!plugin)return false;const t=current(),s=window.JFMPlaybackState?.get?.()||{};if(!t)return false;const data={title:t.title,artist:t.artist,album:t.album||'MAIR',artwork:t.artwork,duration:Math.max(0,Number(t.duration||s.durationMs||0))/1000,elapsed:Math.max(0,Number(s.progressMs||0))/1000,isPlaying:!!s.isPlaying},signature=[t.id,data.isPlaying,Math.floor(data.elapsed/3),data.artwork].join('|');if(!force&&signature===last)return true;last=signature;try{await plugin.update(data);return true}catch{return false}}
+async function remote(command){if(remoteBusy)return;remoteBusy=true;try{const playback=window.JFMPlayback;if(command==='play')await playback?.resume?.();else if(command==='pause')await playback?.pause?.();else if(command==='next')await playback?.next?.();else if(command==='previous')await playback?.previous?.()}finally{setTimeout(()=>{remoteBusy=false;update(true)},350)}}
+async function install(){if(!isNativeIOS())return false;plugin=window.Capacitor?.Plugins?.MAIRNowPlaying;if(!plugin?.update||!plugin?.addListener)return false;native=true;clearWebRemoteActions();await plugin.addListener('remoteCommand',event=>remote(String(event?.command||'')));for(const delay of [0,600,1800,3500])setTimeout(()=>{clearWebRemoteActions();update(true)},delay);timer=setInterval(()=>update(false),3000);return true}
+for(const event of ['jfm:trackchange','jfm:playback-state','pageshow'])window.addEventListener(event,()=>{if(native)update(event==='jfm:trackchange')});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,0),{once:true});else setTimeout(install,0);
+window.MAIRIOSNowPlaying={version:'ios-now-playing-v1',install,update,get active(){return native},status:()=>({native,plugin:!!plugin,timer:!!timer})};
+})();
