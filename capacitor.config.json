@@ -3,10 +3,10 @@
   "appName": "MAIRFM",
   "webDir": "capacitor-shell/www",
   "server": {
-    "url": "https://josh-git-claude-ios-test-build-joshjsps-projects.vercel.app",
+    "url": "https://josh-fm-git-claude-ios-test-build-joshjsps-projects.vercel.app",
     "cleartext": false,
     "allowNavigation": [
-      "josh-git-claude-ios-test-build-joshjsps-projects.vercel.app",
+      "josh-fm-git-claude-ios-test-build-joshjsps-projects.vercel.app",
       "accounts.spotify.com",
       "open.spotify.com",
       "*.spotify.com",
