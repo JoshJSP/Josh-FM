@@ -25,7 +25,7 @@
       const ready=new Promise((resolve,reject)=>{
         const timer=setTimeout(()=>reject(Error('Josh FM-speler reageert niet.')),10000);
         player.addListener('ready',({device_id})=>{clearTimeout(timer);rememberDevice(device_id);localStorage.setItem(STREAM,'1');message('Spotify gekoppeld · Josh FM-speler klaar.');setStatus(true,'gekoppeld');enable(true);resolve(device_id)});
-        player.addListener('not_ready',({device_id}={})=>{if(!device_id||device_id===deviceId)rememberDevice('');try{window.JFMPlaybackState?.patch?.({deviceId:'',deviceName:'',isPlaying:false},'sdk-not-ready')}catch{};message('Spotify-speler is tijdelijk offline.',true)});
+        player.addListener('not_ready',({device_id}={})=>{if(!device_id||device_id===deviceId)rememberDevice('');lastObserved=null;try{window.JFMPlaybackState?.patch?.({deviceId:'',deviceName:'',isPlaying:false},'sdk-not-ready')}catch{};message('Spotify-speler is tijdelijk offline.',true)});
         player.addListener('authentication_error',()=>{rememberDevice('');localStorage.removeItem(STREAM);message('Spotify moet één keer opnieuw gekoppeld worden voor afspelen in Josh FM.',true);enable(false);if($('connect'))$('connect').disabled=false});
         player.addListener('account_error',()=>message('Spotify Premium is nodig om muziek in Josh FM af te spelen.',true));
         player.addListener('autoplay_failed',()=>message('iPhone blokkeerde autoplay. Tik nogmaals op Start Josh FM.',true));
@@ -37,7 +37,17 @@
           const fake={item:{id:t.id,uri:t.uri,name:t.name,duration_ms:t.duration_ms,artists:(t.artists||[]).map(a=>({name:a.name})),album:{name:t.album?.name||'',images:t.album?.images||[]},external_urls:{spotify:t.id?`https://open.spotify.com/track/${t.id}`:''}},progress_ms:state.position,is_playing:!state.paused,device:{id:deviceId,name:'Josh FM'}};
           playback=fake;try{renderPlayback(fake)}catch{};try{window.JFMPlaybackState?.ingest?.(fake,'sdk')}catch{};if(!state.paused&&playbackErrorTimer){clearTimeout(playbackErrorTimer);playbackErrorTimer=null;message('MAIR speelt.')}
           const duration=Number(t.duration_ms||0),position=Number(state.position||0),nearEnd=duration>0&&position>=Math.max(0,duration-1300);
+          // Spotify beeindigt een context in twee vormen: gepauzeerd op (bijna) de duur, of
+          // dezelfde track gepauzeerd met de positie teruggeklapt naar ~0. Alleen die tweede
+          // vorm heeft extra bewijs nodig, en dat bewijs is bewust smal: de vorige observatie
+          // moet deze zelfde track zijn, nog spelend, binnen 3,5s van het einde. Een pauze van
+          // de gebruiker houdt zijn positie vast en haalt deze test dus nooit; een device-
+          // overdracht wist lastObserved eerst en kan het dus ook niet.
+          const collapsedFromEnd=!!(state.paused&&!nearEnd&&position<=1500&&lastObserved&&lastObserved.id===t.id&&!lastObserved.paused&&lastObserved.durationMs>0&&lastObserved.positionMs>position&&lastObserved.positionMs>=Math.max(0,lastObserved.durationMs-3500));
           if(state.paused&&nearEnd)signalNatural({id:t.id,uri:t.uri,durationMs:duration,positionMs:position,source:'sdk-paused-end'});
+          // Meld de bereikte eindpositie, niet de teruggeklapte 0: de canonieke
+          // transitieclassificatie accepteert alleen bewijs binnen 3,5s van de duur.
+          else if(collapsedFromEnd)signalNatural({id:t.id,uri:t.uri,durationMs:lastObserved.durationMs,positionMs:lastObserved.durationMs,source:'sdk-context-reset'});
           else if(!state.paused)lastEndSignal=''
           lastObserved={id:t.id,uri:t.uri,durationMs:duration,positionMs:position,paused:!!state.paused}
         })
@@ -58,6 +68,6 @@
   function ownConnectButton(){const old=$('connect');if(!old||old.dataset.jfmAuthOwner==='1')return;const fresh=old.cloneNode(true);old.replaceWith(fresh);fresh.dataset.jfmAuthOwner='1';fresh.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();connectSpotify().catch(x=>message(x.message||String(x),true))},true)}
   async function reconcile(){try{await repairCallback();const t=await ensure();if(!t){rememberDevice('');setStatus(false,'offline');enable(false);if($('connect'))$('connect').disabled=false;message('Koppel Spotify om Josh FM te starten.');return}if(localStorage.getItem('jfm_auth_requested_streaming')==='1'){localStorage.setItem(STREAM,'1');localStorage.removeItem('jfm_auth_requested_streaming');clearPKCE()}try{setConnected(true)}catch{enable(true);setStatus(true,'gekoppeld')}message('Spotify gekoppeld · speler wordt voorbereid…');await initPlayer()}catch(e){rememberDevice('');setStatus(false,'offline');enable(false);if($('connect'))$('connect').disabled=false;message(e.message||String(e),true)}}
   ownConnectButton();setTimeout(reconcile,350);window.addEventListener('pageshow',()=>{ownConnectButton();setTimeout(reconcile,250)});
-  window.JFMSpotifySDK={version:'sdk-core-v6-single-owner-timeouts',init:initPlayer,reconnect,isAvailable,ensureDevice,transfer,playUris,get player(){return player},get deviceId(){return deviceId},get health(){return{installed:true,hasPlayer:!!player,deviceId,initializing:!!initPromise,reconnecting:!!reconnectPromise}}};
-  window.MAIRRuntime?.register?.('spotify-sdk-core',{version:'sdk-core-v6-single-owner-timeouts',owner:'spotify-sdk'});
+  window.JFMSpotifySDK={version:'sdk-core-v7-context-reset-end',init:initPlayer,reconnect,isAvailable,ensureDevice,transfer,playUris,get player(){return player},get deviceId(){return deviceId},get health(){return{installed:true,hasPlayer:!!player,deviceId,initializing:!!initPromise,reconnecting:!!reconnectPromise}}};
+  window.MAIRRuntime?.register?.('spotify-sdk-core',{version:'sdk-core-v7-context-reset-end',owner:'spotify-sdk'});
 })();
