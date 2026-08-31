@@ -1,0 +1,265 @@
+name: iOS unsigned IPA (SideStore)
+
+# Bouwt een ONGESIGNEERDE MAIRFM.ipa voor SideStore.
+# Geen Apple Developer certificaten, geen provisioning profiles,
+# geen TestFlight, geen signing secrets. SideStore signt zelf op het toestel.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-unsigned-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-unsigned-ipa:
+    name: Build unsigned MAIRFM.ipa
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    defaults:
+      run:
+        shell: bash -euo pipefail {0}
+
+    env:
+      IOS_PROJECT: ios/App/App.xcodeproj
+      IOS_SCHEME: App
+      IOS_TARGET: App
+      IOS_CONFIGURATION: Release
+      EXPECTED_BUNDLE_ID: com.joshjsp.mairfm
+      DERIVED_DATA: ${{ github.workspace }}/ios-derived-data
+      STAGE_DIR: ${{ github.workspace }}/ios-package
+      IPA_PATH: ${{ github.workspace }}/MAIRFM.ipa
+      BUILD_INFO: ${{ github.workspace }}/build-info.txt
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies (npm ci)
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: Capacitor sync iOS
+        run: |
+          set -euo pipefail
+          npx cap sync ios
+
+      - name: Show Xcode toolchain
+        run: |
+          set -euo pipefail
+          echo "Xcode path: $(xcode-select -p)"
+          xcodebuild -version
+          swift --version || true
+          echo "Available Xcode installs:"
+          ls -1 /Applications | grep -i '^Xcode' || true
+
+      - name: Inspect Xcode project and scheme
+        id: inspect
+        run: |
+          set -euo pipefail
+
+          if [ ! -d "$IOS_PROJECT" ]; then
+            echo "::error::Xcode project niet gevonden op $IOS_PROJECT"
+            exit 1
+          fi
+
+          # Geen CocoaPods: dit project gebruikt Capacitor 8 + Swift Package Manager.
+          if [ -f "ios/App/Podfile" ]; then
+            echo "::warning::Podfile aangetroffen; deze workflow verwacht SPM en draait geen pod install."
+          fi
+          if [ ! -f "ios/App/CapApp-SPM/Package.swift" ]; then
+            echo "::error::Verwachte SPM package ios/App/CapApp-SPM/Package.swift ontbreekt."
+            exit 1
+          fi
+
+          echo "--- xcodebuild -list ---"
+          xcodebuild -list -project "$IOS_PROJECT" | tee "${RUNNER_TEMP}/xcodebuild-list.txt"
+
+          # Alleen het Schemes-blok lezen; het Targets-blok bevat dezelfde naam.
+          SCHEMES="$(awk '/^[[:space:]]*Schemes:/{flag=1;next} /^[[:space:]]*$/{flag=0} flag{gsub(/^[[:space:]]+|[[:space:]]+$/,"");print}' "${RUNNER_TEMP}/xcodebuild-list.txt")"
+          echo "Gevonden schemes: ${SCHEMES:-<geen>}"
+
+          BUILD_MODE="scheme"
+          if ! printf '%s\n' "$SCHEMES" | grep -qx "$IOS_SCHEME"; then
+            echo "::warning::Scheme '${IOS_SCHEME}' niet gevonden; val terug op target '${IOS_TARGET}'."
+            BUILD_MODE="target"
+          fi
+          echo "build_mode=${BUILD_MODE}" >> "$GITHUB_OUTPUT"
+
+      - name: Build iOS app for device without code signing
+        run: |
+          set -euo pipefail
+
+          BUILD_ARGS=(
+            -project "$IOS_PROJECT"
+            -configuration "$IOS_CONFIGURATION"
+            -sdk iphoneos
+            -derivedDataPath "$DERIVED_DATA"
+          )
+
+          if [ "${{ steps.inspect.outputs.build_mode }}" = "scheme" ]; then
+            # -destination wordt alleen door xcodebuild geaccepteerd samen met -scheme.
+            BUILD_ARGS+=(-scheme "$IOS_SCHEME" -destination "generic/platform=iOS")
+          else
+            BUILD_ARGS+=(-target "$IOS_TARGET")
+          fi
+
+          xcodebuild "${BUILD_ARGS[@]}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean build
+
+      - name: Package unsigned IPA (Payload/App.app to MAIRFM.ipa)
+        run: |
+          set -euo pipefail
+
+          PRODUCTS_DIR="$DERIVED_DATA/Build/Products/${IOS_CONFIGURATION}-iphoneos"
+          APP_PATH="$PRODUCTS_DIR/App.app"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "::warning::App.app niet op verwacht pad ($APP_PATH); zoeken in build products."
+            APP_PATH="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
+          fi
+
+          if [ -z "${APP_PATH:-}" ] || [ ! -d "$APP_PATH" ]; then
+            echo "::error::Geen .app bundle gevonden na de build. Build is mislukt of leverde geen product op."
+            find "$DERIVED_DATA/Build/Products" -maxdepth 3 -print || true
+            exit 1
+          fi
+
+          echo "Gevonden app bundle: $APP_PATH"
+
+          rm -rf "$STAGE_DIR" "$IPA_PATH"
+          mkdir -p "$STAGE_DIR/Payload"
+          cp -R "$APP_PATH" "$STAGE_DIR/Payload/App.app"
+
+          # -y bewaart symlinks (frameworks), -r is recursief.
+          ( cd "$STAGE_DIR" && zip -qry "$IPA_PATH" Payload )
+
+          ls -lh "$IPA_PATH"
+
+      - name: Verify IPA contents before upload
+        id: verify
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "$IPA_PATH" ]; then
+            echo "::error::MAIRFM.ipa ontbreekt."
+            exit 1
+          fi
+
+          VERIFY_DIR="${RUNNER_TEMP}/ipa-verify"
+          rm -rf "$VERIFY_DIR"
+          mkdir -p "$VERIFY_DIR"
+          unzip -q "$IPA_PATH" -d "$VERIFY_DIR"
+
+          APP_IN_IPA="$(find "$VERIFY_DIR/Payload" -maxdepth 1 -type d -name '*.app' | head -n 1 || true)"
+          if [ -z "${APP_IN_IPA:-}" ]; then
+            echo "::error::Payload/*.app ontbreekt in MAIRFM.ipa."
+            find "$VERIFY_DIR" -maxdepth 2 -print || true
+            exit 1
+          fi
+          echo "Payload bevat: $(basename "$APP_IN_IPA")"
+
+          PLIST="$APP_IN_IPA/Info.plist"
+          if [ ! -f "$PLIST" ]; then
+            echo "::error::Info.plist ontbreekt in $APP_IN_IPA."
+            exit 1
+          fi
+
+          if ! plutil -lint "$PLIST"; then
+            echo "::error::Info.plist is niet leesbaar of niet geldig."
+            exit 1
+          fi
+
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST")"
+          echo "Bundle identifier: $BUNDLE_ID"
+          if [ "$BUNDLE_ID" != "$EXPECTED_BUNDLE_ID" ]; then
+            echo "::error::Bundle identifier is '$BUNDLE_ID', verwacht '$EXPECTED_BUNDLE_ID'."
+            exit 1
+          fi
+
+          BACKGROUND_MODES="$(plutil -extract UIBackgroundModes json -o - "$PLIST" 2>/dev/null || true)"
+          echo "UIBackgroundModes: ${BACKGROUND_MODES:-<ontbreekt>}"
+          if ! printf '%s' "$BACKGROUND_MODES" | grep -q '"audio"'; then
+            echo "::error::UIBackgroundModes bevat geen 'audio'; achtergrondaudio zou breken."
+            exit 1
+          fi
+
+          MARKETING_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST" 2>/dev/null || echo unknown)"
+          BUILD_NUMBER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST" 2>/dev/null || echo unknown)"
+
+          {
+            echo "bundle_id=$BUNDLE_ID"
+            echo "marketing_version=$MARKETING_VERSION"
+            echo "build_number=$BUILD_NUMBER"
+            echo "app_name=$(basename "$APP_IN_IPA")"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "IPA verificatie geslaagd."
+
+      - name: Write build-info.txt
+        if: always()
+        run: |
+          set -euo pipefail
+
+          IPA_SIZE="unknown"
+          if [ -f "$IPA_PATH" ]; then
+            IPA_SIZE="$(ls -lh "$IPA_PATH" | awk '{print $5}')"
+          fi
+
+          {
+            echo "MAIRFM unsigned iOS build"
+            echo "=========================="
+            echo "Status            : ${{ job.status }}"
+            echo "Date (UTC)        : $(date -u '+%Y-%m-%d %H:%M:%S')"
+            echo "Repository        : ${{ github.repository }}"
+            echo "Branch / ref      : ${{ github.ref_name }}"
+            echo "Commit            : ${{ github.sha }}"
+            echo "Runner image      : macos-latest"
+            echo "Xcode version     : $(xcodebuild -version | tr '\n' ' ')"
+            echo "Xcode path        : $(xcode-select -p)"
+            echo "Node version      : $(node --version)"
+            echo "Build mode        : ${{ steps.inspect.outputs.build_mode }}"
+            echo "Configuration     : ${IOS_CONFIGURATION} / iphoneos / generic/platform=iOS"
+            echo "Code signing      : disabled (CODE_SIGNING_ALLOWED=NO, CODE_SIGNING_REQUIRED=NO, empty CODE_SIGN_IDENTITY)"
+            echo "App bundle        : ${{ steps.verify.outputs.app_name }}"
+            echo "Bundle identifier : ${{ steps.verify.outputs.bundle_id }}"
+            echo "Marketing version : ${{ steps.verify.outputs.marketing_version }}"
+            echo "Build number      : ${{ steps.verify.outputs.build_number }}"
+            echo "IPA               : MAIRFM.ipa (${IPA_SIZE})"
+            echo ""
+            echo "Deze .ipa is ONGESIGNEERD en bedoeld om met SideStore op het toestel zelf te signen."
+          } > "$BUILD_INFO"
+
+          cat "$BUILD_INFO"
+          cat "$BUILD_INFO" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload MAIRFM.ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MAIRFM-unsigned-ipa
+          path: MAIRFM.ipa
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload build info artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MAIRFM-build-info
+          path: build-info.txt
+          retention-days: 7
+          if-no-files-found: warn
