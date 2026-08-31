@@ -11,3 +11,14 @@
 @media(orientation:portrait){.mair-car-wave-overlay.is-open::after{content:"Draai je iPhone horizontaal voor Car Mode";position:absolute;inset:0;z-index:30;display:grid;place-items:center;padding:40px;background:#05050a;color:#f5f2f8;text-align:center;font-size:20px;font-weight:850}}
 @media(orientation:landscape) and (max-height:430px){.car-start,.car-search,.car-preview,.car-drive,.car-turn-focus{padding-top:max(9px,env(safe-area-inset-top));padding-bottom:max(9px,env(safe-area-inset-bottom))}.car-start{gap:17px}.car-choice{min-height:78px;padding:12px 16px}.car-drive-head{height:34px}.car-drive-grid{height:calc(100% - 34px);gap:14px}.car-music{height:295px;gap:11px 17px}.car-artwork{border-radius:19px}.car-track-copy h1{font-size:clamp(28px,4.4vw,47px)}.car-track-copy p{font-size:15px}.car-track-progress{margin-top:12px}.car-controls{margin-top:7px}.car-controls button{width:48px;height:48px}.car-controls .car-play{width:64px;height:64px}.car-next{padding-top:8px}.car-nav-card{min-height:225px;padding:16px}.car-nav-maneuver{grid-template-columns:61px 1fr;margin-top:17px}.car-nav-arrow{font-size:54px}.car-nav-maneuver b{font-size:24px}.car-nav-maneuver strong{font-size:14px}.car-nav-bottom{margin-top:18px}}
 @media(orientation:landscape) and (max-width:800px){.car-drive-grid{grid-template-columns:minmax(0,1.55fr) minmax(225px,.8fr)}.car-music{grid-template-columns:126px 1fr}.car-nav-card{border-radius:20px}.car-nav-maneuver{grid-template-columns:52px 1fr;gap:9px}.car-nav-arrow{font-size:48px}}
+
+/* Locatiestatus op het Car Mode-startscherm: expliciet, leesbaar op armlengte. */
+.car-geo{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 0;padding:11px 14px;border:1px solid rgba(255,255,255,.14);border-radius:14px;background:rgba(255,255,255,.05)}
+.car-geo>span{font-weight:800;letter-spacing:.06em;font-size:13px;text-transform:uppercase}
+.car-geo>small{flex:1 1 100%;order:3;font-size:12px;line-height:1.35;opacity:.8}
+.car-geo[data-geo="granted"]{border-color:rgba(104,232,148,.45)}
+.car-geo[data-geo="granted"]>span{color:#68e894}
+.car-geo[data-geo="denied"],.car-geo[data-geo="unavailable"],.car-geo[data-geo="timeout"],.car-geo[data-geo="error"]{border-color:rgba(255,146,146,.45)}
+.car-geo[data-geo="denied"]>span,.car-geo[data-geo="unavailable"]>span,.car-geo[data-geo="timeout"]>span,.car-geo[data-geo="error"]>span{color:#ff9292}
+.car-geo-action{margin-left:auto;min-height:40px;padding:9px 16px;border:1px solid rgba(255,255,255,.28);border-radius:99px;background:rgba(255,255,255,.1);color:inherit;font-weight:800;font-size:13px}
+.car-geo-action[disabled]{opacity:.55}
