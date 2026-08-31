@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {RELEASE_CACHE_DECLARATION} from './release-cache.mjs';
 const read=p=>fs.readFileSync(p,'utf8');
 const failures=[];const expect=(ok,msg)=>{if(!ok)failures.push(msg)};
 const live=read('live-ui.js'),suite=read('radio-suite.js'),pwa=read('pwa-platform.js'),voice=read('debug-tts.js'),voiceEngine=read('mair-voice-engine.js'),smartDj=read('smart-dj.js'),polish=read('mair-pwa-polish.js'),foundation=read('mair-foundation.js'),foundationCss=read('mair-foundation.css'),categorySearch=read('mair-category-search.js'),templateAssets=read('mair-template-assets.css'),manifest=read('manifest.webmanifest'),logo=read('mair-logo.svg'),health=read('station-health.js'),dj=read('mair-dj-v2.js'),brain=read('radio-brain.js'),writer=read('api/dj-writer.js'),handoff=read('dj-handoff-v34.js'),voiceCheck=read('mair-voice-check.js'),sw=read('sw.js'),bootstrap=read('dj-now-queue.js'),stationController=read('channel-click-fix.js'),stationPolicy=read('mair-station-policy.js'),primary=read('playback-primary.js'),background=read('mair-background-guard.js'),resume=read('dj-resume.js'),easy=read('mair-easy-use-v1.js'),ui=read('mair-ui-hardening.js');
@@ -71,7 +72,7 @@ expect(bootstrap.includes('mair-dj-v2.js')&&bootstrap.includes('mair-background-
 expect(handoff.includes('legacy-shim-to-mair-dj-v2')&&!handoff.includes('/me/player/pause'),'Legacy handoff bezit nog playbacklogica');
 expect(voiceCheck.includes('Complete Voice Check')&&voiceCheck.includes('Groq schrijver')&&voiceCheck.includes('Spotify pauze/hervatten'),'Tijdelijke complete Voice Check ontbreekt');
 expect(voiceCheck.includes("dataset.diagnosticScope='audible-voice-chain'"),'Voice Check is niet exclusief als diagnostic gemarkeerd');
-expect(sw.includes("const CACHE='mair-v133-car-mode-nav-20260830'"),'service-worker cache is niet de huidige MAIR-release');
+expect(sw.includes(RELEASE_CACHE_DECLARATION),'service-worker cache is niet de huidige MAIR-release');
 for(const asset of ['./mair-dj-v2.js','./mair-voice-check.js','./mair-background-guard.js','./mair-category-search.js','./mair-station-policy.js','./channel-click-fix.js','./mair-ui-hardening.js','./mair-runtime-core.js','./mair-voice-engine.js','./mair-easy-use-v1.js'])expect(sw.includes(`'${asset}'`),`service worker cachet actuele runtime niet: ${asset}`);
 for(const asset of ['mair-hits.webp','mair-top40.webp','mair-discovery.webp','mair-nederlandstalig.webp','mair-party.webp','mair-chill.webp','mair-summer.webp','mair-throwback.webp','mair-00s.webp','mair-10s.webp'])expect(sw.includes(`'./assets/stations/${asset}'`),`service worker cachet stationcover niet: ${asset}`);
 expect(sw.includes("k.startsWith('josh-fm-')")&&sw.includes("k.startsWith('mair-')"),'service worker moet oude Josh FM/MAIR caches opruimen');

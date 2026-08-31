@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {RELEASE_CACHE_DECLARATION} from './release-cache.mjs';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const ui=read('mair-ui-hardening.js'),policy=read('mair-station-policy.js'),controller=read('channel-click-fix.js'),pwa=read('mair-pwa-polish.js'),sw=read('sw.js'),tts=read('api/tts.js'),background=read('mair-background-guard.js'),primary=read('playback-primary.js'),dj=read('mair-dj-v2.js'),voice=read('mair-voice-engine.js'),easy=read('mair-easy-use-v1.js');
 for(const id of ['hits','top40','new','nl','party','chill','summer','throwback','00s','10s','mix'])if(!ui.includes(`'${id}'`))throw Error('Station ontbreekt in UI-hardening: '+id);
@@ -18,7 +19,7 @@ for(const file of runtimeAssets){
  if(!sw.includes(`./${file}`))throw Error('Actuele MAIR runtime asset ontbreekt in PWA CORE-cache: '+file);
 }
 if(!sw.includes("'./channel-click-fix.js'"))throw Error('Autoritatieve stationcontroller ontbreekt in PWA CORE-cache');
-if(!/const CACHE='mair-v133-car-mode-nav-20260830'/.test(sw))throw Error('PWA cacheversie klopt niet met de huidige MAIRFM-release');
+if(!sw.includes(RELEASE_CACHE_DECLARATION))throw Error('PWA cacheversie klopt niet met de huidige MAIRFM-release');
 if(!sw.includes("'./mair-background-guard.js'"))throw Error('Background guard ontbreekt in PWA CORE-cache');
 if(!background.includes("recover?.('foreground-return')")||!primary.includes('if(backgrounded()||reloadNeedsGesture)return false'))throw Error('Foreground-only background recovery guard ontbreekt');
 if(!dj.includes('ensureVoiceReady')||dj.indexOf('await ensureVoiceReady()')>dj.indexOf('await pauseMusic(uri)'))throw Error('DJ voice-ready gate moet vóór Spotify-pauze staan');

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {RELEASE_CACHE} from './release-cache.mjs';
 
 const read=file=>fs.readFileSync(new URL(`../${file}`,import.meta.url),'utf8');
 const profileSource=read('mair-profile.js');
@@ -60,7 +61,7 @@ assert.equal(pkg.version,'2.0.0-beta.9');
 assert.match(versionSource,/version:'2\.0\.0-beta\.9'/);
 assert.match(versionSource,/displayVersion:'2b\.0\.9'/);
 assert.match(versionSource,/JFM_ASSET_VERSION='81'/);
-assert.equal(cache,'mair-v133-car-mode-nav-20260830');
+assert.equal(cache,RELEASE_CACHE);
 assert.ok(versionApiSource.includes(`cache:'${cache}'`),'API-cache wijkt af van service worker');
 for(const stale of ['mair-v91-radio-brain-20260826','mair-v98-core-20260829',"JFM_ASSET_VERSION='80'"])assert.ok(!predeploySource.includes(stale),`Predeploy bevat verouderde verwachting: ${stale}`);
 
