@@ -1,0 +1,22 @@
+{
+  "appId": "com.joshjsp.mairfm",
+  "appName": "MAIRFM",
+  "webDir": "capacitor-shell/www",
+  "server": {
+    "url": "https://josh-fm-git-claude-ios-test-build-joshjsps-projects.vercel.app",
+    "cleartext": false,
+    "allowNavigation": [
+      "josh-fm-git-claude-ios-test-build-joshjsps-projects.vercel.app",
+      "accounts.spotify.com",
+      "open.spotify.com",
+      "*.spotify.com",
+      "sdk.scdn.co"
+    ]
+  },
+  "ios": {
+    "limitsNavigationsToAppBoundDomains": false,
+    "contentInset": "always",
+    "scrollEnabled": true,
+    "webContentsDebuggingEnabled": true
+  }
+}

@@ -1,0 +1,23 @@
+# Capacitor iOS-testwrapper — nooit meedeployen naar Vercel.
+#
+# Deze bestanden horen wel in Git/GitHub (de macOS-runner heeft ze nodig),
+# maar de Vercel-deploy moet exact de bestaande MAIRFM-webapp blijven.
+# Niets in de webapp leest deze bestanden en er is geen buildstap die ze nodig heeft.
+
+# Native iOS-project (Xcode, SPM, Info.plist, gegenereerde public/-kopie)
+ios/
+
+# Placeholder webDir voor Capacitor; geen MAIRFM-assets
+capacitor-shell/
+
+# Capacitor-config; alleen relevant voor de native shell
+capacitor.config.json
+
+# Lokale Xcode/build-output, mocht die ooit in de repo-root belanden.
+# Bewust met leading en trailing slash: het MAIRFM-runtimebestand build7.js
+# mag hier absoluut niet onder vallen.
+/build/
+/DerivedData/
+Payload/
+*.xcarchive
+*.ipa

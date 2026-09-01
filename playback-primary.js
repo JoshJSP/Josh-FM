@@ -1,4 +1,4 @@
-// Josh FM primary playback controller — the only active owner of transport controls.
+// MAIRFM primary playback controller — the only active owner of transport controls.
 (()=>{
   if(window.__jfmPlaybackPrimaryInstalled)return;window.__jfmPlaybackPrimaryInstalled=true;
   const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -25,7 +25,7 @@
   function clearReloadPrompt(){reloadNeedsGesture=false;try{$('play')?.removeAttribute?.('aria-label')}catch{}}
 
   function activateNow(){try{player()?.activateElement?.()}catch{}}
-  async function ensurePlayer(){for(let i=0;i<70;i++){const p=player();if(p)return p;await wait(120)}throw Error('Josh FM-player is nog niet klaar. Koppel Spotify opnieuw of vernieuw de app.')}
+  async function ensurePlayer(){for(let i=0;i<70;i++){const p=player();if(p)return p;await wait(120)}throw Error('MAIRFM-player is nog niet klaar. Koppel Spotify opnieuw of vernieuw de app.')}
   async function remote(){try{return await api('/me/player')}catch{return null}}
   async function freshDevice(){
     await ensurePlayer();let id='';
@@ -61,7 +61,7 @@
   function stationContext(uri,max=30){const q=stationQueue(),i=stationIndex(uri);if(i<0)return uri?[uri]:[];return [...new Set(q.slice(i,i+max).map(t=>t?.uri).filter(Boolean))]}
   function stationNeighbor(state,delta){const q=stationQueue(),i=stationIndex(state);if(i<0)return'';return q[i+delta]?.uri||''}
   async function playContextDirect(uri,id,source='primary-uri'){
-    const uris=stationContext(uri);if(!uris.length)throw Error('De track staat niet meer in de Josh FM-radioset.');
+    const uris=stationContext(uri);if(!uris.length)throw Error('De track staat niet meer in de MAIRFM-radioset.');
     await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&uris.includes(x.item?.uri),10);if(!s)throw Error('Spotify bevestigde geen afspeelbare track uit de radioset.');
     await nudgeSdkPlayback();ingest(s,source);truth()?.setExpectedLive?.(true,'play-track');return s
@@ -71,10 +71,14 @@
     if(before?.device?.id!==id)before=await transfer(id,false);else if(before?.is_playing){await api('/me/player/pause?device_id='+encodeURIComponent(id),{method:'PUT'});await verify(x=>x.device?.id===id&&!x.is_playing,6)}
     if(!Array.isArray(queue)||!queue.length){info('Radioset wordt gemaakt…');await buildSet()}
     const uris=(queue||[]).slice(0,30).map(x=>x?.uri).filter(Boolean);if(!uris.length)throw Error('Geen afspeelbare nummers in de radioset.');
-    if($('jingles')?.checked&&typeof speakText==='function'){info('Josh FM-jingle…');await speakText('Josh FM. Your music, your radio show.',true).catch(()=>false)}
+    // De jingle mag het starten van muziek nooit ophouden. Fish Audio kan traag of
+    // onbereikbaar zijn en stond hier vóór de eerste play-call; een stille TTS
+    // vertraagde daardoor de hele start. Nu vuurt hij los en loopt hij desnoods
+    // over de intro heen, precies zoals een radiojingle hoort te doen.
+    if($('jingles')?.checked&&typeof speakText==='function'){Promise.resolve(speakText('MAIRFM. Jouw muziek, jouw radio.',true)).catch(()=>false)}
     info('Muziek wordt gestart…');await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&!!x.item?.id);if(!s)throw Error('Spotify bevestigde het starten niet.');await nudgeSdkPlayback();
-    try{session=[];lastTrackId=null;renderHistory();scheduleTalk();startPolling()}catch{};ingest(s,'primary-start');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;info(`Josh FM is live · ${queue.length} tracks klaar.`);return true
+    try{session=[];lastTrackId=null;renderHistory();scheduleTalk();startPolling()}catch{};ingest(s,'primary-start');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;info(`MAIRFM is live · ${queue.length} tracks klaar.`);return true
   }
   async function start(){
     activateNow();
@@ -82,7 +86,7 @@
       if(startPending)return false;
       startPending=true;info('Start wordt klaargezet…');
       try{for(let i=0;i<24&&(busy||djOwnsTransport());i++)await wait(150)}finally{startPending=false}
-      if(busy||djOwnsTransport()){info('Josh FM is nog bezig. Tik Start nog een keer.',true);return false}
+      if(busy||djOwnsTransport()){info('MAIRFM is nog bezig. Tik Start nog een keer.',true);return false}
     }
     return withBusy(async()=>{try{return await startDirect()}catch(e){truth()?.setExpectedLive?.(false,'start-failed');return rememberError(e,'Starten lukte niet: ')}})
   }
@@ -97,19 +101,19 @@
       let local=false;try{await p.pause();local=!!(await verifySdk(x=>x.paused,8))}catch{}
       let s=await verify(x=>x.device?.id===id&&!x.is_playing,3);
       if(!local&&!s){await api('/me/player/pause?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&!x.is_playing,8)}
-      if(!local&&!s)throw Error('Spotify bevestigde pauzeren niet.');if(s)ingest(s,'primary-pause');info('Josh FM staat gepauzeerd.');return true
+      if(!local&&!s)throw Error('Spotify bevestigde pauzeren niet.');if(s)ingest(s,'primary-pause');info('MAIRFM staat gepauzeerd.');return true
     }catch(e){truth()?.setExpectedLive?.(wasExpected,'pause-failed');throw e}
   }
   async function resumeDirect(){
     const{p,id,state}=await ensureActive();let sdk=null;try{sdk=await p.getCurrentState()}catch{}
     const hasTrack=!!(state?.item||sdk?.track_window?.current_track||truth()?.get?.()?.trackId),playing=sdk?.track_window?.current_track?!sdk.paused:(state?.item?!!state.is_playing:!!truth()?.get?.()?.isPlaying);
-    if(playing){if(state)ingest(state,'primary-resume-already');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM speelt.');return true}
+    if(playing){if(state)ingest(state,'primary-resume-already');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM speelt.');return true}
     if(!hasTrack){truth()?.setExpectedLive?.(true,'restart-empty');return startDirect()}
     truth()?.setExpectedLive?.(true,'resume');let local=false;try{await p.resume();local=!!(await verifySdk(x=>!x.paused,8))}catch{}
     let s=await verify(x=>x.device?.id===id&&x.is_playing,3);if(!local&&!s){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,8)}
-    if(!local&&!s)throw Error('Spotify bevestigde hervatten niet.');if(s)ingest(s,'primary-resume');recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM speelt.');return true
+    if(!local&&!s)throw Error('Spotify bevestigde hervatten niet.');if(s)ingest(s,'primary-resume');recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM speelt.');return true
   }
-  async function playPause(){activateNow();if(window.MAIRDJ?.busy&&window.MAIRDJ?.userOverride?.('PLAY_PAUSE')){info('DJ-break wordt afgerond; MAIR blijft daarna gepauzeerd.');return true}return withBusy(async()=>{try{if(reloadIntent&&reloadNeedsGesture){const{state}=await restoreReloadPlayback();if(state)ingest(state,'primary-reload-gesture');truth()?.setExpectedLive?.(true,'reload-gesture');info('Josh FM speelt.');return true}const playing=await observedPlaying();if(playing===null)return startDirect();return playing?pauseDirect():resumeDirect()}catch(e){return rememberError(e,'Play/pauze mislukt: ')}})}
+  async function playPause(){activateNow();if(window.MAIRDJ?.busy&&window.MAIRDJ?.userOverride?.('PLAY_PAUSE')){info('DJ-break wordt afgerond; MAIR blijft daarna gepauzeerd.');return true}return withBusy(async()=>{try{if(reloadIntent&&reloadNeedsGesture){const{state}=await restoreReloadPlayback();if(state)ingest(state,'primary-reload-gesture');truth()?.setExpectedLive?.(true,'reload-gesture');info('MAIRFM speelt.');return true}const playing=await observedPlaying();if(playing===null)return startDirect();return playing?pauseDirect():resumeDirect()}catch(e){return rememberError(e,'Play/pauze mislukt: ')}})}
   async function pause(){return withBusy(async()=>{try{return await pauseDirect()}catch(e){return rememberError(e,'Pauzeren mislukt: ')}})}
   async function resume(){return withBusy(async()=>{try{return await resumeDirect()}catch(e){return rememberError(e,'Hervatten mislukt: ')}})}
 
@@ -170,11 +174,11 @@
     activateNow();return withBusy(async()=>{
       try{
         const cause=delta>0?'USER_NEXT':'USER_PREVIOUS';if(window.MAIRDJ?.busy&&typeof window.MAIRDJ?.cancelActive==='function')await window.MAIRDJ.cancelActive(cause);
-        if(delta>0){markTransitionAction('NEXT');await advance({record:true,source:'primary-next'});info('Josh FM speelt.');return true}
+        if(delta>0){markTransitionAction('NEXT');await advance({record:true,source:'primary-next'});info('MAIRFM speelt.');return true}
         const{p,id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');markTransitionAction('PREVIOUS',{fromTrackId:before});const fallbackUri=stationNeighbor(state,-1);let position=Number(state?.progress_ms||0);if(!position)try{position=Number((await p.getCurrentState())?.position||0)}catch{}
         await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'});if(position>3000){await wait(180);try{await p.previousTrack()}catch{await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'})}}let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,8);
         if(!s){try{await player()?.previousTrack?.()}catch{};s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,5)}
-        if(!s&&fallbackUri)s=await playContextDirect(fallbackUri,id,'primary-prev-fallback');if(!s)throw Error('Spotify bevestigde vorige niet.');if(!s.is_playing){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,6)||s}ingest(s,'primary-prev');truth()?.setExpectedLive?.(true,'previous');recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM speelt.');return true
+        if(!s&&fallbackUri)s=await playContextDirect(fallbackUri,id,'primary-prev-fallback');if(!s)throw Error('Spotify bevestigde vorige niet.');if(!s.is_playing){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,6)||s}ingest(s,'primary-prev');truth()?.setExpectedLive?.(true,'previous');recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM speelt.');return true
       }catch(e){return rememberError(e,(delta>0?'Volgende':'Vorige')+' mislukt: ')}
     })
   }
@@ -183,7 +187,7 @@
     const endedId=String(detail.trackId||'');if(!endedId||endGuardBusy||lastNaturalEnd===endedId||busy||djOwnsTransport())return false;
     endGuardBusy=true;lastNaturalEnd=endedId;
     try{
-      await wait(120);if(djOwnsTransport())return false;const s=await fastNaturalAdvance(endedId);if(!s)throw Error('Volgende track kon niet snel worden gestart.');recoveries++;recoveryFailures=0;recoveryCooldownUntil=0;info('Josh FM gaat automatisch door.');
+      await wait(120);if(djOwnsTransport())return false;const s=await fastNaturalAdvance(endedId);if(!s)throw Error('Volgende track kon niet snel worden gestart.');recoveries++;recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM gaat automatisch door.');
       try{window.dispatchEvent(new CustomEvent('jfm:natural-next-ready',{detail:{endedTrackId:endedId,newTrackId:s?.item?.id||'',auto:true,fast:true}}))}catch{};return true
     }catch(e){return rememberError(e,'Automatisch doorgaan mislukt: ')}finally{endGuardBusy=false;setTimeout(()=>{if(lastNaturalEnd===endedId)lastNaturalEnd=''},1800)}
   }
@@ -212,8 +216,8 @@
 
   function actionFor(id){return id==='start'?start:id==='play'?playPause:id==='next'?()=>skip(1):id==='prev'?()=>skip(-1):null}
   function controlsOwned(){return['start','play','next','prev'].every(id=>$(id)?.dataset?.jfmOwner==='primary')}
-  function bind(){if(bound&&controlsOwned())return true;if(!player()||!deviceId())return false;if(controlsOwned()){bound=true;setBusy(false);return true}bound=true;const own=(id,fn)=>{const old=$(id);if(!old)return;const b=old.cloneNode(true);old.replaceWith(b);b.disabled=false;b.dataset.jfmOwner='primary';b.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();activateNow();Promise.resolve(fn()).catch(()=>{})},true)};own('start',start);own('play',playPause);own('next',()=>skip(1));own('prev',()=>skip(-1));info('Josh FM-player klaar.');return true}
-  document.addEventListener('click',e=>{const b=e.target?.closest?.('#start,#play,#next,#prev,#djNow');if(!b)return;activateNow();if(transportIds.has(b.id)&&!bound){e.preventDefault();e.stopImmediatePropagation();const fn=actionFor(b.id);if(bind()&&fn)Promise.resolve(fn()).catch(()=>{});else info('Josh FM-player wordt nog voorbereid. Tik over een moment opnieuw.',true)}},true);
+  function bind(){if(bound&&controlsOwned())return true;if(!player()||!deviceId())return false;if(controlsOwned()){bound=true;setBusy(false);return true}bound=true;const own=(id,fn)=>{const old=$(id);if(!old)return;const b=old.cloneNode(true);old.replaceWith(b);b.disabled=false;b.dataset.jfmOwner='primary';b.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();activateNow();Promise.resolve(fn()).catch(()=>{})},true)};own('start',start);own('play',playPause);own('next',()=>skip(1));own('prev',()=>skip(-1));info('MAIRFM-player klaar.');return true}
+  document.addEventListener('click',e=>{const b=e.target?.closest?.('#start,#play,#next,#prev,#djNow');if(!b)return;activateNow();if(transportIds.has(b.id)&&!bound){e.preventDefault();e.stopImmediatePropagation();const fn=actionFor(b.id);if(bind()&&fn)Promise.resolve(fn()).catch(()=>{});else info('MAIRFM-player wordt nog voorbereid. Tik over een moment opnieuw.',true)}},true);
   window.addEventListener('jfm:natural-track-end',e=>handleNaturalEnd(e.detail||{}).catch(()=>{}));
 
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
