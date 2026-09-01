@@ -46,7 +46,20 @@ window.JFM_ASSET_VERSION='81';
   const SLEEP_STALE_MS=12*60*60*1000;
   function sanitizeSleepState(){try{const key='jfm_sleep_timer_v1',raw=localStorage.getItem(key);if(!raw)return;const x=JSON.parse(raw),age=Date.now()-Number(x?.createdAt||x?.setAt||0),expired=x?.mode==='time'&&Number(x?.at||0)<=Date.now(),stale=x?.mode==='after-track'&&(!Number(x?.createdAt||x?.setAt||0)||age>SLEEP_STALE_MS);if(expired||stale)localStorage.setItem(key,'null')}catch{try{localStorage.setItem('jfm_sleep_timer_v1','null')}catch{}}}
   sanitizeSleepState();
-  const render=()=>{const version=document.getElementById('appVersion'),build=document.getElementById('appBuild');if(version)version.textContent='MAIR · v'+(window.JFM_RELEASE.displayVersion||window.JFM_RELEASE.version);if(build)build.textContent='Build '+window.JFM_RELEASE.build};
+  // De versionbox staat onderaan de Instellingen-tab, en daar zetten inmiddels 23
+  // modules een kaart boven. In de praktijk was de versie daardoor onvindbaar en werd
+  // hij via /api/version opgezocht. Deze regel zet dezelfde tekst bovenaan diezelfde
+  // tab: een tik op Instellingen en je ziet hem staan. Het is bewust een gewone div en
+  // geen article.card, want de opruimlagen (mair-easy-use-v1, mair-ux-v1) lopen alleen
+  // over article.card en zouden hem anders kunnen verplaatsen of verwijderen. De
+  // inline stijl houdt hem los van de drie stylesheets die om Instellingen vechten.
+  function renderTopVersion(text){
+    const pane=document.getElementById('tab-settings');if(!pane)return;
+    let el=document.getElementById('mairVersionTop');
+    if(!el){el=document.createElement('div');el.id='mairVersionTop';el.style.cssText='padding:4px 2px 12px;color:#7d8795;font-size:11px;font-weight:700';pane.insertBefore(el,pane.firstChild)}
+    if(el.textContent!==text)el.textContent=text
+  }
+  const render=()=>{const version=document.getElementById('appVersion'),build=document.getElementById('appBuild'),label='MAIR · v'+(window.JFM_RELEASE.displayVersion||window.JFM_RELEASE.version),buildLabel='Build '+window.JFM_RELEASE.build;if(version)version.textContent=label;if(build)build.textContent=buildLabel;renderTopVersion(label+' · '+buildLabel)};
   function emit(){try{window.dispatchEvent(new CustomEvent('jfm:release-status',{detail:{...window.JFM_RELEASE}}))}catch{}}
   function requestCacheVersion(){try{navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'})}catch{}}
   async function forceServiceWorkerCheck(){if(!('serviceWorker'in navigator))return false;try{let reg=await navigator.serviceWorker.getRegistration();if(!reg){reg=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'})}else{await reg.update()}if(reg?.waiting){reg.waiting.postMessage({type:'SKIP_WAITING'})}requestCacheVersion();setTimeout(requestCacheVersion,350);return true}catch{return false}}
