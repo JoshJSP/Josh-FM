@@ -41,7 +41,11 @@ ok(engine.includes('onPlaybackStart')&&engine.includes('onPlaybackEnd')&&engine.
 ok(voice.includes("notifyPlayback(meta,'onPlaybackStart'")&&voice.includes("notifyPlayback(meta,'onPlaybackEnd'")&&voice.includes('await mediaAudio.play()'),'Fish Audio must emit evidence only from the actual browser playback path');
 ok(easy.includes("live=phase==='SPEAKING'")&&easy.includes("setDjLive(detail.phase==='SPEAKING'"),'DJ LIVE UI must only follow the speaking phase');
 ok(!spotifyConfig.includes('loadDJHandoff')&&!spotifyConfig.includes('./dj-handoff-v34.js'),'Retired DJ handoff loader must not poll forever');
-ok(integration.includes('window.JFMDJAuthoritative||window.MAIRDJ')&&runtime.includes('window.JFMDJAuthoritative?.busy||window.MAIRDJ?.busy')&&health.includes('window.JFMDJAuthoritative||window.MAIRDJ'),'Diagnostics and car UI must use the authoritative DJ controller');
+// De car-UI-helft van deze check keek naar renderCar() in runtime-modes.js: de tweede,
+// oude Car Mode met een eigen fullscreen view. Die view is verwijderd (een Car Mode, en
+// dat is de overlay uit prototypes/mair-car-mode-wave.js), dus er valt daar niets meer te
+// raadplegen. De eis zelf blijft staan voor de twee lagen die nog bestaan.
+ok(integration.includes('window.JFMDJAuthoritative||window.MAIRDJ')&&health.includes('window.JFMDJAuthoritative||window.MAIRDJ'),'Diagnostics must use the authoritative DJ controller');
 ok(diagnostics.includes("['Huidige track'")&&diagnostics.includes("['Volgende track'")&&diagnostics.includes("['DJ-fase'")&&diagnostics.includes("['TTS-status'")&&diagnostics.includes('esc(v)'),'Diagnostics must expose playback/DJ/TTS context and HTML-escape runtime metadata');
 ok(health.includes('currentTrack:')&&health.includes('nextTrack:')&&health.includes('dj:djState'),'Machine-readable station health must expose current/next/DJ state');
 ok(discovery.includes("await api('/search?type=track&limit=50&q='")&&channel.includes("boundedFetch('/api/nl-charts")&&purity.includes("boundedFetch('/api/category-filter'")&&app.includes('async function timedFetch(input,opt={},timeoutMs=12000)'),'Optional enrichment must use either a local bounded fetch or the central bounded Spotify API route');
