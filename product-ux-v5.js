@@ -30,7 +30,11 @@
   function open({reset=false}={}){ensure();const saved=getState();answers={...answers,...(saved.answers||{})};if(reset)current=0;$('jfmOnboarding').hidden=false;paint();save({opened:true})}
   function close(completed=false){const root=$('jfmOnboarding');if(root)root.hidden=true;save({completed:!!completed||!!getState().completed})}
   function finish(){applyAnswers();save({completed:true,completedAt:Date.now()});close(true);const connect=$('connect');if(connect&&!connect.disabled){try{connect.scrollIntoView({behavior:'smooth',block:'center'});connect.click()}catch{}}}
-  function installSettingsLauncher(){if($('jfmOnboardingLaunch'))return;const pane=$('tab-settings');if(!pane)return;const card=document.createElement('article');card.className='card';card.id='jfmProductSetupCard';card.innerHTML='<div class="kicker">PERSOONLIJKE SETUP</div><h3>Jouw radio-instellingen</h3><p class="muted">Pas muziekontdekking en DJ-aanwezigheid opnieuw aan via de korte setup.</p><button id="jfmOnboardingLaunch" class="secondary jfmSettingsLaunch" type="button">Setup opnieuw openen</button>';const version=pane.querySelector('.versionbox');pane.insertBefore(card,version||null);$('jfmOnboardingLaunch')?.addEventListener('click',()=>open({reset:true}))}
+  function installSettingsLauncher(){
+    // Deze kaart werd aangemaakt en meteen weer verwijderd door mair-easy-use-v1.js
+    // (die #jfmProductSetupCard opruimt). Twee lagen die elkaar tegenwerken; hier stoppen.
+    if(true)return;
+    if($('jfmOnboardingLaunch'))return;const pane=$('tab-settings');if(!pane)return;const card=document.createElement('article');card.className='card';card.id='jfmProductSetupCard';card.innerHTML='<div class="kicker">PERSOONLIJKE SETUP</div><h3>Jouw radio-instellingen</h3><p class="muted">Pas muziekontdekking en DJ-aanwezigheid opnieuw aan via de korte setup.</p><button id="jfmOnboardingLaunch" class="secondary jfmSettingsLaunch" type="button">Setup opnieuw openen</button>';const version=pane.querySelector('.versionbox');pane.insertBefore(card,version||null);$('jfmOnboardingLaunch')?.addEventListener('click',()=>open({reset:true}))}
   function boot(){ensure();const state=getState();if(hasExistingUser()&&!state.opened){save({completed:true,migratedExistingUser:true});return}if(!state.completed)setTimeout(()=>open({reset:true}),700)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.JFMProductUX={version:'product-ux-v5',open,close,state:getState,applyAnswers};
