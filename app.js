@@ -14,7 +14,30 @@ function b64url(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replac
 async function sha256(s){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))}
 function rand(n=64){const c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~',a=new Uint32Array(n);crypto.getRandomValues(a);return [...a].map(x=>c[x%c.length]).join('')}
 async function connect(){const id=spotifyClientId||$('clientId').value.trim();if(!id)throw Error('Spotify-configuratie ontbreekt.');spotifyClientId=id;localStorage.setItem('jfm_client_id',id);const verifier=rand(),state=rand(20);sessionStorage.setItem('jfm_verifier',verifier);sessionStorage.setItem('jfm_state',state);const challenge=b64url(await sha256(verifier));const p=new URLSearchParams({response_type:'code',client_id:id,scope:SCOPES,redirect_uri:redirectUri(),state,code_challenge_method:'S256',code_challenge:challenge});location.href='https://accounts.spotify.com/authorize?'+p}
-async function callback(){const q=new URLSearchParams(location.search),code=q.get('code');if(!code){restore();return}if(q.get('state')!==sessionStorage.getItem('jfm_state'))throw Error('Spotify-beveiligingscontrole mislukt.');const id=spotifyClientId||localStorage.getItem('jfm_client_id');const body=new URLSearchParams({client_id:id,grant_type:'authorization_code',code,redirect_uri:redirectUri(),code_verifier:sessionStorage.getItem('jfm_verifier')});const r=await timedFetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});if(!r.ok)throw Error('Spotify koppelen mislukt.');saveToken(await r.json());history.replaceState({},'',location.pathname)}
+// Een Spotify authorization code is eenmalig. app.js en stability-core probeerden hem
+// allebei in te wisselen; de verliezer kreeg invalid_grant en meldde "Spotify verbinden
+// lukte niet" terwijl het inloggen net gelukt was. restore() draaide bovendien alleen
+// als er GEEN code in de URL stond, waardoor de guard in stability-core (token of
+// refreshToken aanwezig?) op dat moment altijd leeg was. Beide zijn nu gedicht:
+// restore() draait altijd eerst, en de lopende uitwisseling staat op
+// window.__jfmAuthCodeExchange zodat de andere kant erop wacht in plaats van hem over
+// te doen.
+async function callback(){
+  const q=new URLSearchParams(location.search),code=q.get('code');
+  restore();
+  if(!code)return;
+  if(window.__jfmAuthCodeExchange){try{await window.__jfmAuthCodeExchange}catch{}return}
+  if(token||refreshToken)return;
+  if(q.get('state')!==sessionStorage.getItem('jfm_state'))throw Error('Spotify-beveiligingscontrole mislukt.');
+  const id=spotifyClientId||localStorage.getItem('jfm_client_id');
+  const body=new URLSearchParams({client_id:id,grant_type:'authorization_code',code,redirect_uri:redirectUri(),code_verifier:sessionStorage.getItem('jfm_verifier')});
+  window.__jfmAuthCodeExchange=(async()=>{
+    const r=await timedFetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
+    if(!r.ok)throw Error('Spotify koppelen mislukt.');
+    saveToken(await r.json());history.replaceState({},'',location.pathname)
+  })();
+  try{await window.__jfmAuthCodeExchange}finally{setTimeout(()=>{window.__jfmAuthCodeExchange=null},5000)}
+}
 function saveToken(d){token=d.access_token;refreshToken=d.refresh_token||refreshToken;expiresAt=Date.now()+(d.expires_in||3600)*1000-30000;localStorage.setItem('jfm_token',token);if(refreshToken)localStorage.setItem('jfm_refresh',refreshToken);localStorage.setItem('jfm_exp',String(expiresAt))}
 function restore(){token=localStorage.getItem('jfm_token');refreshToken=localStorage.getItem('jfm_refresh');expiresAt=Number(localStorage.getItem('jfm_exp')||0)}
 function invalidateAccessToken(){token=null;expiresAt=0;localStorage.removeItem('jfm_token');localStorage.setItem('jfm_exp','0')}
