@@ -4,7 +4,6 @@
     "deploymentEnabled": {
       "*": false,
       "main": true,
-      "claude/ios-test-build": true,
       "fix/audit-round-1-20260901": true
     }
   },

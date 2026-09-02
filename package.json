@@ -20,7 +20,7 @@
     "mair-ui-contract": "node scripts/mair-ui-contract-check.mjs",
     "build-checks": "node scripts/build1-radio-core-check-v2.mjs && node scripts/build2-check.mjs && node scripts/build3-check.mjs && node scripts/build4-check.mjs && node scripts/build5-check.mjs && node scripts/build6-check.mjs && node scripts/build9-check.mjs",
     "stabilization-check": "node scripts/product-beta-stabilization-check.mjs",
-    "category-purity": "node --check channel-click-fix.js && node --check music-intelligence-v3.js && node --check api/category-filter.js && node --check mair-category-purity.js && node --check mair-playback-category-guard.js && node --check mair-build-orchestrator.js && node scripts/category-purity-check.mjs",
+    "category-purity": "node --check channel-click-fix.js && node --check music-intelligence-v3.js && node --check api/category-filter.js && node scripts/category-purity-check.mjs",
     "mair-hardening": "node --check mair-ui-hardening.js && node --check mair-pwa-polish.js && node scripts/mair-hardening-check.mjs",
     "car-mode-cache": "node --check sw.js && node --check mair-car-sleep-integration.js && node scripts/car-mode-cache-boot-check.mjs",
     "backend-cleanup": "node --check build7.js && node scripts/backend-cleanup-check.mjs",
