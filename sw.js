@@ -11,6 +11,7 @@ CORE.push('./mair-observability.js','./mair-test-simulator.js','./mair-test-lab.
 CORE.push('./mair-ux-state.js','./mair-ux-v1.js','./mair-ux-v1.css');
 CORE.push('./mair-car-sleep-integration.js','./prototypes/mair-car-mode-wave.js','./prototypes/mair-car-mode-wave.css','./prototypes/mair-sleep-landscape.js','./prototypes/mair-sleep-landscape.css');
 CORE.push('./mair-stations-v2.js');
+CORE.push('./mair-back-nav.js');
 // Car Mode, Sleep en Passenger worden na boot bijgeladen door mair-car-sleep-integration.js.
 // Zonder deze bestanden in de cache verschijnt Car Mode bij een offline start helemaal niet.
 CORE.push('./mair-car-70-30.js','./mair-car-autofit.js','./mair-car-menu-sticky.js','./mair-car-stop-metrics.js','./mair-car-nav-clean.css','./mair-car-stops.css','./mair-journey-director.js','./mair-traffic-journey-toast.js','./mair-passenger-mode.js','./mair-passenger-search-host.js');

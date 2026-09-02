@@ -25,7 +25,21 @@
  $('autoProgram')?.addEventListener('change',e=>{localStorage.setItem('jfm_auto_program',e.target.checked?'1':'0');if(e.target.checked)autoMode()});if($('autoProgram'))$('autoProgram').checked=localStorage.getItem('jfm_auto_program')!=='0';
  const djText=$('djText');if(djText&&$('factSource')&&!$('djFeedback')){const wrap=document.createElement('div');wrap.id='djFeedback';wrap.style.cssText='display:flex;gap:8px;margin-top:12px';wrap.innerHTML='<button id="djUp" type="button" style="flex:1;border:1px solid #293650;background:#111827;color:#fff;border-radius:12px;padding:9px">👍 Meer zo</button><button id="djDown" type="button" style="flex:1;border:1px solid #293650;background:#111827;color:#fff;border-radius:12px;padding:9px">👎 Minder zo</button>';$('factSource').insertAdjacentElement('afterend',wrap);const rate=good=>{const d=loadDj(),text=window.jfmLastDJText||djText.textContent||'';if(!text)return;if(good){d.up=(d.up||0)+1;d.liked=d.liked||[];d.liked.unshift(text);d.liked=d.liked.slice(0,15);$('djUp').textContent='👍 Onthouden'}else{d.down=(d.down||0)+1;d.disliked=d.disliked||[];d.disliked.unshift(text);d.disliked=d.disliked.slice(0,15);$('djDown').textContent='👎 Onthouden'}saveDj(d);setTimeout(()=>{if($('djUp'))$('djUp').textContent='👍 Meer zo';if($('djDown'))$('djDown').textContent='👎 Minder zo'},900)};$('djUp').onclick=()=>rate(true);$('djDown').onclick=()=>rate(false)}
  autoMode();setInterval(autoMode,10*60*1000);renderStats();setTimeout(renderShow,1400);if($('installHint')&&/iphone|ipad|ipod/i.test(navigator.userAgent))$('installHint').textContent='Op iPhone: open MAIR vanaf je beginscherm voor de volledige app-ervaring.';
- function authGuard(){const text=($('queueInfo')?.textContent||'').toLowerCase();if(text.includes('opnieuw gekoppeld')||text.includes('niet gekoppeld')||text.includes('spotify-login')){$('setup')?.classList.remove('hidden');if($('connect'))$('connect').disabled=false}}
+ // Het koppelvenster hoort alleen open te gaan als de Spotify-sessie echt weg is.
+ // Dit hing eerder aan de tekst in #queueInfo, en dat is de gedeelde statusregel van
+ // vier modules: elke voorbijgaande fout met 'niet gekoppeld' erin zette het venster
+ // binnen 4 seconden open terwijl de sessie geldig was. Nu wordt de sessiestatus
+ // zelf gelezen. reauthRequired komt uit spotify-test-config.js en gaat uitsluitend
+ // op true bij Spotify's definitieve invalid_grant; een 429, een timeout of een
+ // netwerkfout levert daar bewust AUTH_REFRESH_RECOVERABLE op en dus geen venster.
+ function sessionNeedsReauth(){
+   const hardened=window.MAIRSpotifySessionReliability?.state;
+   if(hardened&&hardened.reauthRequired===true)return true;
+   const auth=window.JFMAuth?.state;
+   if(!auth)return false;
+   return !auth.hasRefreshToken&&!auth.hasAccessToken
+ }
+ function authGuard(){const setup=$('setup');if(!setup||!sessionNeedsReauth())return;setup.classList.remove('hidden');if($('connect'))$('connect').disabled=false}
  setInterval(authGuard,4000);window.addEventListener('pageshow',authGuard);window.addEventListener('online',authGuard);setTimeout(authGuard,800);
  window.JFMRadioSuite={state:()=>s,save,autoMode,renderShow,djFeedback:loadDj,discoveries:()=>[...discovered],discoveryListening:()=>({...discoveryListen}),resetDiscoveries,build:BUILD,boot:null};
  const versioned=src=>{try{const u=new URL(src,location.href);u.searchParams.set('v',BUILD);return u.href}catch{return src+(src.includes('?')?'&':'?')+'v='+encodeURIComponent(BUILD)}};

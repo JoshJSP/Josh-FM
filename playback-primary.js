@@ -53,7 +53,10 @@
     return null
   }
   function setBusy(on){busy=!!on;const ready=!!player()&&!!deviceId();['play','next','prev','start'].forEach(id=>{const b=$(id);if(b)b.disabled=busy||!ready})}
-  async function withBusy(fn){if(busy)return false;setBusy(true);try{return await fn()}finally{setBusy(false)}}
+  // Een tik terwijl er al een transportactie loopt deed niets en zei niets. Dat is de
+  // meest waarschijnlijke verklaring voor "de vorige-knop doet soms niks": de watchdog
+  // draait elke 5 seconden en zet busy. Nu krijgt de gebruiker in elk geval antwoord.
+  async function withBusy(fn){if(busy){info('MAIRFM is nog met de vorige opdracht bezig. Probeer het zo opnieuw.');return false}setBusy(true);try{return await fn()}finally{setBusy(false)}}
   function ingest(s,source='primary'){if(!s)return;const confirmed=String(s?.device?.id||'').trim();if(confirmed&&localStorage.getItem(DEVICE_KEY)!==confirmed)localStorage.setItem(DEVICE_KEY,confirmed);clearResumeGuard(String(s?.item?.id||''));try{playback=s;renderPlayback(s)}catch{};try{truth()?.ingest?.(s,source)}catch{}}
   function rememberError(e,prefix){lastError=String(e?.message||e);failures++;try{truth()?.error?.(lastError)}catch{};info(prefix+lastError,true);return false}
   function stationQueue(){try{return Array.isArray(queue)?queue.filter(t=>t?.uri):[]}catch{return[]}}
@@ -176,7 +179,12 @@
         const cause=delta>0?'USER_NEXT':'USER_PREVIOUS';if(window.MAIRDJ?.busy&&typeof window.MAIRDJ?.cancelActive==='function')await window.MAIRDJ.cancelActive(cause);
         if(delta>0){markTransitionAction('NEXT');await advance({record:true,source:'primary-next'});info('MAIRFM speelt.');return true}
         const{p,id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');markTransitionAction('PREVIOUS',{fromTrackId:before});const fallbackUri=stationNeighbor(state,-1);let position=Number(state?.progress_ms||0);if(!position)try{position=Number((await p.getCurrentState())?.position||0)}catch{}
-        await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'});if(position>3000){await wait(180);try{await p.previousTrack()}catch{await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'})}}let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,8);
+        await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'});
+        /* Spotify herstart bij 'previous' de lopende track zodra die langer dan een paar
+           seconden speelt; daarvoor stond hier een tweede aanroep. Die vuurde alleen ook
+           als de eerste al gewisseld had, en dan sprong hij twee nummers terug. Nu wordt
+           eerst gekeken of er al iets veranderd is. */
+        if(position>3000){await wait(220);const moved=await verify(x=>x.item?.id&&x.item.id!==before,2);if(!moved){try{await p.previousTrack()}catch{await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'})}}}let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,8);
         if(!s){try{await player()?.previousTrack?.()}catch{};s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,5)}
         if(!s&&fallbackUri)s=await playContextDirect(fallbackUri,id,'primary-prev-fallback');if(!s)throw Error('Spotify bevestigde vorige niet.');if(!s.is_playing){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,6)||s}ingest(s,'primary-prev');truth()?.setExpectedLive?.(true,'previous');recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM speelt.');return true
       }catch(e){return rememberError(e,(delta>0?'Volgende':'Vorige')+' mislukt: ')}

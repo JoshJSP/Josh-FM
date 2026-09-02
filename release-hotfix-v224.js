@@ -1,5 +1,12 @@
 // Josh FM v2.2.4 runtime hotfix — Spotify Feb-2026 search limits, robust iOS start, paged channels.
 (()=>{
+// GEDEACTIVEERD. Dit bestand hoort bij release v2.2.4 en wordt door geen enkele loader
+// meer ingeladen. Het overschrijft JFMPlayback.start en JFMPlayback.playUri met een eigen
+// implementatie, dus als iemand het per ongeluk in index.html zet neemt het de transport-
+// laag over van playback-primary.js. Het bestand blijft staan als referentie, maar stopt
+// nu direct. Verwijder deze regel bewust als je het weer wilt gebruiken.
+if(!window.__MAIR_ALLOW_V224_HOTFIX)return;
+
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   const DEVICE_KEY='jfm_spotify_device_id', SEARCH_LIMIT=10;
   const status=(text,bad=false)=>{const q=document.getElementById('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}};

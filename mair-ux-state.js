@@ -10,7 +10,29 @@ function playback(){try{return window.JFMPlaybackState?.get?.()||window.JFMPlayb
 function dj(){try{return window.MAIRDJ?.diagnostics?.()||window.JFMDJAuthoritative?.diagnostics?.()||null}catch{return null}}
 function currentTrack(){const item=window.playback?.item||null,p=playback();if(!item&&!p?.trackId)return null;return{id:clean(item?.id||p?.trackId,120),name:clean(item?.name||$('title')?.textContent||'',180),artists:(item?.artists||[]).map(x=>clean(x?.name||x,100)).filter(Boolean),image:item?.album?.images?.[0]?.url||$('artImg')?.src||'',durationMs:Number(item?.duration_ms||p?.durationMs||0)}}
 function nextTrack(){const item=window.__jfmSpotifyUpcomingTruth?.items?.[0]||window.JFMStationHealth?.snapshot?.()?.nextTrack||null;if(!item)return null;return{id:clean(item.id,120),name:clean(item.name,180),artists:(item.artists||[]).map(x=>clean(x?.name||x,100)).filter(Boolean),image:item.album?.images?.[0]?.url||item.image||'',request:!!item.request}}
-function connection(){const status=$('status'),connected=!!(status?.classList.contains('on')||window.JFMSpotifySDK?.deviceId||playback()?.deviceId),connecting=!!($('connect')?.disabled&&!connected);return{connected,connecting,label:connected?'Verbonden':connecting?'Verbinden…':'Niet verbonden'}}
+// De verbindingsstatus hing aan de CSS-klasse van de statuspil. stability-core haalt
+// die klasse er bij elke voorbijgaande hapering af - een trage tokenvernieuwing, een
+// not_ready van de SDK, een mislukte reconcile - en dan viel de hele app terug op
+// DISCONNECTED: koppelscherm zichtbaar, 'Verbind Spotify om te beginnen' in beeld.
+// Dat is wat er bij openen, tijdens luisteren en bij schermwisselingen gebeurde.
+// De sessie zelf is de waarheid: een geldig refresh token betekent verbonden, ook als
+// het Spotify-device even weg is. Alleen een definitieve invalid_grant of een compleet
+// lege sessie telt als niet verbonden.
+function sessionAlive(){
+  try{
+    const hardened=window.MAIRSpotifySessionReliability?.state;
+    if(hardened&&hardened.reauthRequired===true)return false;
+    const auth=window.JFMAuth?.state;
+    if(auth&&(typeof auth.hasAccessToken==='boolean'||typeof auth.hasRefreshToken==='boolean'))return !!(auth.hasAccessToken||auth.hasRefreshToken);
+  }catch{}
+  return null
+}
+function connection(){
+  const status=$('status'),alive=sessionAlive(),device=!!(window.JFMSpotifySDK?.deviceId||playback()?.deviceId);
+  const connected=alive===false?false:alive===true?true:!!(status?.classList.contains('on')||device);
+  const connecting=!!($('connect')?.disabled&&!connected);
+  return{connected,connecting,label:connected?'Verbonden':connecting?'Verbinden…':'Niet verbonden'}
+}
 function station(){const id=window.MAIRStationController?.channel||window.JFMMusicChoice?.channel||document.body.dataset.musicChannel||'mix',label=window.MAIRStationPolicy?.label?.(id)||LABELS[id]||clean(id,60)||'Your Mix';return{id,label:clean(label.replace(/^MAIR\s+/i,''),80)||'Your Mix',pending:Date.now()-stationFeedbackAt<10000?stationFeedback:''}}
 function publicDJ(detail=dj()){
   const phase=clean(detail?.phase||'COUNTING',40).toUpperCase();
@@ -24,7 +46,13 @@ function userError(p,online,health){
   if(!online)return{severity:'warning',title:'Geen internet',message:'MAIRFM wacht op verbinding. Zodra je weer online bent, proberen we verder te gaan.',primaryAction:null,secondaryAction:null,diagnosticsCode:'NETWORK_OFFLINE',autoDismiss:false};
   if(health?.reloadNeedsGesture)return{severity:'action',title:'Klaar om verder te gaan',message:'Tik één keer om muziek en DJ-audio weer te activeren.',primaryAction:'resume',secondaryAction:null,diagnosticsCode:'AUDIO_GESTURE',autoDismiss:false};
   if(lastUserError&&Date.now()-lastUserError.at<15000){const scope=lastUserError.scope,low=clean(lastUserError.error,300).toLowerCase();if(scope==='auth')return{severity:'error',title:'Spotify verbinden lukte niet',message:'Probeer het opnieuw. Als het blijft gebeuren, open dan Diagnostics.',primaryAction:'retry',secondaryAction:'diagnostics',diagnosticsCode:'SPOTIFY_CONNECT',autoDismiss:false};if(scope==='request')return{severity:'warning',title:'Nummer zoeken lukte niet',message:'Je uitzending blijft spelen. Probeer de aanvraag straks opnieuw.',primaryAction:null,secondaryAction:'diagnostics',diagnosticsCode:'REQUEST_FAILED',autoDismiss:true};if(/device|apparaat/.test(low))return{severity:'error',title:'Spotify-apparaat niet beschikbaar',message:'Open Spotify één keer op dit apparaat en probeer daarna opnieuw.',primaryAction:'device',secondaryAction:'reconnect',diagnosticsCode:'SPOTIFY_DEVICE',autoDismiss:false}}
-  const raw=clean(lastStationError||p?.lastError||health?.lastError,300),low=raw.toLowerCase();if(!raw)return null;
+  // health.lastError wordt in playback-primary wel gezet maar vrijwel nooit gewist, dus
+  // een enkele device-hapering aan het begin van een sessie liet hier permanent
+  // "Spotify-apparaat niet beschikbaar" met een knop "Opnieuw verbinden" staan, ook
+  // terwijl de muziek gewoon speelde. Een playbackfout telt daarom alleen mee zolang
+  // playback nu ook echt stilstaat terwijl het zou moeten spelen.
+  const playbackBroken=!!(p?.expectedLive&&!p?.isPlaying);
+  const raw=clean(lastStationError||(playbackBroken?(p?.lastError||health?.lastError):''),300),low=raw.toLowerCase();if(!raw)return null;
   if(/premium|403/.test(low))return{severity:'error',title:'Spotify Premium nodig',message:'MAIRFM gebruikt Spotify om volledige nummers af te spelen. Hiervoor is een Premium-account nodig.',primaryAction:'retry',secondaryAction:'diagnostics',diagnosticsCode:'SPOTIFY_PREMIUM',autoDismiss:false};
   if(/device|apparaat|not.ready|geen actief/.test(low))return{severity:'error',title:'Spotify-apparaat niet beschikbaar',message:'Open Spotify één keer op dit apparaat en probeer daarna opnieuw.',primaryAction:'device',secondaryAction:'reconnect',diagnosticsCode:'SPOTIFY_DEVICE',autoDismiss:false};
   if(/gesture|tik|vernieuw/.test(low))return{severity:'action',title:'Klaar om verder te gaan',message:'Tik één keer om muziek en DJ-audio weer te activeren.',primaryAction:'resume',secondaryAction:null,diagnosticsCode:'AUDIO_GESTURE',autoDismiss:false};

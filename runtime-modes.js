@@ -1,30 +1,38 @@
-// MAIR runtime modes — compatibility runtime for Car Mode only. User-facing controls live in mair-user-controls.js.
+// MAIR runtime modes — compatibiliteitslaag, geen eigen UI meer.
+//
+// Dit bestand bouwde een tweede, volledige Car Mode: een fullscreen sectie #jfmCarView
+// met eigen transportknoppen, die bij elke boot in de DOM werd gezet en aan te zetten was
+// via een schakelaar in Instellingen. Daarnaast bestond de echte Car Mode al
+// (prototypes/mair-car-mode-wave.js, de knop op de Radio-tab). Twee Car Modes die elkaar
+// niet kenden, met een knop "Volgende DJ-break overslaan" die naar een element wees dat
+// niet bestaat, in een app waar de DJ uit staat.
+//
+// De view, de schakelaar en de bijbehorende CSS zijn verwijderd. Wat blijft is de kleine
+// API die andere modules echt gebruiken:
+//   integration-guards.js -> state().data, state().battery, dataBudget()
+//   live-ui.js            -> shouldRunNonCritical(), batteryBudget()
+// Die modi (data saver, battery, night) waren al eerder uitgezet; deze laag geeft daarom
+// vaste, ruime waarden terug in plaats van te doen alsof er nog iets te kiezen valt.
 (()=>{
-  const $=id=>document.getElementById(id);
-  const KEY='jfm_car_mode';
-  const state={car:localStorage.getItem(KEY)==='1'};
-  let lastRender=0;
-  function save(k,v){
-    if(k!=='car')return false;
-    state.car=!!v;localStorage.setItem(KEY,v?'1':'0');apply(true);return true
-  }
-  function apply(force=false){
-    document.body.classList.toggle('jfm-car-mode',state.car);
-    document.body.classList.toggle('mair-car-mode',state.car);
-    if(force)try{window.dispatchEvent(new CustomEvent('mair:car-mode',{detail:{enabled:state.car}}))}catch{}
-    renderCar();return true
-  }
-  function current(){try{const t=playback?.item?trackObj(playback.item):null;if(t)return t}catch{}try{const s=window.JFMPlaybackState?.get?.(),q=Array.isArray(queue)?queue:[];return q.find(t=>t.id===s?.trackId)||null}catch{return null}}
-  function ensureCar(){
-    if($('jfmCarView'))return;const el=document.createElement('section');el.id='jfmCarView';el.className='jfm-car-view';el.innerHTML='<div class="jfm-car-top"><div><span class="jfm-car-live">LIVE</span><b id="jfmCarShow">MAIR</b></div><button id="jfmCarExit" type="button">Sluit Car Mode</button></div><div class="jfm-car-art"><img id="jfmCarArt" alt="Albumhoes"><div id="jfmCarArtFallback">MAIR</div></div><h2 id="jfmCarTitle">MAIR</h2><p id="jfmCarArtist">—</p><div class="jfm-car-controls"><button id="jfmCarPrev" type="button" aria-label="Vorige">‹</button><button id="jfmCarPlay" type="button" aria-label="Play of pauze">▶</button><button id="jfmCarNext" type="button" aria-label="Volgende">›</button></div><button id="jfmCarSkipDJ" class="jfm-car-secondary" type="button">🔕 Volgende DJ-break overslaan</button><p id="jfmCarStatus" class="muted">Bedien alleen wanneer dat veilig kan.</p>';document.body.appendChild(el);
-    $('jfmCarExit')?.addEventListener('click',()=>save('car',false));$('jfmCarPlay')?.addEventListener('click',()=>window.MAIRPlayback?.playPause?.()||window.JFMPlayback?.playPause?.());$('jfmCarNext')?.addEventListener('click',()=>window.MAIRPlayback?.next?.()||window.JFMPlayback?.next?.());$('jfmCarPrev')?.addEventListener('click',()=>window.MAIRPlayback?.previous?.()||window.JFMPlayback?.previous?.());$('jfmCarSkipDJ')?.addEventListener('click',()=>document.getElementById('skipTalk')?.click());
-  }
-  function renderCar(){if(!state.car)return;const t=current(),s=window.JFMPlaybackState?.get?.(),show=window.JFMStationClock?.current?.()?.show?.name||'MAIR',djBusy=!!(window.JFMDJAuthoritative?.busy||window.MAIRDJ?.busy);if($('jfmCarShow'))$('jfmCarShow').textContent=show;if($('jfmCarTitle'))$('jfmCarTitle').textContent=t?.name||'MAIR';if($('jfmCarArtist'))$('jfmCarArtist').textContent=(t?.artists||[]).join(', ')||'—';const img=$('jfmCarArt'),fb=$('jfmCarArtFallback');if(img&&fb){if(t?.image){img.src=t.image;img.classList.remove('hidden');fb.classList.add('hidden')}else{img.removeAttribute('src');img.classList.add('hidden');fb.classList.remove('hidden')}}if($('jfmCarPlay'))$('jfmCarPlay').textContent=s?.isPlaying?'Ⅱ':'▶';if($('jfmCarStatus'))$('jfmCarStatus').textContent=!navigator.onLine?'Offline · wacht op verbinding':djBusy?'DJ live':'MAIR live'}
-  function install(){ensureCar();apply(true)}
-  window.addEventListener('jfm:trackchange',renderCar);window.addEventListener('jfm:playback-state',renderCar);window.addEventListener('jfm:show-change',renderCar);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){apply();renderCar()}});
-  setInterval(()=>{if(!state.car)return;const n=Date.now();if(n-lastRender<4000)return;lastRender=n;renderCar()},4000);
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
-  // Keep the old API surface as a compatibility alias while removing the retired modes.
-  window.JFMRuntimeModes={version:'runtime-modes-v3-car-only',state:()=>({car:state.car,data:false,battery:false,night:false,nightAuto:false,nightEffective:false}),set:save,apply,shouldRunNonCritical:()=>true,dataBudget:()=>({artwork:true,prefetch:true,discoveryRefreshMs:15*60*1000,maxDiscoveryPercent:100}),batteryBudget:()=>({uiIntervalMs:4000,background:true,animations:true})};
-  window.MAIRCarMode=window.JFMRuntimeModes;
+  const KEY='jfm_car_mode',OLD='mair_car_mode_v1';
+  // Oude toestand opruimen: anders blijft een toestel met jfm_car_mode='1' uit een
+  // vorige versie de body-klassen dragen zonder dat er nog iets bij hoort.
+  try{localStorage.removeItem(KEY);localStorage.removeItem(OLD)}catch{}
+  try{document.body?.classList.remove('jfm-car-mode','mair-car-mode')}catch{}
+  try{document.getElementById('jfmCarView')?.remove()}catch{}
+
+  const state=()=>({car:false,data:false,battery:false,night:false,nightAuto:false,nightEffective:false});
+  const api={
+    version:'runtime-modes-v4-compat-only',
+    state,
+    // set() bestaat nog omdat oude aanroepers hem verwachten, maar er valt niets meer te
+    // zetten: Car Mode is de overlay op de Radio-tab en heeft geen globale schakelaar.
+    set:()=>false,
+    apply:()=>true,
+    shouldRunNonCritical:()=>true,
+    dataBudget:()=>({artwork:true,prefetch:true,discoveryRefreshMs:15*60*1000,maxDiscoveryPercent:100}),
+    batteryBudget:()=>({uiIntervalMs:2500,background:true,animations:true})
+  };
+  window.JFMRuntimeModes=api;
+  window.MAIRCarMode=api;
 })();

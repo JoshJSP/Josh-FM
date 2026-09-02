@@ -34,9 +34,19 @@ window.JFM_ASSET_VERSION='81';
     addSyncScript('mair-my-mair-js','./mair-my-mair.js?v=81');
   }
   loadMairUI();
-  function sanitizeSleepState(){try{const key='jfm_sleep_timer_v1',raw=localStorage.getItem(key);if(!raw)return;const x=JSON.parse(raw),expired=x?.mode==='time'&&Number(x?.at||0)<=Date.now(),unsafe=x?.mode==='after-track';if(expired||unsafe)localStorage.setItem(key,'null')}catch{try{localStorage.setItem('jfm_sleep_timer_v1','null')}catch{}}}
+  // 'Stop na dit nummer' werd hier bij elke start onvoorwaardelijk gewist, waardoor de
+  // keuze stil verdween zodra iOS de app had opgeruimd. De waarschijnlijke reden stond
+  // niet in de commit (7356f3e heeft geen toelichting), maar past bij het gedrag dat
+  // pwa-platform.js toen had: die pauzeerde bij de eerstvolgende trackwissel zodra de
+  // huidige track afweek van de opgeslagen trackId, en na een herstart wijkt die per
+  // definitie af. Dat tweede pad is nu weg; mair-sleep.js pauzeert alleen als de track
+  // die eindigt exact de opgeslagen track is, dus een oude vlag kan niets meer breken.
+  // Wat overblijft is verval: een vlag van dagen oud wil niemand nog. Twaalf uur dekt
+  // een nacht slapen en verloopt daarna.
+  const SLEEP_STALE_MS=12*60*60*1000;
+  function sanitizeSleepState(){try{const key='jfm_sleep_timer_v1',raw=localStorage.getItem(key);if(!raw)return;const x=JSON.parse(raw),age=Date.now()-Number(x?.createdAt||x?.setAt||0),expired=x?.mode==='time'&&Number(x?.at||0)<=Date.now(),stale=x?.mode==='after-track'&&(!Number(x?.createdAt||x?.setAt||0)||age>SLEEP_STALE_MS);if(expired||stale)localStorage.setItem(key,'null')}catch{try{localStorage.setItem('jfm_sleep_timer_v1','null')}catch{}}}
   sanitizeSleepState();
-  const render=()=>{const version=document.getElementById('appVersion'),build=document.getElementById('appBuild');if(version)version.textContent='MAIR · v'+(window.JFM_RELEASE.displayVersion||window.JFM_RELEASE.version);if(build)build.textContent='Build '+window.JFM_RELEASE.build};
+  const render=()=>{const version=document.getElementById('appVersion'),build=document.getElementById('appBuild'),label='MAIR · v'+(window.JFM_RELEASE.displayVersion||window.JFM_RELEASE.version),buildLabel='Build '+window.JFM_RELEASE.build;if(version)version.textContent=label;if(build)build.textContent=buildLabel};
   function emit(){try{window.dispatchEvent(new CustomEvent('jfm:release-status',{detail:{...window.JFM_RELEASE}}))}catch{}}
   function requestCacheVersion(){try{navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'})}catch{}}
   async function forceServiceWorkerCheck(){if(!('serviceWorker'in navigator))return false;try{let reg=await navigator.serviceWorker.getRegistration();if(!reg){reg=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'})}else{await reg.update()}if(reg?.waiting){reg.waiting.postMessage({type:'SKIP_WAITING'})}requestCacheVersion();setTimeout(requestCacheVersion,350);return true}catch{return false}}

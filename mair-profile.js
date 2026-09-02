@@ -27,6 +27,16 @@ function dna(s={}){try{return window.MAIRMyMair?.radioDna?.(s)?.label||'Persoonl
 function recap(period='weekly'){try{return window.MAIRModeManager?.recap?.(period)||{}}catch{return{}}}
 function spotifyConnected(){try{const state=window.JFMAuth?.state;if(state&&typeof state==='object')return!!(state.hasRefreshToken||state.hasAccessToken);return!!(localStorage.getItem('jfm_refresh')||localStorage.getItem('jfm_token'))}catch{return false}}
 function recentHtml(track){const name=track?.name||track?.title||'MAIR track',artist=(track?.artists||[track?.artist]).filter(Boolean).join(', ')||'MAIR';const image=track?.image||track?.imageUrl||track?.albumImage||'';return `<div class="mair-profile-track"><div class="mair-profile-cover">${image?`<img src="${esc(image)}" alt="">`:esc(name.slice(0,2).toUpperCase())}</div><b>${esc(name)}</b><small>${esc(artist)}</small></div>`}
+// De Instellingen-tab wordt volledig door deze pagina afgedekt: mair-profile.css
+// heeft .mair-profile-tab>:not(#mairProfilePage){display:none!important}. Alles wat
+// andere modules in die tab hangen is dus onzichtbaar, inclusief de versionbox uit
+// index.html. Wat Josh moet kunnen zien hoort daarom hier te staan.
+function releaseLine(){
+  const r=window.JFM_RELEASE||{};
+  const version=String(r.displayVersion||r.version||'onbekend');
+  const build=String(r.build||'onbekend');
+  return `v${version} · build ${build}`
+}
 function row(icon,title,copy,action=''){return `<div class="mair-profile-row${action?' mair-profile-row-action':''}"${action?` data-profile-action="${action}" role="button" tabindex="0"`:''}><span class="mair-profile-row-icon">${icon}</span><span><b>${esc(title)}</b><small>${esc(copy)}</small></span>${action?'<em aria-hidden="true">›</em>':''}</div>`}
 function metric(value,label){return `<div style="background:#0d0d10;border:1px solid #23242a;border-radius:16px;padding:14px 12px;min-width:0"><div style="color:#fff;font-size:22px;font-weight:900;line-height:1.05;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(value)}</div><div style="margin-top:7px;color:#8f9099;font-size:11px;line-height:1.2">${esc(label)}</div></div>`}
 function periodButton(period,label,current){const active=period===current;return `<button type="button" data-profile-period="${period}" style="appearance:none;border:1px solid ${active?'#a64b13':'#303037'};background:${active?'#2a160a':'#101012'};color:${active?'#ff7a12':'#92939c'};border-radius:999px;padding:6px 9px;font:inherit;font-size:9px;font-weight:900;letter-spacing:.04em;cursor:pointer">${label}</button>`}
@@ -47,15 +57,29 @@ function render(){ensureCss();const pane=$('tab-settings');if(!pane)return null;
 </section>
 <section class="mair-profile-card"><div class="mair-profile-section-title"><i>☷</i><span><b>Persoonlijke voorkeuren</b><small>Jouw muziek, jouw MAIR</small></span></div><div class="mair-profile-list">${row('♫','Favoriete artiesten',favArtists)}${row('◷','Favoriete periodes',favoritePeriod)}${row('☆','Radio-DNA',mood)}${row('＋','Ontdekkingsniveau',`${Number(s.discoveries||0)} ontdekkingen`)}</div></section>
 <section class="mair-profile-card"><div class="mair-profile-section-title"><i>⌁</i><span><b>Recente activiteit</b><small>Onlangs geluisterd</small></span></div>${f.recent.length?`<div class="mair-profile-activity">${f.recent.map(recentHtml).join('')}</div>`:'<div class="mair-profile-empty">Luister verder om hier je recente muziek te zien.</div>'}</section>
-<section class="mair-profile-card mair-profile-account"><div class="mair-profile-section-title"><i>●</i><span><b>App & account</b><small>Spotify, privacy en ondersteuning</small></span></div><div class="mair-profile-list">${row('◉','Spotify',spotifyConnected()?'Gekoppeld aan MAIRFM':'Niet gekoppeld')}${row('⌁','Privacy','Luisterdata blijft lokaal op dit apparaat')}${row('◇','Geavanceerd & diagnostiek','Technische status, tests en herstel','diagnostics')}${row('↺','Alles resetten','Wis alle MAIR-luisterdata en begin opnieuw','resetProfile')}${row('↪','Spotify ontkoppelen','Verbreek de huidige Spotify-sessie','logout')}</div></section>
+<section class="mair-profile-card mair-profile-account"><div class="mair-profile-section-title"><i>●</i><span><b>App & account</b><small>Spotify, privacy en ondersteuning</small></span></div><div class="mair-profile-list">${row('◉','Spotify',spotifyConnected()?'Gekoppeld aan MAIRFM':'Niet gekoppeld')}${row('⌁','Privacy','Luisterdata blijft lokaal op dit apparaat')}${row('◷','Versie',releaseLine())}${row('⇧','Backup exporteren','Bewaar je MAIR-gegevens als bestand','backupExport')}${row('⇩','Backup importeren','Zet een eerder bewaard bestand terug','backupImport')}${row('◇','Geavanceerd & diagnostiek','Technische status, tests en herstel','diagnostics')}${row('↺','Alles resetten','Wis alle MAIR-luisterdata en begin opnieuw','resetProfile')}${row('↪','Spotify ontkoppelen','Verbreek de huidige Spotify-sessie','logout')}</div></section>
 <div class="mair-profile-footer-note">MAIRFM · Jouw muziek. Als echte radio.</div>`;
 $('mairProfileEdit')?.addEventListener('click',()=>{const name=prompt('Naam op je MAIR-profiel',p.displayName);if(name&&name.trim()){saveProfile({displayName:name.trim()});render()}});
 page.querySelectorAll('[data-profile-period]').forEach(btn=>btn.addEventListener('click',()=>{savePeriod(btn.dataset.profilePeriod);render()}));
 const reset=page.querySelector('[data-profile-action="resetProfile"]');const doReset=()=>{if(!confirm('Alles opnieuw beginnen? Dit wist je luistertijd, nummers, favorieten, ontdekkingen, recente activiteit, recaps, requests, skips en aangeleerde muzieksmaak. Je Spotify-koppeling en profielnaam blijven behouden.'))return;resetListeningProfile()};reset?.addEventListener('click',doReset);reset?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();doReset()}});
 const diagnostics=page.querySelector('[data-profile-action="diagnostics"]');const openDiagnostics=()=>{if(window.MAIRDiagnosticsHub?.open)window.MAIRDiagnosticsHub.open();else window.dispatchEvent(new Event('mair:diagnostics-open'))};diagnostics?.addEventListener('click',openDiagnostics);diagnostics?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDiagnostics()}});
+const exportRow=page.querySelector('[data-profile-action="backupExport"]');
+const doExport=()=>{if(typeof window.JFMDataPortability?.download!=='function'){alert('Backup is nog aan het laden. Probeer het over een paar seconden opnieuw.');return}try{window.JFMDataPortability.download()}catch(e){alert('Backup maken lukte niet: '+(e?.message||e))}};
+exportRow?.addEventListener('click',doExport);exportRow?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();doExport()}});
+const importRow=page.querySelector('[data-profile-action="backupImport"]');
+const doImport=()=>{
+  let input=document.getElementById('mairProfileImportFile');
+  if(!input){input=document.createElement('input');input.type='file';input.id='mairProfileImportFile';input.accept='application/json,.json';input.hidden=true;document.body.appendChild(input);
+    input.addEventListener('change',async e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;
+      try{await window.JFMDataPortability?.importFile?.(file);alert('Backup hersteld. MAIRFM wordt opnieuw geladen.');setTimeout(()=>location.reload(),400)}
+      catch(err){alert('Import mislukt: '+(err?.message||err))}})}
+  if(typeof window.JFMDataPortability?.importFile!=='function'){alert('Backup is nog aan het laden. Probeer het over een paar seconden opnieuw.');return}
+  input.click()
+};
+importRow?.addEventListener('click',doImport);importRow?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();doImport()}});
 const logout=page.querySelector('[data-profile-action="logout"]');const doLogout=()=>{$('logout')?.click()};logout?.addEventListener('click',doLogout);logout?.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();doLogout()}});return page}
 function syncNav(){const btn=document.querySelector('.mair-bottom-nav [data-mair-tab="settings"]');if(btn)btn.setAttribute('aria-label','Profiel');$('mairfmSettingsShortcut')?.remove()}
-function boot(){render();syncNav();window.addEventListener('pageshow',()=>{render();syncNav()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});for(const e of ['jfm:trackchange','mair:taste-feedback','mair:request-confirmed','mair:station-selected','mair:mode-analytics','mair:discovery-counted','mair:discoveries-reset','mair:profile-reset'])window.addEventListener(e,()=>setTimeout(render,120));setInterval(()=>{if($('tab-settings')?.classList.contains('active'))render()},15000)}
+function boot(){render();syncNav();window.addEventListener('pageshow',()=>{render();syncNav()});document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});for(const e of ['jfm:trackchange','mair:taste-feedback','mair:request-confirmed','mair:station-selected','mair:mode-analytics','mair:discovery-counted','mair:discoveries-reset','mair:profile-reset','jfm:release-status'])window.addEventListener(e,()=>setTimeout(render,120));setInterval(()=>{if($('tab-settings')?.classList.contains('active'))render()},15000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 window.MAIRProfile={version:'mair-profile-v12-no-listening-goal',render,profile,saveProfile,selectedPeriod,resetListeningProfile,spotifyConnected};
 })();
