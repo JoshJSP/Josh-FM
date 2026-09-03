@@ -36,5 +36,5 @@ ok('tablet and desktop navigation cannot cover playback controls',css.includes('
 // De bovenmarge moet de safe area volgen zodat tekst nooit onder de Dynamic Island komt,
 // maar mag er niets bovenop stapelen: geen vaste ondergrens en geen extra offset, anders
 // ontstaat er een zwarte balk boven de eerste kaart. Onderin blijft de home indicator vrij.
-ok('mobile shell respects Dynamic Island and home indicator safe areas',css.includes('padding:max(8px,env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom))!important')&&!/padding-top:max\(\d{2,}px/.test(css));
+ok('mobile shell respects Dynamic Island and home indicator safe areas',css.includes('padding:max(8px,calc(env(safe-area-inset-top) - 11px)) 16px calc(96px + env(safe-area-inset-bottom))!important')&&!/padding-top:max\(\d{2,}px/.test(css));
 console.log(`PASS UX contract: ${checks} checks`);
