@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import {RELEASE_ASSET_VERSION} from './release-cache.mjs';
 
 const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 const radioHome = read('mair-radio-home.js');
@@ -28,7 +29,7 @@ assert.match(dashboard, /mairfmSettingsSection='Mijn MAIR'/, 'Mijn MAIR heeft ee
 assert.ok(!/Math\.random/.test(dashboard), 'Mijn MAIR mag geen verzonnen statistieken tonen');
 assert.match(loader, /mair-my-mair\.js/, 'Mijn MAIR wordt door de runtime geladen');
 assert.match(easyUse, /mair-ux-v1\.css\?v=/, 'UX-stylesheet gebruikt een centrale cacheversie');
-assert.match(loader, /JFM_ASSET_VERSION='81'/, 'Nieuwe UI-assets krijgen de huidige cacheversie');
+assert.ok(loader.includes(`JFM_ASSET_VERSION='${RELEASE_ASSET_VERSION}'`), 'Nieuwe UI-assets krijgen de huidige assetversie');
 assert.match(loader, /mair-personalization-css/, 'Personalisatie-stijlen hebben een zelfstandige cacheveilige laadroute');
 assert.match(serviceWorker, /mair-my-mair\.js/, 'Mijn MAIR zit in de offline app-shell');
 

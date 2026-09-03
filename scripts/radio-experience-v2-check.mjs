@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import {RELEASE_CACHE} from './release-cache.mjs';
+import {RELEASE_CACHE, RELEASE_ASSET_VERSION} from './release-cache.mjs';
 
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const checks=[];
@@ -89,7 +89,7 @@ check('DJ runtime preserves automatic cadence',has(dj,'v4.1-audible-handoff-evid
 
 const versionRuntime=['./dj-memory.js','./mair-imaging.js','./mair-live-news.js','./mair-news-bulletin.js','./mair-voice-lab.js','./mair-soak-monitor.js','./mair-station-director.js','./mair-sleep.js'];
 const cachedRuntime=[...versionRuntime,'./spotify-api-budget.js','./spotify-upcoming-truth.js'];
-check('version loader wires UI radio experience modules',versionRuntime.every(x=>version.includes(x))&&version.includes("JFM_ASSET_VERSION='81'"));
+check('version loader wires UI radio experience modules',versionRuntime.every(x=>version.includes(x))&&version.includes(`JFM_ASSET_VERSION='${RELEASE_ASSET_VERSION}'`));
 check('service worker caches all radio experience modules',cachedRuntime.every(x=>sw.includes(x))&&sw.includes(RELEASE_CACHE));
 check('server release endpoint matches release cache',apiVersion.includes(RELEASE_CACHE));
 check('runtime facade remains explicit',has(runtime,"const owners=","playback:'playback-primary + mair-reload-audibility'","dj:'mair-dj-v2'"));
