@@ -34,7 +34,14 @@ function renderNext(){paintNext();if(!window.JFMSpotifyUpcomingTruth)syncSpotify
 window.jfmRenderNext=renderNext;
 const oldBuild=buildSet;buildSet=window.buildSet=async function(){const list=await oldBuild();try{window.JFMRotation?.annotateAll?.(queue||list||[])}catch{}queue=direct(queue||list||[]);invalidateUpcoming('radioset-rebuild');renderNext();return queue};
 function hideLegacyRadioMode(){const modeTitle=[...document.querySelectorAll('#tab-radio h3')].find(x=>x.textContent.trim()==='Radiomodus');const card=modeTitle?.closest('.card');if(card)card.style.display='none';const mini=$('modeMini');if(mini)mini.style.display='none'}
-let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(id&&id!==seen){seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;m.lastPlayed=m.lastPlayed||{};m.lastPlayed[id]=Date.now();if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);invalidateUpcoming('trackchange')}hideLegacyRadioMode();renderNext();ensureDirectorControls()},3000);
+// De boekhouding hieronder moet elke tik doorlopen: play counts en de
+// upcoming-invalidatie mogen niet wegvallen omdat het scherm uit staat. Het DOM-werk
+// juist niet. paintNext() schrijft in de verborgen compat-container die build7.js
+// aanmaakt, en renderNext() doet er zonder JFMSpotifyUpcomingTruth ook nog een
+// Spotify-aanroep bij. Elke 3 seconden, ook met de app in de achtergrond (audit M-12).
+function paintWhenVisible(){if(document.hidden)return;hideLegacyRadioMode();renderNext();ensureDirectorControls()}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)paintWhenVisible()});
+let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(id&&id!==seen){seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;m.lastPlayed=m.lastPlayed||{};m.lastPlayed[id]=Date.now();if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);invalidateUpcoming('trackchange')}paintWhenVisible()},3000);
 window.addEventListener('jfm:trackchange',()=>{invalidateUpcoming('trackchange-event');paintNext();if(!window.JFMSpotifyUpcomingTruth)syncSpotifyUpcoming(true).catch(()=>{})});
 window.addEventListener('jfm:requests-change',()=>{const sig=requestSig();if(sig!==lastRequestSig){lastRequestSig=sig;invalidateUpcoming('request-change');if(!window.JFMSpotifyUpcomingTruth)syncSpotifyUpcoming(true).catch(()=>{})}});
 window.addEventListener('pageshow',()=>{hideLegacyRadioMode();if(!window.JFMSpotifyUpcomingTruth)syncSpotifyUpcoming(true).catch(()=>{})});
