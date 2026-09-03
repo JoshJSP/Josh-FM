@@ -20,6 +20,13 @@
   function message(text,bad=false){const el=$('queueInfo');if(el){el.textContent=text;el.style.color=bad?'#ffb4b4':''}}
   function setStatus(ok,text){const s=$('status');if(s){s.classList.toggle('on',ok);s.classList.toggle('off',!ok);s.textContent=text||(ok?'gekoppeld':'offline')}}
   function enable(ok){['start','play','prev','next','djNow','skipTalk','searchBtn','rebuild'].forEach(id=>{const e=$(id);if(e)e.disabled=!ok})}
+  // Zoeken en een nieuwe radioset bouwen zijn Web API-acties: die hebben alleen een geldig
+  // token nodig, geen afspeelapparaat. Ze horen dus niet mee uit te gaan als enkel de
+  // speler faalt. sessionAlive() gebruikt dezelfde sessiewaarheid als de UX-laag sinds
+  // e1b2f73: een geldig refresh token telt als verbonden, ook zonder device.
+  const SESSION_CONTROLS=['searchBtn','rebuild'];
+  function enableSessionControls(ok){SESSION_CONTROLS.forEach(id=>{const e=$(id);if(e)e.disabled=!ok})}
+  function sessionAlive(){try{return !!window.JFMAuth?.state?.hasRefreshToken}catch{return false}}
   function rememberPKCE(v,s){localStorage.setItem(PKCE_V,v);localStorage.setItem(PKCE_S,s);sessionStorage.setItem('jfm_verifier',v);sessionStorage.setItem('jfm_state',s)}
   function clearPKCE(){localStorage.removeItem(PKCE_V);localStorage.removeItem(PKCE_S);sessionStorage.removeItem('jfm_verifier');sessionStorage.removeItem('jfm_state')}
   function rememberDevice(id){deviceId=String(id||'').trim();if(deviceId)localStorage.setItem(DEVICE,deviceId);else localStorage.removeItem(DEVICE)}
@@ -98,7 +105,7 @@
   async function transfer(play=false){const id=await ensureDevice();await api('/me/player',{method:'PUT',body:{device_ids:[id],play:!!play}});return id}
   async function playUris(uris){const id=await ensureDevice();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris}});return true}
   function ownConnectButton(){const old=$('connect');if(!old||old.dataset.jfmAuthOwner==='1')return;const fresh=old.cloneNode(true);old.replaceWith(fresh);fresh.dataset.jfmAuthOwner='1';fresh.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();connectSpotify().catch(x=>message(x.message||String(x),true))},true)}
-  async function reconcile(){try{await repairCallback();const t=await ensure();if(!t){rememberDevice('');setStatus(false,'offline');enable(false);if($('connect'))$('connect').disabled=false;message('Koppel Spotify om MAIRFM te starten.');return}if(localStorage.getItem('jfm_auth_requested_streaming')==='1'){localStorage.setItem(STREAM,'1');localStorage.removeItem('jfm_auth_requested_streaming');clearPKCE()}try{setConnected(true)}catch{enable(true);setStatus(true,'gekoppeld')}message('Spotify gekoppeld · speler wordt voorbereid…');await initPlayerWithRetry()}catch(e){rememberDevice('');setStatus(false,'offline');enable(false);if($('connect'))$('connect').disabled=false;message(e.message||String(e),true)}}
+  async function reconcile(){try{await repairCallback();const t=await ensure();if(!t){rememberDevice('');setStatus(false,'offline');enable(false);if($('connect'))$('connect').disabled=false;message('Koppel Spotify om MAIRFM te starten.');return}if(localStorage.getItem('jfm_auth_requested_streaming')==='1'){localStorage.setItem(STREAM,'1');localStorage.removeItem('jfm_auth_requested_streaming');clearPKCE()}try{setConnected(true)}catch{enable(true);setStatus(true,'gekoppeld')}message('Spotify gekoppeld · speler wordt voorbereid…');await initPlayerWithRetry()}catch(e){rememberDevice('');setStatus(false,'offline');enable(false);/* Een mislukte spelerinitialisatie - koude start, trage SDK, geen device - zegt niets over de Spotify-sessie. Alles uitzetten maakte ook de zoekknop in het verzoek-blad dood. */if(sessionAlive())enableSessionControls(true);if($('connect'))$('connect').disabled=false;message(e.message||String(e),true)}}
   ownConnectButton();setTimeout(reconcile,350);window.addEventListener('pageshow',()=>{ownConnectButton();setTimeout(reconcile,250)});
   // Herstelprikkels na een mislukte koude start. Alle drie zijn afgeschermd:
   // ze doen niets zolang er al een device is, een init loopt of de ladder al draait.
