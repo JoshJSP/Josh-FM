@@ -1,6 +1,7 @@
 :root{--mairfm-orange:#ff6a00;--mairfm-bg:#070707;--mairfm-panel:#111214;--mairfm-line:#292b30;--mairfm-muted:#a3a6ad;--mairfm-good:#62d995;--mairfm-warning:#f2bd55;--mairfm-error:#ff6f78}
 html,body{max-width:100%;overflow-x:hidden}
-body.mairfm-ux-v1{background:radial-gradient(circle at 50% -20%,#25130a 0,transparent 38%),var(--mairfm-bg)!important;color:#fff}
+:root{background:radial-gradient(circle at 50% 0,#2a1509 0,transparent 58%),var(--mairfm-bg,#070707)!important;background-attachment:fixed!important}
+body.mairfm-ux-v1{background:radial-gradient(circle at 50% 0,#2a1509 0,transparent 58%),var(--mairfm-bg)!important;background-attachment:fixed!important;color:#fff}
 body.mairfm-ux-v1 .shell{width:min(100%,1120px)!important;max-width:1120px!important;padding:24px 24px 108px!important}
 body.mairfm-ux-v1 .top,body.mairfm-ux-v1 .tabs{display:none!important}
 .mairfm-radio.active{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);gap:18px;align-items:start}.mairfm-radio:not(.active){display:none!important}
