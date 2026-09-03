@@ -83,7 +83,7 @@
   function installCard(){
     if($('jfmLocationCard'))return;const pane=$('tab-settings');if(!pane)return;
     const card=document.createElement('article');card.className='card';card.id='jfmLocationCard';
-    card.innerHTML='<div class="kicker">DJ CONTEXT</div><h3>Locatie voor de DJ</h3><label class="switch"><input id="jfmLocationToggle" type="checkbox"><span></span><b>Gebruik mijn plaats/regio</b></label><p id="jfmLocationStatus" class="muted">Locatie staat uit.</p><button id="jfmLocationRefresh" class="secondary" type="button">Ververs locatie</button><p class="muted">Josh FM bewaart alleen een grove plaats/regio, geen exacte GPS-coördinaten. De DJ noemt je locatie maar af en toe.</p>';
+    card.innerHTML='<div class="kicker">DJ CONTEXT</div><h3>Locatie voor de DJ</h3><label class="switch"><input id="jfmLocationToggle" type="checkbox"><span></span><b>Gebruik mijn plaats/regio</b></label><p id="jfmLocationStatus" class="muted">Locatie staat uit.</p><button id="jfmLocationRefresh" class="secondary" type="button">Ververs locatie</button><p class="muted">MAIR bewaart alleen een grove plaats/regio, geen exacte GPS-coördinaten. De DJ noemt je locatie maar af en toe.</p>';
     const djCard=$('talk')?.closest('.card');if(djCard?.nextSibling)pane.insertBefore(card,djCard.nextSibling);else pane.appendChild(card);
     $('jfmLocationToggle').checked=enabled();$('jfmLocationToggle').addEventListener('change',e=>setEnabled(e.target.checked));$('jfmLocationRefresh').addEventListener('click',()=>refresh().catch(()=>{}));render()
   }
