@@ -14,7 +14,7 @@ een iPhone is getest — zie de laatste sectie.
 |---|-----------|--------|
 | C-1 | Release gate en CI 25 commits rood door een hardcoded cacheversie | **Opgelost.** `scripts/release-cache.mjs` leest `const CACHE` uit `sw.js` en bewaakt dat `api/version.js` dezelfde versie meldt. `npm run predeploy` is groen. |
 | C-2 | Automatisch doorspelen kan stilvallen of dezelfde track herhalen | **Opgelost.** `stability-core.js` heeft de tweede bewijsvorm (`collapsedFromEnd`: zelfde track, was nog spelend, binnen 3,5 s van het einde, positie teruggeklapt naar ~0), en `playback-primary.js` heeft `RESUME_GUARD_LIMIT` — na herhaald mislukt hervatten van hetzelfde nummer gaat de radio precies één keer gecontroleerd door. Dit is het gebied met de onaantastbare drempels; niet aangeraakt. |
-| C-3 | Time Machine garandeert het jaarbereik niet in alle paden | **Opgelost voor alle drie de lekken.** `fallbackDirectWithContext()` filtert nu expliciet op `eligible()`, `prepareNextRotation()` filtert kandidaten via `modeEligible()` vóór de directoraanroep, en `originalYear()` wantrouwt veel meer heruitgave-signalen. **Nog open:** dat een *verzoek* de jaargrens wél mag doorbreken is nergens als besluit vastgelegd. |
+| C-3 | Time Machine garandeert het jaarbereik niet in alle paden | **Opgelost, maar de eerdere conclusie hier was fout.** Op 3 september stond hier dat C-3 volledig dicht was. Josh testte en zag het tegendeel: een paar nummers binnen het venster, daarna tracks erbuiten of herhaling. De filters lekken inderdaad niet - de fout zat in de *bevoorrading*. `prepareNextRotation()` haalde nieuwe tracks alleen uit `JFMQueue.buildActive()`, de gewone persoonlijke bron, die het jaarvenster niet kent. In een reproductie met een realistische bibliotheek gaf elke rotatie `generated 64, kandidaten 0, rotation-build-empty`: de queue groeide nooit, de Spotify-context van 30 uri's liep leeg en Spotify koos daarna zelf verder. De aanvulling komt nu uit `MAIRModeManager.poolFor()`, met terugval op de oude route. Drie regressietests in `scripts/time-machine-gate-check.mjs`. **Nog open:** dat een *verzoek* de jaargrens wél mag doorbreken is nergens als besluit vastgelegd. **Les:** een filter dat waterdicht is zegt niets over de vraag of er nog aanvoer is. |
 | C-4 | Elf Car Mode-bestanden ontbraken in de service-worker-cache | **Opgelost.** Alle elf staan in `CORE`, en `boot()` laadt per module via `loadOptional()` met een eigen catch, zodat één ontbrekende module `ensureLauncher()` niet meer onbereikbaar maakt. |
 | C-4b | `cacheCore()` liet de hele SW-installatie falen op één van 28 bestanden | **Opgelost.** `CRITICAL` is teruggebracht tot negen echte kernbestanden; de rest gaat via `Promise.allSettled`. |
 
@@ -70,6 +70,17 @@ zoals de cachebump dat deed. Drie andere scripts (`app-smoke-check.mjs`,
 `predeploy-check.mjs`, en de v362-variant) toetsen nog op `'39'` maar patchen die string eerst
 weg, dus die vallen nu niet om. Dezelfde oplossing als bij de cacheversie ligt voor de hand: één
 module die de waarde uit `version.js` leest.
+
+## Nieuwe bevindingen — 3 september 2026, tweede ronde
+
+Gevonden tijdens het werk aan Josh' vier urgente punten. Ingedeeld volgens dezelfde
+risicoschaal.
+
+| # | Bevinding | Risico | Status |
+|---|-----------|--------|--------|
+| N-1 | **Sleeptimer: twee modules maken hetzelfde element aan, in verschillende ouders.** `mair-car-sleep-integration.js` zet `#mairSleepArtwork` bovenin `.mair-sleep-now`; `prototypes/mair-sleep-landscape.js` hangt datzelfde id achteraan `.mair-sleep-wrap`. Beide bewaken met `if(!art)`, dus wie het eerst is wint — en dat verschilt per laadvolgorde. Alleen de tweede plaatsing krijgt `grid-area:art` in de landschapslayout; bij de eerste zou het artwork buiten het raster vallen. | Laag, maar niet-deterministisch | **Open.** Niet gefixt: één van de twee makers weghalen is een keuze over welke module de sleep-presentatie bezit, en dat is meer dan een kleine ingreep. |
+| N-2 | **Verouderde terugvalwaarden voor de assetversie.** Naast de zes releasechecks (nu opgelost) herhalen ook vier runtimebestanden de waarde als `||`-fallback, met achterhaalde getallen: `dj-handoff-bootstrap-v2b02.js` `'40'`, `radio-suite.js` `'48'`, `spotify-test-config.js` `'48'`, `build7.js` en `mair-easy-use-v1.js` `'81'`. Ze doen alleen iets als `version.js` niet geladen is, dus er is nu geen zichtbaar effect. | Laag | **Open.** Bewust laten staan: het zijn noodwaarden in een pad dat normaal nooit loopt, en ze aanpassen raakt vijf runtimebestanden zonder aantoonbare winst. |
+| N-3 | **`node --check` vangt geen weggehaalde constanten.** Bij het verwijderen van de Month/Year-schakelaar bleven twee verwijzingen naar `RECAP_PERIOD_KEY` staan in `mair-profile.js`. Dat is geldige syntax, dus `node --check` en de hele predeploy-poort bleven groen; pas bij een profiel-reset was het een `ReferenceError` geweest. | Middel als methodiek | **Opgelost in dit geval**, maar de poort dekt dit soort fouten structureel niet af. Een linter met `no-undef` zou dit wél vangen; die is er niet. |
 
 ## Wat hier niet in staat
 
