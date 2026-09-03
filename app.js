@@ -60,7 +60,7 @@ async function refresh(){const d=await api('/me/player');if(!d?.item)return;play
 function renderPlayback(d){const t=d.item;$('title').textContent=t.name;$('artist').textContent=(t.artists||[]).map(a=>a.name).join(', ');$('barFill').style.width=Math.min(100,(d.progress_ms||0)/(t.duration_ms||1)*100)+'%';$('elapsed').textContent=fmt(d.progress_ms||0);$('duration').textContent=fmt(t.duration_ms||0);$('play').textContent=d.is_playing?'❚❚':'▶';const img=t.album?.images?.[0]?.url;$('artImg').classList.toggle('hidden',!img);$('artFallback').classList.toggle('hidden',!!img);if(img)$('artImg').src=img;$('spotifyLink').href=t.external_urls?.spotify||'#'}
 function fmt(ms){const s=Math.floor(ms/1000),m=Math.floor(s/60);return`${m}:${String(s%60).padStart(2,'0')}`}
 function startPolling(){clearInterval(poll);poll=setInterval(()=>refresh().catch(console.warn),5000)}
-function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 // De luisterhistorie is bewust niet zichtbaar. Deze functie schreef in #history en
 // #sessionCount, en die bestaan alleen nog in de verborgen legacy-compat box van
 // build7.js: het rendeerde dus in het niets. session[] blijft gevuld, want de DJ-context

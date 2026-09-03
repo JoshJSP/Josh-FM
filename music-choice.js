@@ -16,7 +16,7 @@
     summer:{label:'Summer',icon:'☀️',desc:'Feelgood pop en zomertracks.',rule:'summer'}
   };
   let current=localStorage.getItem(CHANNEL_KEY)||'mix',pair=[],busy=false,baseBuild=null,lastGoodByChannel={};if(!CHANNELS[current])current='mix';
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const year=t=>Number(String(t?.release||'').slice(0,4))||0,artist=t=>String(t?.artists?.[0]||'').toLowerCase().trim(),pairKey=(a,b)=>[a?.id,b?.id].filter(Boolean).sort().join('|');
   const trackFromSpotify=t=>({id:t.id,uri:t.uri,name:t.name,artists:(t.artists||[]).map(a=>a.name),album:t.album?.name||'',release:t.album?.release_date||'',image:t.album?.images?.[1]?.url||t.album?.images?.[0]?.url||'',url:t.external_urls?.spotify||'',duration:t.duration_ms||0,popularity:Number(t.popularity||0)});
   function emptyBattle(){return{votes:0,tracks:{},artists:{},history:[],recentPairs:[]}}
