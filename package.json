@@ -37,7 +37,7 @@
     "ux-1": "node --check mair-ux-state.js && node --check mair-ux-v1.js && node scripts/ux-state-behavior-check.mjs && node scripts/ux-contract-check.mjs",
     "my-mair": "node --check mair-my-mair.js && node scripts/my-mair-preferences-check.mjs",
     "profile-discovery-fixes": "node --check mair-profile.js && node --check discovery.js && node --check radio-suite.js && node scripts/profile-discovery-fixes-check.mjs",
-    "mair-modes": "node --check mair-modes.js && node --check mair-modes-ui.js && node --check queue-core.js && node --check api/dj-writer.js && node scripts/mair-modes-check.mjs && node scripts/time-machine-gate-check.mjs",
+    "mair-modes": "node --check mair-modes.js && node --check queue-core.js && node --check api/dj-writer.js && node scripts/mair-modes-check.mjs",
     "voice-behavior": "node --check debug-tts.js && node --check mair-voice-engine.js && node scripts/voice-engine-behavior-check.mjs && node scripts/voice-clean-audio-check.mjs",
     "dj-personality": "node --check mair-dj-profile-polish.js && node --check api/dj-writer.js && node scripts/dj-personality-radio-check.mjs",
     "reload-audibility": "node --check mair-reload-audibility.js && node scripts/reload-audibility-check.mjs",

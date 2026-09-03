@@ -17,32 +17,11 @@
     return out
   }
   function current(){try{return normalize(Array.isArray(queue)?queue:[])}catch{return[]}}
-  // Verplichte eindpoort. Elke weg naar de wachtrij loopt via commit(), dus een actieve
-  // modusregel kan hier niet worden omzeild door een director-, fallback- of rotatiepad.
-  // Het contract is bewust generiek; Time Machine is de eerste toepassing.
-  function activeModePolicy(){
-    try{
-      const manager=window.MAIRModeManager,mode=manager?.state?.();
-      if(!mode||mode.mode!=='time-machine')return null;
-      const year=Number(mode.options?.year)||0;
-      if(!year||typeof manager.timeMachineAllows!=='function')return null;
-      return{mode:'time-machine',year,range:`${year-2}-${year}`,label:`Time Machine ${year}`,allows(track){try{return !!manager.timeMachineAllows(track,year)}catch{return false}}}
-    }catch{return null}
-  }
-  function enforceModePolicy(list,meta={}){
-    const policy=activeModePolicy();if(!policy)return Array.isArray(list)?list:[];
-    const input=Array.isArray(list)?list:[],kept=input.filter(t=>policy.allows(t)),removed=input.length-kept.length;
-    if(removed)trace('mode-gate',{mode:policy.mode,year:policy.year,removed,kept:kept.length,source:String(meta.source||''),reason:String(meta.reason||'')});
-    // Een te kleine pool mag nooit stil terugvallen op verkeerde jaren: liever een
-    // zichtbare, afgevangen fout dan een uitzending die de productregel breekt.
-    if(input.length&&!kept.length){const error=Error(`${policy.label} hield geen enkele track uit ${policy.range} over. MAIR programmeert liever niets dan het verkeerde jaar.`);error.code='MODE_POOL_EMPTY';error.mode=policy.mode;error.year=policy.year;error.removed=removed;throw error}
-    return kept
-  }
   function loadActive(){try{const x=JSON.parse(sessionStorage.getItem(ACTIVE_KEY)||'{}');if(Date.now()-Number(x.at||0)>6*60*60*1000||x.station!==(localStorage.getItem('jfm_music_channel_v1')||'mix'))return[];return normalize(x.tracks)}catch{return[]}}
   function persistActive(list,stationId=station){try{sessionStorage.setItem(ACTIVE_KEY,JSON.stringify({at:Date.now(),station:stationId||localStorage.getItem('jfm_music_channel_v1')||'mix',tracks:normalize(list).slice(0,60)}))}catch{}}
   function emit(reason){try{window.dispatchEvent(new CustomEvent('jfm:queue-change',{detail:{revision,reason,station,tracks:current().length}}))}catch{}}
   function commit(list,meta={}){
-    const next=normalize(enforceModePolicy(list,meta));if(!next.length)throw Error('De radioset bevat geen geldige Spotify-tracks.');
+    const next=normalize(list);if(!next.length)throw Error('De radioset bevat geen geldige Spotify-tracks.');
     queue=next;revision++;source=String(meta.source||source||'unknown');station=String(meta.station||localStorage.getItem('jfm_music_channel_v1')||'mix');lastReason=String(meta.reason||'commit');lastError='';
     persistActive(next,station);try{window.__jfmStationQueueSig=''}catch{};trace('commit',{revision,source,station,reason:lastReason,tracks:next.length});emit(lastReason);return next
   }
@@ -70,8 +49,6 @@
     if(!valid(track))throw Error('Ongeldige request-track.');
     // Verzoeken volgen dezelfde modusregel als de programmering. Dit is de enige route
     // die de wachtrij omzeilt, dus de poort staat hier expliciet ook.
-    const policy=activeModePolicy();
-    if(policy&&!policy.allows(track)){trace('mode-gate-request',{mode:policy.mode,year:policy.year,uri:String(track?.uri||''),reason:String(reason||'')});const error=Error(`${policy.label} speelt alleen muziek uit ${policy.range}. Dit verzoek valt daarbuiten en wordt niet ingepland.`);error.code='MODE_TRACK_BLOCKED';error.mode=policy.mode;error.year=policy.year;throw error}
     return serialize('transport',async()=>{
       const state=await api('/me/player');if(!state?.item?.uri)throw Error('Spotify heeft geen actieve track.');if(!state.is_playing)throw Error('Spotify staat gepauzeerd; request wordt ingepland zodra MAIR speelt.');
       const id=deviceId(state);if(!id)throw Error('Geen actief Spotify-device.');
@@ -86,8 +63,8 @@
       try{window.JFMSpotifyUpcomingTruth?.sync?.(true)}catch{};return true
     })
   }
-  function state(){const policy=activeModePolicy();return{version:'queue-core-v2',revision,source,station,lastReason,lastError,tracks:current().length,building:building>0,transporting:transporting>0,events:events.length,modeGate:policy?{mode:policy.mode,year:policy.year,range:policy.range}:null}}
-  window.JFMQueue={version:'queue-core-v3-mode-gate',valid,normalize,current,commit,build,buildActive,programNext,authoredAfter,state,modePolicy:activeModePolicy,log:()=>[...events]};
+  function state(){return{version:'queue-core-v2',revision,source,station,lastReason,lastError,tracks:current().length,building:building>0,transporting:transporting>0,events:events.length}}
+  window.JFMQueue={version:'queue-core-v4-no-mode-gate',valid,normalize,current,commit,build,buildActive,programNext,authoredAfter,state,log:()=>[...events]};
   window.MAIRRuntime?.register?.('queue-core',{version:'queue-core-v3-mode-gate',owner:'authored-queue'});
   try{if((!Array.isArray(queue)||!queue.length)){const restored=loadActive();if(restored.length)queue=restored}if(Array.isArray(queue)&&queue.length)commit(queue,{source:'bootstrap',station:localStorage.getItem('jfm_music_channel_v1')||'mix',reason:'core-bootstrap'})}catch(e){lastError=String(e?.message||e);trace('bootstrap-error',{error:lastError})}
 })();

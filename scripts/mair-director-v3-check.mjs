@@ -63,16 +63,13 @@ assert.ok(director.plan(tracks,[]).slice(0,3).some(track=>track.id==='track-17')
 assert.equal(director.change('more-discovery'),true);
 assert.equal(director.state().adjustment.id,'more-discovery');
 
-modeState.mode='time-machine';modeState.options={year:2012};
-const timeTracks=[2009,2010,2011,2012,2013].map(y=>({id:`year-${y}`,uri:`spotify:track:${String(y).padStart(22,'0')}`,name:`Year ${y}`,artists:[`Artist ${y}`],release:`${y}-01-01`,popularity:60}));
-assert.deepEqual(Array.from(director.plan(timeTracks,[]),track=>Number(track.release.slice(0,4))).sort(),[2010,2011,2012]);
-assert.ok(director.plan(timeTracks,[]).every(track=>[2010,2011,2012].includes(Number(track.release.slice(0,4)))),'Time Machine bewaart uitsluitend Y-2 tot en met Y');
-
 const queueCore=fs.readFileSync(new URL('../queue-core.js',import.meta.url),'utf8');
 const intelligence=fs.readFileSync(new URL('../music-intelligence-v3.js',import.meta.url),'utf8');
 const ui=fs.readFileSync(new URL('../director.js',import.meta.url),'utf8');
 assert.ok(queueCore.includes("includes('request')")&&queueCore.includes("mark?.('REQUEST'"),'Director-herplanning wordt niet als request gemarkeerd');
 assert.ok(intelligence.includes('window.JFMProgramDirector?.directWithContext'),'legacy intelligence delegeert aan de centrale Director');
-for(const label of ['Meer energie','Rustiger','Ouder','Meer vertrouwd','Meer ontdekken'])assert.ok(ui.includes(label),`Change It mist ${label}`);
 assert.ok(ui.includes("replan('taste',true)"),'likes/dislikes herprogrammeren ook de veilige Spotify-context');
-console.log('MAIR Director v3: PASS — horizon, satisfaction, skip recovery, anti-repeat, modes, Forgotten, Change It en Time Machine');
+// De knoppen Flow en Change It zijn op verzoek van het beginscherm gehaald; de
+// onderliggende setMode/change blijven in rotation-engine bestaan maar hebben geen UI meer.
+for(const dood of ['mairDirectorFlow','mairDirectorChange','mairDirectorSheetV3','FLOW_LABELS','CHANGE_LABELS'])assert.ok(!ui.includes(dood),`director.js verwijst nog naar ${dood}`);
+console.log('MAIR Director v3: PASS — horizon, satisfaction, skip recovery, anti-repeat, modes en Forgotten');

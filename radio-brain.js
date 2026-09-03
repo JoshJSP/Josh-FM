@@ -32,7 +32,7 @@ function decide(input={}){
   if(relationship){score+=2;reason.push('defensible-music-link')}
   if(validTrack(input.nextTrack)){score+=1;reason.push('next-track-known')}
   if(facts.length&&recentCount(history,'ARTIST_FACT',2700000,now)+recentCount(history,'TRACK_FACT',2700000,now)===0){score+=2;reason.push('verified-fact')}
-  if(input.nextTrack?.discovery||input.currentTrack?.discovery){score+=1;reason.push('discovery')}if(['chaos','afterparty'].includes(specialMode)){score+=1;reason.push('special-mode')}if(specialMode==='roadtrip'&&specialLabel.includes('Final Stretch')){score+=1;reason.push('roadtrip-finale')}
+  if(input.nextTrack?.discovery||input.currentTrack?.discovery){score+=1;reason.push('discovery')}if(specialMode==='roadtrip'&&specialLabel.includes('Final Stretch')){score+=1;reason.push('roadtrip-finale')}
   const recentTypes=recent.slice(0,3).map(x=>x.type),recentArtists=new Set(recent.slice(0,3).flatMap(x=>x.artists||[]).map(x=>String(x).toLowerCase()));
   const artists=[...(input.currentTrack?.artists||[]),...(input.nextTrack?.artists||[])];if(artists.some(a=>recentArtists.has(String(a).toLowerCase()))){score-=2;reason.push('recent-artist-penalty')}
   if(recentTypes[0]&&recentTypes[0]===recentTypes[1])score-=2;
