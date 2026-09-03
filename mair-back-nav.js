@@ -107,15 +107,7 @@ document.addEventListener('touchend',e=>{
 const HAS_OWN_BACK=new Set(['car','sleep','director','diagnostics','modes','dj','request-sheet','request-pane','passenger']);
 function ensureBackButton(view){
   const existing=$('mairBackNavButton');
-  const needed=!view&&!!activeTab();
-  if(!needed){existing?.remove();return}
-  if(existing)return;
-  const b=document.createElement('button');
-  b.id='mairBackNavButton';b.type='button';b.setAttribute('aria-label','Terug naar Radio');
-  b.textContent='‹ Radio';
-  b.style.cssText='position:fixed;left:max(12px,env(safe-area-inset-left));top:max(12px,calc(env(safe-area-inset-top) + 6px));z-index:14000;min-width:88px;min-height:48px;padding:0 16px;border:1px solid #2a2a2a;border-radius:99px;background:rgba(12,12,12,.92);color:#fff;font-size:15px;font-weight:800;backdrop-filter:blur(12px)';
-  b.addEventListener('click',()=>{goHome();sync()});
-  document.body.appendChild(b);
+  existing?.remove();
 }
 
 document.addEventListener('click',()=>setTimeout(sync,60),true);
