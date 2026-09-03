@@ -16,6 +16,23 @@
   // Filter hier al, zodat een Time Machine-sessie de bestaande 'geen nieuwe tracks'-route
   // volgt in plaats van de eindpoort in JFMQueue.commit te laten gooien.
   function modeEligible(t){try{return window.JFMRotation?.eligible?.(t)!==false}catch{return true}}
+  // Een actieve modus heeft een eigen bron. De gewone persoonlijke bron kent het jaarvenster
+  // niet, dus tijdens Time Machine overleeft daar vrijwel niets het filter hierboven en levert
+  // elke rotatie nul kandidaten op. De queue groeit dan niet meer, de Spotify-context loopt leeg
+  // en Spotify kiest daarna zelf verder - buiten het jaarvenster. poolFor() doet de
+  // jaar-zoekopdrachten die de sessie ook opstartten, dus daar halen we de aanvulling vandaan.
+  // Faalt dat of levert het niets op, dan blijft de oude route over: nooit slechter dan nu.
+  async function rotationSource(reason){
+    const mode=window.MAIRModeManager?.state?.();
+    if(mode&&mode.mode&&mode.mode!=='normal'&&typeof window.MAIRModeManager?.poolFor==='function'){
+      try{
+        const pool=await window.MAIRModeManager.poolFor(mode.mode,mode.options||{});
+        if(Array.isArray(pool)&&pool.length){trace('mode-pool-used',{mode:mode.mode,tracks:pool.length});return pool}
+        trace('mode-pool-empty',{mode:mode.mode});
+      }catch(error){trace('mode-pool-failed',{mode:mode.mode,message:String(error?.message||error)})}
+    }
+    return window.JFMQueue.buildActive('continuity-'+reason);
+  }
   function managed(q,id){return q.length>0&&currentIndex(q,id)>=0}
   // Include enough of the authored order to avoid restoring stale loadedThrough/appended state
   // when a rebuilt set happens to share the same first few tracks.
@@ -30,7 +47,7 @@
   function rollWindow(q,index){if(index<ROLL_AT_INDEX)return{q,index};const cut=Math.max(0,index-ROLL_KEEP_BEHIND),next=q.slice(cut),keep=new Set(next.map(t=>t.id));queue=window.JFMQueue?.commit?.(next,{source:'continuity',station:stationId(),reason:'window-roll'})||next;loadedThrough=Math.max(1,loadedThrough-cut);appended=new Set([...appended].filter(id=>keep.has(id)));window.__jfmStationQueueSig=signature(next);persist(next);trace('window-rolled',{cut,kept:next.length,loadedThrough});return{q:next,index:index-cut}}
   async function prepareNextRotation(reason='low-buffer'){
     if(building||busy||!window.JFMQueue?.buildActive)return false;let active=stationQueue(),id=currentId(),index=currentIndex(active,id);if(!managed(active,id))return false;const remaining=active.length-index-1;if(remaining>ROTATION_TRIGGER)return false;({q:active,index}=rollWindow(active,index));building=true;const previousInfo=document.getElementById('queueInfo')?.textContent||'',activeStation=stationId(),repeatLock=repeatWindow(activeStation);trace('rotation-build-start',{reason,index,remaining:active.length-index-1,tracks:active.length,station:activeStation,repeatLock});
-    try{const old=[...active],recentIds=recentHistoryIds(repeatLock),recentArtists=recentlyUsedArtists(old,artistWindow(activeStation)),oldIds=new Set(old.map(t=>t.id)),generated=await window.JFMQueue.buildActive('continuity-'+reason);let candidates=generated.filter(t=>t?.id&&TRACK_URI.test(t?.uri||'')&&modeEligible(t)&&!oldIds.has(t.id)&&!recentIds.has(t.id));
+    try{const old=[...active],recentIds=recentHistoryIds(repeatLock),recentArtists=recentlyUsedArtists(old,artistWindow(activeStation)),oldIds=new Set(old.map(t=>t.id)),generated=await rotationSource(reason);let candidates=generated.filter(t=>t?.id&&TRACK_URI.test(t?.uri||'')&&modeEligible(t)&&!oldIds.has(t.id)&&!recentIds.has(t.id));
       // For HITS/TOP40, never bypass the recent-track lock just to fill a batch. A smaller fresh batch is preferable to an early repeat.
       if(candidates.length<10&&!['hits','top40'].includes(activeStation)){const relaxedRecent=recentHistoryIds(Math.min(20,repeatLock));const relaxed=generated.filter(t=>t?.id&&TRACK_URI.test(t?.uri||'')&&modeEligible(t)&&!oldIds.has(t.id)&&!relaxedRecent.has(t.id)&&!candidates.some(x=>x.id===t.id));candidates=[...candidates,...relaxed]}
       candidates.sort((a,b)=>{const aa=String(a?.artists?.[0]||'').toLowerCase().trim(),ba=String(b?.artists?.[0]||'').toLowerCase().trim();return Number(recentArtists.has(aa))-Number(recentArtists.has(ba))});const context=old.slice(-6),director=window.JFMProgramDirector;if(director?.directWithContext)candidates=director.directWithContext(candidates,context);const next=candidates.slice(0,ROTATION_ADD);if(next.length){queue=window.JFMQueue.commit([...old,...next],{context:old.slice(-2),source:'continuity',station:activeStation,reason:'rotation-ready'});generation++;persist(queue);window.__jfmStationQueueSig=signature(queue);lastError='';trace('rotation-build-ready',{reason,added:next.length,generation,total:queue.length,station:activeStation,repeatLock});try{window.jfmRenderNext?.()}catch{};status(`MAIR programmeert vooruit · ${next.length} nieuwe tracks klaar.`);setTimeout(()=>maintain('rotation-ready').catch(()=>{}),120);return true}trace('rotation-build-empty',{reason,generated:generated.length,station:activeStation,repeatLock});if(previousInfo)status(previousInfo);return false}catch(e){lastError=String(e?.message||e);trace('rotation-build-error',{reason,message:lastError});queue=active;window.__jfmStationQueueSig=signature(active);if(previousInfo)status(previousInfo,true);return false}finally{building=false}}

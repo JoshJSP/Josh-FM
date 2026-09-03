@@ -147,7 +147,7 @@ check('c. director fallback laat geen verkeerde jaren door', () => {
 
 /* ---------------- harness 3: continuïteitsrotatie ---------------- */
 
-function rotationHarness(generated) {
+function rotationHarness(generated, { modeManager = null } = {}) {
   const bus = new Events(), elements = { queueInfo: { textContent: '', style: {} } }, commits = [];
   const allows = t => { const y = Number(String(t?.release || '').slice(0, 4)) || 0; return y >= YEAR - 2 && y <= YEAR };
   const authored = [track(1, 2011), track(2, 2012), track(3, 2010), track(4, 2011), track(5, 2012), track(6, 2010), track(7, 2011), track(8, 2012)];
@@ -166,6 +166,7 @@ function rotationHarness(generated) {
     JFMRotation: { eligible: allows },
     JFMPlaybackState: { get: () => ({ trackId: 1 }) },
   });
+  if (modeManager) context.MAIRModeManager = modeManager;
   context.window = context;
   vm.createContext(context);
   vm.runInContext(read('station-queue.js'), context, { filename: 'station-queue.js' });
@@ -187,6 +188,52 @@ check('f2. rotatie zonder geldige jaren commit niets in plaats van verkeerde jar
   assert.equal(commits.length, 0, 'er mag dan niets worden gecommit');
   const log = context.JFMStationQueueLog || [];
   assert.ok(log.some(x => x.stage === 'rotation-build-empty'), 'de lege rotatie moet zichtbaar zijn in de trace');
+});
+
+// De aanvulling tijdens een actieve modus. Het jaarfilter is waterdicht, maar de gewone
+// persoonlijke bron kent het jaarvenster niet: daar overleeft vrijwel niets het filter, elke
+// rotatie levert dan nul kandidaten en de queue groeit niet meer. Zodra de Spotify-context
+// leeg is kiest Spotify zelf verder, buiten het venster. Daarom moet de rotatie tijdens een
+// modus uit de pool van die modus putten.
+const timeMachineManager = (pool, { onPoolFor } = {}) => ({
+  state: () => ({ mode: 'time-machine', options: { year: YEAR } }),
+  poolFor: async (mode, options) => { onPoolFor?.(mode, options); if (pool instanceof Error) throw pool; return pool },
+});
+
+check('h. tijdens Time Machine vult de rotatie aan uit de modus-pool', async () => {
+  let gevraagd = null;
+  const persoonlijk = [track(40, 2019), track(41, 2021), track(42, 2023)]; // volledig buiten het venster
+  const modusPool = [track(50, 2012), track(51, 2011), track(52, 2010)];
+  const { context, commits } = rotationHarness(persoonlijk, {
+    modeManager: timeMachineManager(modusPool, { onPoolFor: (mode, options) => { gevraagd = { mode, options } } }),
+  });
+  assert.equal(await context.JFMStationQueue.prepareNextRotation('test'), true, 'met een gevulde modus-pool moet de rotatie slagen');
+  assert.deepEqual(gevraagd, { mode: 'time-machine', options: { year: YEAR } }, 'poolFor wordt met de actieve modus en opties aangeroepen');
+  assert.equal(commits.length, 1, 'de rotatie commit precies één keer');
+  assert.ok(commits[0].some(t => [50, 51, 52].includes(t.id)), 'de nieuwe tracks moeten uit de modus-pool komen');
+  assert.ok(!commits[0].some(t => [40, 41, 42].includes(t.id)), 'geen enkele track uit de persoonlijke bron mag erin staan');
+  const log = context.JFMStationQueueLog || [];
+  assert.ok(log.some(x => x.stage === 'mode-pool-used'), 'het gebruik van de modus-pool moet traceerbaar zijn');
+});
+
+check('i. zonder actieve modus blijft de persoonlijke bron de bron', async () => {
+  let aangeroepen = false;
+  const { context, commits } = rotationHarness([track(60, 2011), track(61, 2012)], {
+    modeManager: { state: () => ({ mode: 'normal', options: {} }), poolFor: async () => { aangeroepen = true; return [track(70, 2012)] } },
+  });
+  assert.equal(await context.JFMStationQueue.prepareNextRotation('test'), true, 'een gewone rotatie moet blijven werken');
+  assert.equal(aangeroepen, false, 'poolFor mag buiten een modus niet worden aangeroepen');
+  assert.ok(commits[0].some(t => [60, 61].includes(t.id)), 'de persoonlijke bron blijft de bron in normale modus');
+});
+
+check('j. een falende modus-pool valt terug op het oude gedrag in plaats van te breken', async () => {
+  const { context, commits } = rotationHarness([track(80, 2011), track(81, 2012)], {
+    modeManager: timeMachineManager(new Error('Spotify-zoekopdracht mislukt')),
+  });
+  assert.equal(await context.JFMStationQueue.prepareNextRotation('test'), true, 'een mislukte modus-pool mag de rotatie niet stukmaken');
+  assert.ok(commits[0].some(t => [80, 81].includes(t.id)), 'de rotatie valt terug op de persoonlijke bron');
+  const log = context.JFMStationQueueLog || [];
+  assert.ok(log.some(x => x.stage === 'mode-pool-failed'), 'de mislukking moet zichtbaar zijn in de trace');
 });
 
 /* ---------------- runner ---------------- */
