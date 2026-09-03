@@ -1,6 +1,10 @@
 # MAIR stability cleanup
 
-Deze branch is de actuele release-candidate voor de kern van MAIR. Productie wordt bewust niet automatisch gemerged.
+> **Status (2026-09-03).** Deze notities horen bij de release-candidate van augustus 2026 en zijn
+> inmiddels naar `main` gemerged. De runtime-eigenaren hieronder gelden nog; losse versienummers in
+> dit bestand zijn historisch. De actuele cacheversie staat altijd in `sw.js`.
+
+Deze branch was de release-candidate voor de kern van MAIR. Productie wordt bewust niet automatisch gemerged.
 
 ## Actieve runtime-eigenaren
 - Playback/transport: `playback-primary.js`
@@ -22,7 +26,7 @@ Oudere JFM/DJ-bestanden blijven alleen staan waar ze nog als compatibility/fallb
 - lokale Web Playback SDK-verificatie na reload, ook als Spotify remote al `is_playing=true` meldt
 - natuurlijke trackwissel tijdens reload zonder terugspoelen naar de oude track
 - reload-audio observability in Diagnose
-- service-worker cache rotatie naar v89
+- service-worker cache rotatie (de destijds actieve versie was v89; de actuele versie staat in `sw.js` en wordt door `scripts/release-cache.mjs` als enige bron van waarheid uitgelezen)
 - regressietests voor voice cast, DJ personality/radioklok en reload-audibility
 
 ## Cleanup
