@@ -147,10 +147,10 @@ check('c. director fallback laat geen verkeerde jaren door', () => {
 
 /* ---------------- harness 3: continuïteitsrotatie ---------------- */
 
-function rotationHarness(generated, { modeManager = null } = {}) {
+function rotationHarness(generated, { modeManager = null, year = YEAR } = {}) {
   const bus = new Events(), elements = { queueInfo: { textContent: '', style: {} } }, commits = [];
-  const allows = t => { const y = Number(String(t?.release || '').slice(0, 4)) || 0; return y >= YEAR - 2 && y <= YEAR };
-  const authored = [track(1, 2011), track(2, 2012), track(3, 2010), track(4, 2011), track(5, 2012), track(6, 2010), track(7, 2011), track(8, 2012)];
+  const allows = t => { const y = Number(String(t?.release || '').slice(0, 4)) || 0; return y >= year - 2 && y <= year };
+  const authored = [1, 2, 3, 4, 5, 6, 7, 8].map((id, i) => track(id, year - (i % 3)));
   const context = {
     window: null,
     document: { getElementById: id => elements[id] || null },
@@ -234,6 +234,53 @@ check('j. een falende modus-pool valt terug op het oude gedrag in plaats van te 
   assert.ok(commits[0].some(t => [80, 81].includes(t.id)), 'de rotatie valt terug op de persoonlijke bron');
   const log = context.JFMStationQueueLog || [];
   assert.ok(log.some(x => x.stage === 'mode-pool-failed'), 'de mislukking moet zichtbaar zijn in de trace');
+});
+
+// Diepere gevallen rond de aanvulling: andere jaartallen, dubbels, en een modus-pool
+// die zelf iets buiten het venster aanlevert.
+check('k. de aanvulling werkt voor elk gekozen jaar, niet alleen 2012', async () => {
+  for (const jaar of [1995, 2005, 2024]) {
+    const buiten = [track(200, jaar + 5), track(201, jaar - 9)];
+    const pool = [track(210, jaar), track(211, jaar - 1), track(212, jaar - 2)];
+    const { context, commits } = rotationHarness(buiten, {
+      year: jaar,
+      modeManager: { state: () => ({ mode: 'time-machine', options: { year: jaar } }), poolFor: async () => pool },
+    });
+    assert.equal(await context.JFMStationQueue.prepareNextRotation('test'), true, `rotatie moet slagen voor ${jaar}`);
+    assert.equal(commits.length, 1, `precies een commit voor ${jaar}`);
+    const jaren = commits[0].map(t => Number(String(t.release).slice(0, 4)));
+    assert.ok(jaren.every(y => y >= jaar - 2 && y <= jaar), `alle tracks moeten binnen ${jaar - 2}-${jaar} vallen`);
+    assert.ok(commits[0].some(t => [210, 211, 212].includes(t.id)), `de modus-pool moet ${jaar} aanvullen`);
+  }
+});
+
+check('l. tracks die al in de wachtrij staan komen er niet nog een keer bij', async () => {
+  // De harness heeft tracks 1..8 als bestaande set; de pool biedt 2 en 5 opnieuw aan.
+  const pool = [track(2, YEAR), track(5, YEAR), track(90, YEAR - 1)];
+  const { context, commits } = rotationHarness([], {
+    modeManager: { state: () => ({ mode: 'time-machine', options: { year: YEAR } }), poolFor: async () => pool },
+  });
+  assert.equal(await context.JFMStationQueue.prepareNextRotation('test'), true, 'de rotatie moet slagen op de enige nieuwe track');
+  const ids = commits[0].map(t => t.id);
+  // Let op: deze arrays komen uit de vm-context en hebben dus het Array.prototype van een
+  // ander realm. assert.deepEqual vergelijkt prototypes en faalt daarop, ook op twee lege
+  // arrays. Vergelijk hier dus op lengte, niet op vorm.
+  const dubbel = ids.filter((id, i) => ids.indexOf(id) !== i);
+  assert.equal(dubbel.length, 0, `geen enkele track mag dubbel in de wachtrij staan (dubbel: ${dubbel.join(',')})`);
+  assert.ok(ids.includes(90), 'de nieuwe track uit de modus-pool moet er wel bij');
+});
+
+check('m. een modus-pool met vervuiling wordt alsnog op jaar gefilterd', async () => {
+  // poolFor hoort al te filteren, maar als daar ooit iets doorheen glipt mag de rotatie
+  // dat niet klakkeloos committen.
+  const vervuild = [track(300, YEAR), track(301, 1980), track(302, YEAR - 2), track(303, 2030)];
+  const { context, commits } = rotationHarness([], {
+    modeManager: { state: () => ({ mode: 'time-machine', options: { year: YEAR } }), poolFor: async () => vervuild },
+  });
+  assert.equal(await context.JFMStationQueue.prepareNextRotation('test'), true, 'de geldige tracks moeten wel doorkomen');
+  const ids = commits[0].map(t => t.id);
+  assert.ok(ids.includes(300) && ids.includes(302), 'de tracks binnen het venster moeten worden toegevoegd');
+  assert.ok(!ids.includes(301) && !ids.includes(303), 'de tracks buiten het venster mogen nergens in de commit staan');
 });
 
 /* ---------------- runner ---------------- */
