@@ -13,6 +13,10 @@
   function tick(){
     syncFromPlayback();
     if(!trackId)return;
+    // De klok blijft synchroniseren, maar schrijft niets naar het scherm zolang dat uit
+    // staat: vier DOM-updates per seconde voor een onzichtbare balk kosten alleen accu.
+    // De visibilitychange-handler hieronder anchort opnieuw en tekent meteen bij terugkeer.
+    if(document.hidden)return;
     let ms=baseMs+(playing?performance.now()-anchor:0);
     if(durationMs>0)ms=Math.min(ms,durationMs);
     const elapsed=$('elapsed'),fill=$('barFill'),duration=$('duration');
