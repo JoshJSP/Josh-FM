@@ -4,7 +4,7 @@
     "deploymentEnabled": {
       "*": false,
       "main": true,
-      "fix/audit-round-1-20260901": true
+      "claude/audit-round-2-20260903": true
     }
   },
   "headers": [
