@@ -234,6 +234,100 @@ check('B2. zonder geldige sessie gaat alles wel uit', async () => {
     'de sessiewaarheid moet uit JFMAuth komen, niet uit de CSS-klasse van de statuspil');
 });
 
+/* ---------------- C. de SDK-scripttag na een mislukte download ---------------- */
+
+// Josh: de koppeling werkt alleen direct na opnieuw verbinden, en soms pas na een herlaad.
+// loadSDK() maakte het tag #spotify-sdk-stable een keer aan en ruimde het nergens op. Faalde
+// de download, dan vond elke volgende poging datzelfde dode tag en wachtte er 20 seconden op
+// in plaats van opnieuw te downloaden. Alleen een verse pagina hielp dan nog.
+function sdkTagHarness() {
+  const bus = new Events();
+  const els = {};
+  const gemaakt = [];            // elk <script> dat is aangemaakt
+  const inHead = new Map();      // wat er daadwerkelijk in de head hangt, op id
+  const maakScript = () => {
+    const node = maakElement('');
+    node.dataset = {};
+    node.remove = () => { inHead.delete(node.id) };
+    gemaakt.push(node);
+    return node;
+  };
+  const document = {
+    readyState: 'complete', hidden: false, visibilityState: 'visible',
+    body: maakElement('body'),
+    head: { appendChild(node) { inHead.set(node.id, node); return node } },
+    // Het SDK-tag bestaat alleen als het echt in de head hangt; anders null, net als in de
+    // browser. Een generieke fallback zou loadSDK laten denken dat het tag al bestaat.
+    getElementById: id => (inHead.has(id) ? inHead.get(id) : (id === 'spotify-sdk-stable' ? null : (els[id] || (els[id] = maakElement(id))))),
+    querySelector: () => null, querySelectorAll: () => [],
+    createElement: tag => (tag === 'script' ? maakScript() : maakElement()),
+    addEventListener() {}, removeEventListener() {},
+  };
+  const context = {
+    window: null, document,
+    localStorage: storage({ jfm_client_id: 'testclient' }), sessionStorage: storage(),
+    location: { search: '', pathname: '/', origin: 'https://example.test' },
+    history: { replaceState() {} }, navigator: { onLine: true },
+    URLSearchParams, CustomEvent: FakeCustomEvent,
+    spotifyClientId: 'testclient', token: 'token', refreshToken: 'refresh',
+    ensure: async () => 'token', timedFetch: async () => ({ ok: true, status: 200, json: async () => ({}) }),
+    api: async () => ({ devices: [] }), setConnected() {}, renderPlayback() {}, playback: null, saveToken() {},
+    setTimeout: (fn, ms) => setTimeout(fn, Math.min(Number(ms) || 0, 1)),
+    clearTimeout: id => clearTimeout(id), setInterval: (fn, ms) => setInterval(fn, Math.max(Number(ms) || 1, 1)),
+    clearInterval: id => clearInterval(id),
+    Promise, Date, Math, JSON, console,
+  };
+  Object.assign(context, {
+    addEventListener: (...a) => bus.addEventListener(...a), dispatchEvent: (...a) => bus.dispatchEvent(...a),
+    JFMPlaybackState: { patch() {}, ingest() {}, get: () => null, reset() {} },
+    JFMAuth: { state: { hasAccessToken: true, hasRefreshToken: true, expiresAt: Date.now() + 3600000 } },
+  });
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(read('stability-core.js'), context, { filename: 'stability-core.js' });
+  return { context, gemaakt, inHead };
+}
+
+check('C1. een mislukte SDK-download wordt bij een herpoging opnieuw gedownload', async () => {
+  const { context, gemaakt, inHead } = sdkTagHarness();
+  const poging = () => context.JFMSpotifySDK.init().catch(e => String(e && e.message || e));
+
+  const eerste = poging();
+  await new Promise(r => setTimeout(r, 10));
+  assert.equal(gemaakt.length, 1, 'de eerste poging moet het SDK-script aanmaken');
+  assert.ok(inHead.has('spotify-sdk-stable'), 'het script hoort in de head te hangen');
+  gemaakt[0].onerror();                                   // download mislukt
+  assert.equal(await eerste, 'Spotify-speler kon niet laden.', 'de eerste poging hoort te falen');
+
+  const tweede = poging();
+  await new Promise(r => setTimeout(r, 10));
+  assert.equal(gemaakt.length, 2, 'een herpoging moet een NIEUW script aanmaken in plaats van op het dode te wachten');
+  gemaakt[1].onerror();
+  await tweede;
+});
+
+check('C2. een script dat nog laadt wordt niet weggegooid', async () => {
+  // Alleen een tag die echt gefaald is mag vervangen worden; een trage download houden we.
+  const { context, gemaakt } = sdkTagHarness();
+  const eerste = context.JFMSpotifySDK.init().catch(() => 'mislukt');
+  await new Promise(r => setTimeout(r, 10));
+  assert.equal(gemaakt.length, 1, 'eerste poging maakt het script aan');
+  // Geen onerror: de download loopt nog. Een tweede poging hoort te wachten, niet te vervangen.
+  const tweede = context.JFMSpotifySDK.init().catch(() => 'mislukt');
+  await new Promise(r => setTimeout(r, 10));
+  assert.equal(gemaakt.length, 1, 'een nog lopende download mag niet worden afgebroken en vervangen');
+  gemaakt[0].onerror();
+  await Promise.all([eerste, tweede]);
+});
+
+check('C3. de opruiming staat expliciet in de broncode', () => {
+  const bron = read('stability-core.js');
+  assert.ok(bron.includes('jfmSdkFailed'), 'een gefaald SDK-script moet als zodanig gemarkeerd worden');
+  assert.ok(bron.includes('markSdkFailed'), 'de markering hoort via een gedeelde helper te lopen');
+  assert.ok(/if\(s&&s\.dataset&&s\.dataset\.jfmSdkFailed==='1'\)/.test(bron),
+    'loadSDK moet een gefaald tag weggooien voordat het de poll-tak in gaat');
+});
+
 /* ---------------- runner ---------------- */
 
 let geslaagd = 0;
@@ -242,4 +336,4 @@ for (const [naam, fn] of results) {
   catch (e) { console.error('FAIL', naam, '—', e?.stack || e); process.exitCode = 1 }
 }
 if (process.exitCode) process.exit(1);
-console.log(`Verzoek-zoekflow: ${geslaagd}/${results.length} PASS — zoekopdracht, resultaten, escaping en sessie/device-scheiding`);
+console.log(`Verzoek-zoekflow: ${geslaagd}/${results.length} PASS — zoekopdracht, resultaten, escaping, sessie/device-scheiding en SDK-herpoging`);
