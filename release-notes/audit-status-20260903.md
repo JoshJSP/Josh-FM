@@ -61,6 +61,16 @@ een iPhone is getest — zie de laatste sectie.
 | L-7 | Losse notitiebestanden in de repo-root | **Open.** `.release-note-20260812-0237.txt`, `release-note-v225.txt`, `release-ready.txt`, `README-hotfix.md`, `README_ICON_UPDATE.txt`, `icon-source-note.txt`, `radio-copy-notes.txt`. `PRE_DEPLOY.md` regel 11 verbiedt ze. Verplaatsen of verwijderen is destructief en wacht op akkoord. Let op: `ICON_VERSION.txt` hoort hier níét bij — die kan door de icon-scripts gebruikt worden. |
 | L-8 | `body{overflow-x:hidden}` maskeert echte overflow | **Open.** Uitzetten legt overflowbugs bloot die dan per component opgelost moeten worden; dat is zichtbaar werk dat op een toestel gecontroleerd hoort te worden. |
 
+## Nieuw opgemerkt tijdens deze ronde
+
+Niet uit de audit, wel dezelfde soort valkuil als C-1: `window.JFM_ASSET_VERSION` staat als
+letterlijke `'81'` in `version.js`, en `scripts/my-mair-preferences-check.mjs` controleert dat
+met een hardcoded `/JFM_ASSET_VERSION='81'/`. Een assetbump breekt de poort dus opnieuw, precies
+zoals de cachebump dat deed. Drie andere scripts (`app-smoke-check.mjs`,
+`predeploy-check.mjs`, en de v362-variant) toetsen nog op `'39'` maar patchen die string eerst
+weg, dus die vallen nu niet om. Dezelfde oplossing als bij de cacheversie ligt voor de hand: één
+module die de waarde uit `version.js` leest.
+
 ## Wat hier niet in staat
 
 Geen enkele wijziging hierboven is op een telefoon getest. `npm run predeploy` is een statische
