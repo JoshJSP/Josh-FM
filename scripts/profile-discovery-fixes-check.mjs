@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {RELEASE_CACHE} from './release-cache.mjs';
+import {RELEASE_CACHE, RELEASE_ASSET_VERSION} from './release-cache.mjs';
 
 const read=file=>fs.readFileSync(new URL(`../${file}`,import.meta.url),'utf8');
 const profileSource=read('mair-profile.js');
@@ -49,7 +49,7 @@ function radioSuiteRuntime(){
   const intervals=[];
   class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]))}static now(){return now}}
   const document={querySelectorAll:()=>[],querySelector:()=>null,getElementById:()=>null,createElement:()=>({}),head:{appendChild(){}},body:{appendChild(){},dataset:{}}};
-  const window={JFM_ASSET_VERSION:'81',addEventListener(){},dispatchEvent(){}};
+  const window={JFM_ASSET_VERSION:RELEASE_ASSET_VERSION,addEventListener(){},dispatchEvent(){}};
   const context={window,document,localStorage:storage(),navigator:{userAgent:''},CustomEvent:class{constructor(type,init){this.type=type;this.detail=init?.detail}},URL,Date:FakeDate,settings:{mode:'normal'},setMode(){},queue:[{id:'d1',uri:'spotify:track:d1',name:'Discovery',artists:['Artist'],_discovery:true},{id:'known',uri:'spotify:track:known',name:'Known',artists:['Artist'],_discovery:false}],playback:{item:{id:'d1'},is_playing:true},setInterval:(fn,ms)=>{intervals.push({fn,ms});return intervals.length},setTimeout:()=>0,clearTimeout(){},console};
   vm.runInNewContext(radioSuiteSource,context,{filename:'radio-suite.js'});
   const tick=intervals.find(x=>x.ms===1000)?.fn;
@@ -62,7 +62,7 @@ const cache=swSource.match(/const CACHE='([^']+)'/)?.[1];
 assert.equal(pkg.version,'2.0.0-beta.9');
 assert.match(versionSource,/version:'2\.0\.0-beta\.9'/);
 assert.match(versionSource,/displayVersion:'2b\.0\.9'/);
-assert.match(versionSource,/JFM_ASSET_VERSION='81'/);
+assert.ok(versionSource.includes(`window.JFM_ASSET_VERSION='${RELEASE_ASSET_VERSION}';`));
 assert.equal(cache,RELEASE_CACHE);
 assert.ok(versionApiSource.includes(`cache:'${cache}'`),'API-cache wijkt af van service worker');
 for(const stale of ['mair-v91-radio-brain-20260826','mair-v98-core-20260829',"JFM_ASSET_VERSION='80'"])assert.ok(!predeploySource.includes(stale),`Predeploy bevat verouderde verwachting: ${stale}`);
@@ -127,6 +127,40 @@ assert.equal(switched.suite.discoveries().length,1);
 switched.advance(10000);
 assert.equal(switched.suite.discoveries().length,1,'Dezelfde Discovery werd dubbel geteld');
 
+// "Your Month on MAIR" en "Your Year on MAIR" zijn uit het product gehaald; alleen de
+// week blijft. Deze test bewaakt beide kanten: de week rendert nog volledig, en de
+// periodeschakelaar met MONTH/YEAR komt niet terug.
+function profileRenderRuntime({recapData={topArtist:'Artiest',topTrack:'Nummer',minutes:120,tracks:9,insight:'Inzicht'}}={}){
+  const gemaakt=[];
+  const maakElement=()=>{const el={id:'',className:'',style:{},dataset:{},children:[],innerHTML:'',classList:{add(){},remove(){},toggle(){}},appendChild(kind){el.children.push(kind);return kind},insertBefore(kind){el.children.push(kind);return kind},querySelectorAll:()=>[],querySelector:()=>null,addEventListener(){},remove(){},setAttribute(){},insertAdjacentElement(){},closest:()=>null};gemaakt.push(el);return el};
+  const pane=maakElement();pane.id='tab-settings';
+  const perId={'tab-settings':pane};
+  const document={readyState:'complete',hidden:false,head:{appendChild(){}},body:{appendChild(){},classList:{add(){},remove(){}}},
+    getElementById:id=>perId[id]||null,querySelector:()=>null,querySelectorAll:()=>[],
+    createElement:()=>{const el=maakElement();return el},addEventListener(){}};
+  const window={MAIRModeManager:{recap:()=>recapData},JFMRadioSuite:{state:()=>({minutes:600,tracks:120})},addEventListener(){},dispatchEvent(){}};
+  const context={window,document,localStorage:storage(),sessionStorage:storage(),CustomEvent:class{},location:{reload(){}},prompt:()=>null,confirm:()=>false,setTimeout:()=>0,setInterval:()=>0,clearTimeout(){},console};
+  vm.runInNewContext(profileSource,context,{filename:'mair-profile.js'});
+  window.MAIRProfile.render();
+  // De paginacontainer is het element dat aan tab-settings is toegevoegd.
+  const html=pane.children.map(c=>c.innerHTML||'').join(String.fromCharCode(10));
+  return {api:window.MAIRProfile,html};
+}
+
+const weekRender=profileRenderRuntime();
+assert.ok(weekRender.html.includes('Your Week on MAIR'),'De weekkaart moet nog steeds "Your Week on MAIR" tonen');
+assert.ok(weekRender.html.includes('mair-profile-week-grid'),'Het weekraster met TOP ARTIST/TRACKS moet blijven bestaan');
+assert.ok(weekRender.html.includes('TOP ARTIST')&&weekRender.html.includes('ONTDEKKINGEN'),'De weekcijfers moeten blijven staan');
+assert.ok(weekRender.html.includes('Artiest')&&weekRender.html.includes('Nummer'),'De weekdata uit recap() moet nog worden gerenderd');
+assert.ok(!/Your (Month|Year) on MAIR/.test(weekRender.html),'Month en Year mogen niet meer als kop verschijnen');
+assert.ok(!weekRender.html.includes('data-profile-period'),'De periodeschakelaar mag niet terugkomen');
+assert.ok(!/>MONTH<|>YEAR</.test(weekRender.html),'De MONTH- en YEAR-knoppen mogen niet terugkomen');
+assert.equal(typeof weekRender.api.selectedPeriod,'undefined','selectedPeriod hoort niet meer geexporteerd te zijn');
+assert.ok(!/monthly|yearly/.test(profileSource),'Er mag geen maand- of jaarlogica meer in mair-profile.js staan');
+// De opgeslagen periodekeuze is nu betekenisloos en moet bij een profiel-reset worden opgeruimd.
+assert.ok(profileSource.includes("'mair_profile_recap_period_v1'"),'De oude periodesleutel moet nog wel worden gewist bij een reset');
+
+console.log('PASS Your Week on MAIR intact, Month en Year verwijderd');
 console.log('PASS release consistency');
 console.log('PASS profile cleanup and Spotify status');
 console.log('PASS isolated advanced diagnostics and retired-control safety');
