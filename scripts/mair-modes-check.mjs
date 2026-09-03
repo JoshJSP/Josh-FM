@@ -1,21 +1,101 @@
-import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
-const read=f=>fs.readFileSync(new URL(`../${f}`,import.meta.url),'utf8'),src=read('mair-modes.js'),ui=read('mair-modes-ui.js'),profile=read('mair-profile.js'),css=read('mair-modes.css'),rotation=read('rotation-engine.js'),builder=read('dj-context-builder.js'),brain=read('radio-brain.js'),writer=read('api/dj-writer.js'),version=read('version.js'),sw=read('sw.js');
-function runtime(initial={},analytics={events:[],sessions:[]}){const store=new Map([['mair_mode_state_v1',JSON.stringify(initial)],['mair_mode_analytics_v1',JSON.stringify(analytics)]]),listeners={};const localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};const document={body:{dataset:{}},addEventListener:(n,f)=>(listeners[n]??=[]).push(f)};const window={addEventListener:(n,f)=>(listeners[n]??=[]).push(f),dispatchEvent:()=>{},MAIRRuntime:{register:()=>{}},JFMRequests:{isRequest:t=>!!t.request}};const context=vm.createContext({window,document,localStorage,CustomEvent:class{constructor(type,opt){this.type=type;this.detail=opt?.detail}},setInterval:()=>1,setTimeout:()=>1,clearTimeout:()=>{},console,Date,Math,JSON,Number,String,Array,Set,Map,Object});vm.runInContext(src,context,{filename:'mair-modes.js'});return{api:window.MAIRModeManager,store,listeners,window}}
-for(const target of [1985,1999,2004,2012,2016,2020]){const time=runtime({mode:'time-machine',options:{year:target},startedAt:1,activeMs:0,endsAfterMs:3600000,sessionId:`t-${target}`}).api,track=(id,y,extra={})=>({id,uri:`spotify:track:${id}`,name:id,artists:['Test'],release:y?`${y}-01-01`:'',...extra});assert.equal(time.timeMachineAllows(track('y-3',target-3),target),false,`${target}: Y-3 geweigerd`);assert.equal(time.timeMachineAllows(track('y-2',target-2),target),true,`${target}: Y-2 toegestaan`);assert.equal(time.timeMachineAllows(track('y',target),target),true,`${target}: Y toegestaan`);assert.equal(time.timeMachineAllows(track('y+1',target+1),target),false,`${target}: Y+1 geweigerd`);assert.equal(time.timeMachineAllows(track('unknown',0),target),false,`${target}: onbekend jaar geweigerd`);assert.equal(time.timeMachineAllows(track('reissue',target,{name:'Test - Remastered'}),target),false,`${target}: remaster zonder origineel jaar geweigerd`);assert.equal(time.timeMachineAllows(track('known-reissue',target+10,{name:'Test - Remastered',originalYear:target-1}),target),true,`${target}: expliciet origineel jaar toegestaan`);assert.ok(time.rotationScore(track('target',target),[])>time.rotationScore(track('future',target+1),[]),`Time Machine gate bepaalt score voor ${target}`)}
-{
-  const target=2012,h=runtime(),track=(id,y,extra={})=>({id,uri:`spotify:track:${id}`,name:id,artists:['Test'],release:y?`${y}-01-01`:'',...extra}),commits=[];
-  h.window.api=async()=>({tracks:{items:[track('search-y-2',2010),track('search-y',2012),track('search-y+1',2013),track('search-unknown',0)]}});
-  h.window.JFMQueue={buildActive:async()=>[track('base-valid',2011),track('base-future',2014),track('base-unknown',0)],current:()=>[],commit:list=>{commits.push(list);return list}};
-  h.window.JFMRotation={plan:pool=>[track('injected-future',2013),...pool]};h.window.JFMPlayback={playUri:async()=>true};
-  const pool=await h.api.poolFor('time-machine',{year:target});assert.ok(pool.length>=3,'Time Machine bouwt geldige pool');assert.ok(pool.every(t=>h.api.timeMachineAllows(t,target)),'pool bevat uitsluitend Y-2..Y');
-  const started=await h.api.start('time-machine',{year:target},true);assert.equal(started.fallback,false,'Time Machine heeft geldige kandidaten');assert.equal(commits.length,1,'Time Machine commit exact één queue');assert.ok(commits[0].every(t=>h.api.timeMachineAllows(t,target)),'finale queuecommit bevat uitsluitend Y-2..Y');assert.ok(!commits[0].some(t=>t.id==='injected-future'),'finale gate verwijdert door rotation geïnjecteerde Y+1-track');
+// Wat er over is van de modes-laag na het verwijderen van Time Machine, Chaos Mode en
+// Afterparty (3 september 2026). Roadtrip was al eerder met pensioen gestuurd door de
+// journey director van Car Mode, dus het kopje "MAIR Modes" had daarna geen enkele
+// werkende modus meer over en is in zijn geheel verdwenen.
+//
+// mair-modes.js blijft wél bestaan: die levert de recap- en analytics-laag waar
+// "Your Week on MAIR" op draait. Deze poort bewaakt precies dat deel, plus de belofte dat
+// de verwijderde modi niet stilletjes terugkomen.
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+
+const read = f => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+const src = read('mair-modes.js'), profile = read('mair-profile.js'), rotation = read('rotation-engine.js');
+const builder = read('dj-context-builder.js'), writer = read('api/dj-writer.js');
+const version = read('version.js'), sw = read('sw.js'), queue = read('queue-core.js');
+const stationQueue = read('station-queue.js'), director = read('director.js');
+
+function runtime(initial = {}, analytics = { events: [], sessions: [] }) {
+  const store = new Map([
+    ['mair_mode_state_v1', JSON.stringify(initial)],
+    ['mair_mode_analytics_v1', JSON.stringify(analytics)],
+  ]);
+  const listeners = {};
+  const localStorage = { getItem: k => store.get(k) || null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
+  const document = { body: { dataset: {} }, addEventListener: (n, f) => (listeners[n] ??= []).push(f), readyState: 'complete', getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] };
+  const context = {
+    window: null, document, localStorage, sessionStorage: localStorage,
+    CustomEvent: class { constructor(t, o = {}) { this.type = t; this.detail = o.detail } },
+    addEventListener: (n, f) => (listeners[n] ??= []).push(f), dispatchEvent: () => true,
+    setTimeout: () => 1, clearTimeout() {}, setInterval: () => 1, clearInterval() {},
+    Promise, Date, Math, JSON, console,
+  };
+  context.window = context;
+  vm.createContext(context);
+  vm.runInContext(src, context, { filename: 'mair-modes.js' });
+  return { api: context.MAIRModeManager, window: context, store };
 }
-const last={id:'x',release:'2018',popularity:75,artists:['A']},contrast={id:'y',release:'1985',popularity:20,artists:['B']},similar={id:'z',release:'2019',popularity:70,artists:['C']},chaosScore=level=>{const api=runtime({mode:'chaos',options:{level},startedAt:1,activeMs:0,endsAfterMs:0,sessionId:`c-${level}`}).api;return api.rotationScore(contrast,[last])-api.rotationScore(similar,[last])};assert.ok(chaosScore('absolute')>chaosScore('wild')&&chaosScore('wild')>chaosScore('mild'),'alle drie Chaos-levels verhogen het contrast stapsgewijs');
-const road=runtime({mode:'roadtrip',options:{minutes:120},startedAt:1,activeMs:85*60000,endsAfterMs:120*60000,sessionId:'r'}).api;assert.equal(road.state().phase,'Peak');assert.ok(road.rotationScore({id:'hi',popularity:95},[])>road.rotationScore({id:'lo',popularity:10},[]),'Roadtrip Peak kiest energie');
-const after=runtime({mode:'afterparty',options:{subtype:'mix'},startedAt:1,activeMs:0,endsAfterMs:0,sessionId:'a'}).api;assert.ok(after.rotationScore({id:'req',popularity:70,request:true},[])>after.rotationScore({id:'plain',popularity:70},[]),'Afterparty verhoogt requestprioriteit beperkt');
-for(const subtype of ['party','throwbacks','guilty','mix'])assert.equal(runtime({mode:'afterparty',options:{subtype},startedAt:1,activeMs:0,endsAfterMs:0,sessionId:`a-${subtype}`}).api.state().options.subtype,subtype);
-const switching=runtime({mode:'roadtrip',options:{minutes:60},startedAt:1,activeMs:0,endsAfterMs:3600000,sessionId:'r'}).api;const blocked=await switching.start('chaos',{level:'wild'});assert.equal(blocked.requiresConfirmation,true,'grote modes zijn wederzijds exclusief');
-const now=Date.now(),recapRuntime=runtime({}, {events:[{at:now-1000,type:'track',track:'Levels',artist:'Avicii',year:2011,station:'mix',mode:'normal'},{at:now-900,type:'track',track:'Levels',artist:'Avicii',year:2011,station:'mix',mode:'normal'},{at:now-800,type:'skip',mode:'normal'},{at:now-700,type:'request',mode:'afterparty'},{at:now-600,type:'listen_minute',mode:'normal'}],sessions:[]}),week=recapRuntime.api.recap('weekly',now);assert.equal(week.tracks,2);assert.equal(week.topArtist,'Avicii');assert.equal(week.topTrack,'Levels');assert.equal(week.skips,1);assert.equal(week.requests,1);assert.equal(week.minutes,1);let recapArmed=0;recapRuntime.window.MAIRDJ={armManual:()=>{recapArmed++;return true}};assert.equal(recapRuntime.api.requestRecap('weekly').ok,true);assert.equal(recapArmed,1);assert.equal(recapRuntime.api.djContext().recap.topArtist,'Avicii');
-assert.equal(runtime().api.recap('weekly',now).tracks,0,'lege historie blijft eerlijk leeg');const clearRuntime=runtime({}, {events:[{at:now,type:'track',track:'Test',artist:'MAIR'}],sessions:[]});clearRuntime.api.clear();assert.equal(clearRuntime.store.has('mair_mode_analytics_v1'),false,'Wis lokale historie wist mode analytics');assert.ok(src.lastIndexOf("record('listen_minute'")<src.lastIndexOf("if(state.mode==='normal')return"),'normale MAIR-playback telt mee voor Weekly, niet alleen speciale modes');
-for(const token of ['time-machine','chaos','roadtrip','afterparty'])assert.ok(ui.includes(`'${token}'`)||ui.includes(`${token}:`),`UI mist ${token}`);for(const period of ['weekly','monthly','yearly'])assert.ok(profile.includes(`periodButton('${period}'`),`Profiel mist ${period} recap`);assert.ok(css.includes('env(safe-area-inset-top)')&&css.includes('@media(max-width:560px)'));assert.ok(rotation.includes('MAIRModeManager?.rotationScore'));assert.ok(builder.includes('specialMode'));assert.ok(brain.includes('special-mode'));assert.ok(writer.includes('MODE_INSTRUCTIONS')&&writer.includes('Historische context mag uitsluitend uit ALLOWED FACTS'));assert.ok(version.includes('mair-modes.js')&&version.includes('mair-modes-ui.js'));for(const file of ['./mair-modes.js','./mair-modes-ui.js','./mair-modes.css'])assert.ok(sw.includes(file),`SW mist ${file}`);
-console.log('MAIR Modes: PASS — exclusiviteit, Time Machine, 3× Chaos policy, Roadtrip curve, Afterparty requests, recap en failsafe-wiring');
+
+/* ---------------- recap: de motor onder Your Week on MAIR ---------------- */
+
+const now = Date.now();
+const recapRuntime = runtime({}, {
+  events: [
+    { at: now - 1000, type: 'track', track: 'Levels', artist: 'Avicii', year: 2011, station: 'mix', mode: 'normal' },
+    { at: now - 900, type: 'track', track: 'Levels', artist: 'Avicii', year: 2011, station: 'mix', mode: 'normal' },
+    { at: now - 800, type: 'skip', mode: 'normal' },
+    { at: now - 700, type: 'request', mode: 'normal' },
+    { at: now - 600, type: 'listen_minute', mode: 'normal' },
+  ],
+  sessions: [],
+});
+const week = recapRuntime.api.recap('weekly', now);
+assert.equal(week.tracks, 2, 'de weekrecap telt gespeelde tracks');
+assert.equal(week.topArtist, 'Avicii');
+assert.equal(week.topTrack, 'Levels');
+assert.equal(week.skips, 1);
+assert.equal(week.requests, 1);
+assert.equal(week.minutes, 1);
+
+let recapArmed = 0;
+recapRuntime.window.MAIRDJ = { armManual: () => { recapArmed++; return true } };
+assert.equal(recapRuntime.api.requestRecap('weekly').ok, true, 'een recap kan worden aangevraagd');
+assert.equal(recapArmed, 1);
+assert.equal(recapRuntime.api.djContext().recap.topArtist, 'Avicii');
+
+assert.equal(runtime().api.recap('weekly', now).tracks, 0, 'lege historie blijft eerlijk leeg');
+const clearRuntime = runtime({}, { events: [{ at: now, type: 'track', track: 'Test', artist: 'MAIR' }], sessions: [] });
+clearRuntime.api.clear();
+assert.equal(clearRuntime.store.has('mair_mode_analytics_v1'), false, 'Wis lokale historie wist ook de mode-analytics');
+assert.ok(src.lastIndexOf("record('listen_minute'") < src.lastIndexOf("if(state.mode==='normal')return"),
+  'normale MAIR-playback telt mee voor Weekly');
+
+/* ---------------- Your Week on MAIR blijft in het profiel ---------------- */
+
+assert.ok(profile.includes('Your Week on MAIR') && profile.includes('mair-profile-week-grid'), 'Profiel mist de weekrecap');
+assert.ok(!/periodButton|data-profile-period|monthly|yearly/.test(profile), 'Maand- en jaarrecap mogen niet terugkomen');
+
+/* ---------------- de drie verwijderde modi komen niet terug ---------------- */
+
+const verwijderd = ['time-machine', 'chaos', 'afterparty'];
+for (const bestand of [['mair-modes.js', src], ['rotation-engine.js', rotation], ['queue-core.js', queue], ['station-queue.js', stationQueue], ['director.js', director], ['api/dj-writer.js', writer]]) {
+  for (const modus of verwijderd) {
+    assert.ok(!bestand[1].includes(modus), `${bestand[0]} verwijst nog naar ${modus}`);
+  }
+}
+assert.ok(!fs.existsSync(new URL('../mair-modes-ui.js', import.meta.url)), 'de modes-UI hoort verwijderd te zijn');
+assert.ok(!fs.existsSync(new URL('../mair-modes.css', import.meta.url)), 'de modes-styling hoort verwijderd te zijn');
+assert.ok(!version.includes('mair-modes-ui.js') && !version.includes('mair-modes.css'), 'version.js laadt de modes-UI niet meer');
+assert.ok(!sw.includes('mair-modes-ui.js') && !sw.includes('mair-modes.css'), 'de service worker cachet de modes-UI niet meer');
+assert.ok(!queue.includes('modePolicy') && !queue.includes('MODE_TRACK_BLOCKED'), 'de jaar-eindpoort in queue-core is weg');
+
+/* ---------------- wat blijft: mair-modes.js zelf en zijn koppelingen ---------------- */
+
+assert.ok(version.includes('mair-modes.js') && sw.includes('./mair-modes.js'),
+  'mair-modes.js blijft geladen en gecached voor de recap-laag');
+assert.ok(rotation.includes('MAIRModeManager?.rotationScore'), 'de rotatie blijft de mode-score bevragen');
+assert.ok(builder.includes('MAIRModeManager?.djContext'), 'de DJ-context blijft de mode-context bevragen');
+assert.ok(writer.includes('MODE_INSTRUCTIONS'), 'de writer houdt zijn mode-instructies');
+
+console.log('MAIR Modes: PASS — recap en Your Week intact, Time Machine, Chaos en Afterparty volledig verwijderd');

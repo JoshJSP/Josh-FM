@@ -92,10 +92,9 @@ function scheduleReplan(j){
   },wait);
 }
 function retireRoadtrip(){
-  const styleId='mairRetireRoadtripStyle';
-  if(!document.getElementById(styleId)){
-    const st=document.createElement('style');st.id=styleId;st.textContent='.mair-mode-card.mode-roadtrip{display:none!important}';document.head.appendChild(st);
-  }
+  // De Modes-UI bestaat niet meer, dus de kaart verbergen en de ondertitel herschrijven
+  // hoeft niet langer. Wat blijft is het vangnet: een roadtrip-sessie die nog in
+  // localStorage stond wordt gestopt, en starten blijft geblokkeerd.
   const manager=window.MAIRModeManager;
   if(manager&&!manager.__roadtripRetired){
     const originalStart=manager.start?.bind(manager);
@@ -103,8 +102,6 @@ function retireRoadtrip(){
     manager.__roadtripRetired=true;
     try{if(manager.state?.().mode==='roadtrip')manager.stop?.('roadtrip-retired')}catch{}
   }
-  const entry=document.getElementById('mairfmModesOpen')?.querySelector('span');
-  if(entry&&/Roadtrip/i.test(entry.textContent||''))entry.textContent='Time Machine, Chaos, Afterparty en meer';
 }
 function boot(){
   installPlanner();retireRoadtrip();

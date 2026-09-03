@@ -3,7 +3,7 @@
   const $=id=>document.getElementById(id);
   const WATCHDOG_MS=15000,FORCE_DEDUPE_MS=1200;
   let syncing=false,lastCurrent='',lastItems=[],lastOk=0,lastAttempt=0,cooldownUntil=0,lastError='';
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function map(t){if(!t?.id)return null;return{id:t.id,uri:t.uri||'',name:t.name||'',artists:(t.artists||[]).map(a=>a?.name||a).filter(Boolean),image:t.album?.images?.[1]?.url||t.album?.images?.[0]?.url||''}}
   function paint(items=[],loading=false){
     const box=$('directorQueue'),next=$('nextUp');

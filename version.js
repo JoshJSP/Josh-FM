@@ -14,7 +14,6 @@ window.JFM_ASSET_VERSION='81';
     addStyle('mair-station-art-css','./mair-station-art.css?v=81');
     addStyle('mair-request-layer-fix-css','./request-layer-fix.css?v=81');
     addStyle('mair-personalization-css','./mair-ux-v1.css?v=81');
-    addStyle('mair-modes-css','./mair-modes.css?v=81');
     addSyncScript('mair-radio-sequencer-js','./mair-radio-sequencer.js');
     addSyncScript('mair-dj-profile-polish-js','./mair-dj-profile-polish.js');
     addSyncScript('mair-dj-memory-js','./dj-memory.js');
@@ -30,7 +29,6 @@ window.JFM_ASSET_VERSION='81';
     addSyncScript('mair-station-director-js','./mair-station-director.js');
     addSyncScript('mair-sleep-js','./mair-sleep.js');
     addSyncScript('mair-modes-js','./mair-modes.js?v=81');
-    addSyncScript('mair-modes-ui-js','./mair-modes-ui.js?v=81');
     addSyncScript('mair-my-mair-js','./mair-my-mair.js?v=81');
   }
   loadMairUI();

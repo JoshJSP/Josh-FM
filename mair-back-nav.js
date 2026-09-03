@@ -29,7 +29,6 @@ const VIEWS=[
   {id:'sleep',el:()=>$('mairSleepOverlay'),open:el=>!!el&&!el.hidden,close:()=>{try{window.MAIRSleep?.close?.();return true}catch{return false}}},
   {id:'director',el:()=>$('mairDirectorOverlay'),open:el=>!!el&&!el.hidden,close:()=>click('#mairDirectorClose')},
   {id:'diagnostics',el:()=>document.querySelector('.mair-diagnostics-sheet'),open:visible,close:()=>click('#mairDiagnosticsClose')},
-  {id:'modes',el:()=>$('mairModesSheet'),open:visible,close:()=>click('#mairModesClose')},
   {id:'dj',el:()=>$('mairDJSheet'),open:visible,close:()=>click('#mairDJSheet .mair-sheet-back')},
   {id:'request-sheet',el:()=>$('b7RequestSheet'),open:visible,close:()=>click('#b7ReqClose')},
   {id:'request-pane',el:()=>document.querySelector('.mair-request-pane.mair-sheet-open'),open:visible,close:()=>click('.mair-request-close')},

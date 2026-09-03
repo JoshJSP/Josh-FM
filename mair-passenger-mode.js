@@ -27,5 +27,14 @@ function renderBadge(){const pending=(state.requests||[]).filter(r=>r.status==='
 function injectCarMenu(){const menu=document.querySelector('#mairCarWaveOverlay .car-menu');if(menu&&!menu.querySelector('[data-passenger-open]')){const b=document.createElement('button');b.type='button';b.dataset.passengerOpen='1';b.className='car-passenger-menu';b.textContent=state.active?'Passenger Mode bekijken':'Passenger Mode';b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openPanel()});menu.insertBefore(b,menu.firstChild)}renderBadge()}
 function ensureEntry(){if($('mairPassengerOpen'))return;const car=$('mairCarModeOpen');if(!car)return;const b=document.createElement('button');b.id='mairPassengerOpen';b.type='button';b.className=car.className;b.innerHTML='👥 Passenger Mode <span>Laat anderen nummers aanvragen</span>';b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openPanel()});car.insertAdjacentElement('afterend',b)}
 function syncDom(){if(domSyncQueued)return;domSyncQueued=true;requestAnimationFrame(()=>{domSyncQueued=false;ensureEntry();injectCarMenu()})}
-const observer=new MutationObserver(syncDom);observer.observe(document.documentElement,{subtree:true,childList:true});window.addEventListener('mair:car-mode',()=>setTimeout(syncDom,100));if(state.active)startPoll();setInterval(syncDom,1800);syncDom();window.MAIRPassengerMode={version:'2026-08-30-v5-qr-iphone-fix',open:openPanel,create,close,refresh,state:()=>({...state,requests:[...(state.requests||[])]})};
+// De observer keek naar document.documentElement met subtree:true en vuurde dus op elke
+// DOM-mutatie in de hele app, inclusief het UI-werk van de andere lagen. syncDom hoeft
+// maar op twee plekken te kijken: de radiotab, waar de Car Mode-knop verschijnt waar
+// ensureEntry() zich naast hangt, en de Car Mode-overlay, waar het menu als directe
+// child wordt bijgeplakt door zowel het prototype als mair-car-menu-sticky.js. Beide
+// targets bestaan nog niet noodzakelijk bij het laden, dus watchTargets() haakt aan
+// zodra ze er zijn; de bestaande tik van 1800 ms blijft het vangnet (audit M-7).
+const observer=new MutationObserver(syncDom);let overlayWatched=false,radioWatched=false;
+function watchTargets(){if(!radioWatched){const radio=$('tab-radio');if(radio){radioWatched=true;observer.observe(radio,{subtree:true,childList:true})}}if(!overlayWatched){const overlay=$('mairCarWaveOverlay');if(overlay){overlayWatched=true;observer.observe(overlay,{childList:true})}}}
+watchTargets();window.addEventListener('mair:car-mode',()=>{watchTargets();setTimeout(syncDom,100)});if(state.active)startPoll();setInterval(()=>{watchTargets();syncDom()},1800);syncDom();window.MAIRPassengerMode={version:'2026-08-30-v5-qr-iphone-fix',open:openPanel,create,close,refresh,state:()=>({...state,requests:[...(state.requests||[])]})};
 })();

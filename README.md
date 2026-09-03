@@ -21,6 +21,7 @@ Configureer secrets uitsluitend in Vercel of een vergelijkbare serveromgeving. C
 Vereist voor de volledige ervaring:
 
 - `SPOTIFY_CLIENT_ID`: publieke Spotify-app Client ID. Kan anders lokaal in Instellingen worden ingevoerd.
+- `MAPBOX_PUBLIC_TOKEN`: Mapbox Directions + Geocoding voor de navigatie in Car Mode. Dit hoort een publiek `pk.`-token te zijn met een URL-restrictie op het eigen domein, want `/api/config` geeft het runtime aan de browser. Zonder dit token meldt Car Mode "Mapbox-token ontbreekt" en werkt bestemmingszoeken en routering niet; de radio zelf blijft normaal doorspelen.
 - `GROQ_API_KEY`: Nederlandse DJ-copy via `/api/dj-writer`.
 - `FISH_AUDIO_API_KEY`: Nederlandse DJ-audio via `/api/tts`.
 

@@ -3,8 +3,15 @@
 ## Mission
 Improve MAIRFM/Josh-FM into a stable autonomous AI radio station that can run for at least 60 minutes without manual intervention, unwanted silence, playback lockups, or an incorrect DJ voice.
 
+> **Status (2026-09-03).** Dit bestand is historisch: het beschrijft de opdracht waarmee de
+> Codex-audit begon. De architectuur- en prioriteitsvolgorde hieronder gelden nog steeds, maar de
+> branchregel niet meer. `codex/mairfm-audit` is achterhaald (32 commits die nooit naar `main`
+> zijn gegaan) en de "Phase 1: Audit only"-opdracht is afgerond. Werk voor nieuwe sessies vanaf
+> `main` op een eigen branch, zoals `CLAUDE.md` beschrijft.
+
 ## Working rules
-- Work only on the `codex/mairfm-audit` branch unless explicitly told otherwise.
+- Werk vanaf de actuele `main` op een eigen branch. De oude regel "alleen op `codex/mairfm-audit`"
+  is vervallen.
 - Do not deploy production changes automatically.
 - Do not modify secrets, API keys, or deployment credentials.
 - Never place secrets in frontend code or commit them.
