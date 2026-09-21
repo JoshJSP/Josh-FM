@@ -19,7 +19,7 @@ const checks=[
  ['popular-category-pools',/buildPool/.test(channels)&&/limit=10&q=/.test(channels)&&!/limit=25&q=/.test(channels)&&!/popularity/.test(policy)],
  ['dutch-filter',/semanticQualityFilter/.test(channels)&&/\/api\/category-filter/.test(channels)&&/policy\(\)\?\.confidence\?\.\(id\)/.test(channels)&&/minConfidence:.95/.test(policy)&&/language:'nl'/.test(policy)&&/hoofdzakelijk Nederlands/.test(classifier)&&!/nlArtists/.test(channels)],
  ['dj-v3-bootstrap',bootstrap.includes('progress-clock-v226.js')&&bootstrap.includes('mair-dj-v2.js')&&!bootstrap.includes('dj-authoritative-v226.js')],
- ['dj-groq-writer',writer.includes('GROQ_API_KEY')&&writer.includes('openai/gpt-oss-120b')&&writer.includes("MAIR_DJ_PROMPT_VERSION='1.0.0'")&&writer.includes('persoonlijke Nederlandse muziekzender')],
+ ['dj-groq-writer',writer.includes('GROQ_API_KEY')&&writer.includes('openai/gpt-oss-120b')&&writer.includes("MAIR_DJ_PROMPT_VERSION='1.1.0'")&&writer.includes('persoonlijke Nederlandse muziekzender')],
  ['dj-prebuffers-before-pause',dj.indexOf('window.prepareSpeech')<dj.indexOf('await pauseMusic(uri)')&&dj.includes("setPhase('ARMED'")],
  ['dj-rewind-resume',dj.includes('rewindCurrent(uri)')&&dj.includes('await resumeMusic(uri)')],
  ['dj-auto-scheduler',dj.includes('count++')&&dj.includes('remaining()')&&dj.includes("window.addEventListener('mair:track-transition'")&&dj.includes("detail.cause==='NATURAL_END'")&&!dj.includes('schedulePendingRetry')],
