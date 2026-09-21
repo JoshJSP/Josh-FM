@@ -93,6 +93,16 @@ for(const runtimeModule of ['progress-clock-v226.js','mair-observability.js','ma
   assert.match(djQueueSource,new RegExp(`loadRuntime\\(\\)[\\s\\S]*${runtimeModule.replace(/\./g,'\\.')}`),`${runtimeModule} hoort altijd te laden, ook zonder DJ`);
 assert.ok(swSource.includes("'./mair-public-dj-off.js'"),'De DJ-uit-laag hoort in de PWA-cache te staan');
 
+// De bootgraaf werd alleen met de DJ uit nagelopen. Zet iemand de vlag aan, dan
+// laadt loadDJ() zes extra bestanden - en een bestand dat niet in CORE staat
+// breekt de DJ pas na installatie, offline, zonder foutmelding. Deze poort
+// loopt de aan-tak af en eist dat elk bestand erin gecached wordt.
+const loadDjBody=djQueueSource.slice(djQueueSource.indexOf('async function loadDJ()'),djQueueSource.indexOf('async function loadDJOff()'));
+const djModules=[...loadDjBody.matchAll(/load\('\.\/([^']+)'/g)].map(m=>m[1]);
+assert.ok(djModules.length>=5,`loadDJ() hoort de DJ-keten te laden, gevonden: ${djModules.join(', ')||'niets'}`);
+for(const djModule of djModules)
+  assert.ok(swSource.includes(`'./${djModule}'`),`${djModule} wordt door loadDJ() geladen maar staat niet in de PWA-cache; met de DJ aan breekt dat pas offline`);
+
 const discoveryRun=discoveryRuntime();
 assert.equal(await discoveryRun.discovery.rebuild(true),true);
 const known=discoveryRun.context.queue.find(track=>track.id==='known');

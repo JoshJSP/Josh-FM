@@ -29,4 +29,15 @@ if(!voice.includes("CustomEvent('mair:dj-speaking'")||!voice.includes("classList
 if(!easy.includes("addEventListener('mair:dj-speaking'")||!easy.includes('setDjLive'))throw Error('DJ LIVE UI moet speaking lifecycle volgen');
 if(!sw.includes("'./mair-easy-use-v1.js'"))throw Error('Easy-use DJ UI ontbreekt in PWA CORE-cache');
 const voices=[...tts.matchAll(/\b(josh|maya|max|noah):'([a-f0-9]{32})'/g)].map(m=>m[2]);if(voices.length<4||new Set(voices).size<4)throw Error('DJ-profielen hebben geen vier unieke standaardstemmen');
+// Auditpunt H-5. Deze vier pollers herinstalleren alleen UI-haken. Met het
+// scherm uit valt er niets te haken, dus ze horen over te slaan en eenmalig in
+// te draaien bij terugkeer. Samen schelen ze ruim honderd wakeups per minuut
+// in de broekzak; zonder poort sluipt zo'n blinde tik er zo weer in.
+for(const file of ['mair-back-nav.js','personal-learning-v4.js','mair-journey-director.js','mair-passenger-mode.js']){
+  const src=read(file);
+  if(!src.includes('setInterval(()=>{if(document.hidden)return;'))
+    throw Error(`${file} heeft een blinde UI-poller; die hoort document.hidden te respecteren`);
+  if(!src.includes('visibilitychange'))
+    throw Error(`${file} slaat wel over met het scherm uit maar draait niet in bij terugkeer`);
+}
 console.log('MAIR hardening checks: OK');
