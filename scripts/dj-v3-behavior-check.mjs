@@ -16,7 +16,7 @@ class FakeCustomEvent{constructor(type,options={}){this.type=type;this.detail=op
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:['2026-08-26T10:30:00Z']))}static now(){return Date.now()}}
 function makeElement(extra={}){return{value:'',textContent:'',dataset:{},checked:false,addEventListener(){},querySelector(){return null},cloneNode(){return makeElement({...this})},replaceWith(){},...extra}}
 
-function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTransport=true,writerSucceeds=true,writerDelay=0,prepareDelay=0,prepareFailures=0,playerFailures=0,writerText='Dit is een voorbereide MAIR DJ-break.',writerTexts=null,factsEnabled=false,requestTrackId=''}={}){
+function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTransport=true,writerSucceeds=true,writerDelay=0,prepareDelay=0,prepareFailures=0,playerFailures=0,writerText='Dit is een voorbereide MAIR DJ-break.',writerTexts=null,factsEnabled=false,requestTrackId='',writerAttempts=null}={}){
   const bus=new FakeEventTarget();
   const elements={talk:makeElement({value:'1'}),facts:makeElement({checked:factsEnabled}),talkValue:makeElement(),djBreakTime:makeElement(),djText:makeElement()};
   const document={readyState:'complete',visibilityState:hidden?'hidden':'visible',getElementById:id=>elements[id]||null,addEventListener(){}};
@@ -38,7 +38,7 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
     if(path.startsWith('/me/player/seek?')){metrics.seekApi++;remote.progress=0;return null}
     throw new Error(`Unexpected API call ${path}`);
   };
-  const fetch=async(url,opt={})=>{if(url!=='/api/dj-writer')throw new Error(`Unexpected fetch ${url}`);metrics.writer++;if(!writerSucceeds)throw new Error('writer offline');if(writerDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,writerDelay);opt.signal?.addEventListener('abort',()=>{clearTimeout(timer);metrics.writerAborted++;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))},{once:true})});const text=Array.isArray(writerTexts)?writerTexts[Math.min(metrics.writer-1,writerTexts.length-1)]:writerText;return{ok:true,status:200,json:async()=>({text,provider:'groq',model:'test-model'})}};
+  const fetch=async(url,opt={})=>{if(url!=='/api/dj-writer')throw new Error(`Unexpected fetch ${url}`);metrics.writer++;if(!writerSucceeds)throw new Error('writer offline');if(writerDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,writerDelay);opt.signal?.addEventListener('abort',()=>{clearTimeout(timer);metrics.writerAborted++;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))},{once:true})});const text=Array.isArray(writerTexts)?writerTexts[Math.min(metrics.writer-1,writerTexts.length-1)]:writerText;return{ok:true,status:200,json:async()=>({text,provider:'groq',model:'test-model',...(writerAttempts?{attempts:writerAttempts}:{})})}};
   const audioStatus={provider:'fish',model:'test-fish',voiceId:'voice',cacheSize:0,audioUnlocked:true,playbackMode:'html-audio'};
   const JFMDJAudio={status:audioStatus,unlock:async()=>true};
   const prepareSpeech=async(_text,_jingle,meta={})=>{metrics.prepare++;if(prepareDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,prepareDelay);meta.signal?.addEventListener('abort',()=>{clearTimeout(timer);metrics.prepareAborted++;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))},{once:true})});if(prepareFailures-->0){audioStatus.error='temporary Fish Audio failure';return false}audioStatus.error='';audioStatus.cacheSize=1;return true};
@@ -182,6 +182,24 @@ async function testCompleteVoiceCheckUsesOneAudibleBreakId(){
   for(const name of ['DJ Writer','Fish/TTS generatie','Spotify pause bevestigd','DJ playback START bewezen','DJ playback END bewezen','Spotify resume bevestigd','Volgende playback-state gezond'])assert.ok(rows.some(x=>x.name===name&&x.status==='pass'),`${name} ontbreekt`);
   const handoff=h.state().lastHandoff;assert.equal(handoff.breakId,id);assert.ok(handoff.playbackStartedAt>0);assert.ok(handoff.playbackEndedAt>=handoff.playbackStartedAt);assert.ok(handoff.resumeAt>=handoff.playbackEndedAt);assert.equal(handoff.terminalStatus,'VOICE_CHECK_PASS')
 }
+// Valt Claude om en vangt Groq het op, dan was de break geslaagd en verdween de
+// reden. Dat is de stilste manier waarop een verkeerd geconfigureerde aanbieder
+// wegkomt: je ziet provider 'groq' en verder niets.
+async function testUpstreamFallbackReasonStaysVisible(){
+  const h=createHarness({
+    writerText:'Dat was Track D, en nu door met Next van Artist hier op MAIR.',
+    writerAttempts:[{provider:'claude',model:'claude-opus-5',status:400,error:'output_config: unexpected field'}],
+  });
+  await prepareAutomaticDue(h);
+  const writer=h.state().writer;
+  assert.equal(writer.provider,'groq','Groq hoort de break te hebben geschreven');
+  assert.match(writer.upstream,/claude/,'de afgehaakte aanbieder hoort zichtbaar te blijven');
+  assert.match(writer.upstream,/output_config/,'met de reden erbij, anders is de melding waardeloos');
+  const clean=createHarness({writerText:'Dat was Track D, en nu door met Next van Artist hier op MAIR.'});
+  await prepareAutomaticDue(clean);
+  assert.equal(clean.state().writer.upstream,'','zonder afhakers hoort er geen ruis in de diagnostiek te staan');
+}
+
 const tests=[
   ['automatic break uses SDK-first critical path',testSuccessfulAutomaticBreak],
   ['duplicate natural event is idempotent',testDuplicateNaturalEventCannotDoubleAir],
@@ -195,6 +213,7 @@ const tests=[
   ['writer failure uses safe Dutch fallback',testWriterFailureUsesSafeDutchFallback],
   ['changed next track drops stale DJ copy before pause',testChangedNextTrackDropsStaleCopyBeforePause],
   ['changed next track keeps a break that never named it',testChangedNextTrackKeepsIndependentCopy],
+  ['a provider that dropped out stays visible in diagnostics',testUpstreamFallbackReasonStaysVisible],
   ['changed DJ profile drops prepared voice before pause',testChangedVoiceProfileDropsPreparedBreakBeforePause],
   ['stale writer response is cancelled on track change',testStaleWriterResponseIsCancelled],
   ['stale TTS response is cancelled on track change',testStaleTTSResponseIsCancelled],
