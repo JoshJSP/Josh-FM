@@ -12,8 +12,33 @@ function moveCard(id,sectionTitle){const card=$(id);if(!card||card.closest('#mai
 function moveSelfTest(){const b=$('selfTest');const card=b?.closest('article.card');if(!card||card.closest('#mairDiagnosticsBody'))return;const sec=addSection('diag-selftest','VOLLEDIGE MAIR CHECK');sec?.appendChild(card)}
 function moveVoiceTest(){const btn=$('testVoice');if(!btn||btn.closest('#mairDiagnosticsBody'))return;const sec=addSection('diag-voice-test','STEMTEST');const info=$('voiceInfo');sec?.appendChild(btn);if(info)sec?.appendChild(info)}
 function moveControl(id,sectionId,title){const control=$(id);if(!control||control.closest('#mairDiagnosticsBody'))return;addSection(sectionId,title)?.appendChild(control)}
-function sync(){purgeRetired();if(!ensureHub())return;moveVoiceTest();moveControl('mairImagingPreview','diag-imaging-test','SONIC LOGO TEST');moveCard('mairTraceCard','CENTRALE RUNTIME STATUS');moveCard('mairTestLabCard','MAIR TEST LAB');moveCard('mairVoiceCheckCard','COMPLETE VOICE CHECK');moveCard('mairVoiceEngineCard','VOICE ENGINE');moveCard('mairVoiceLabCard','VOICE LAB');moveCard('mairSoakCard','RELIABILITY MONITOR');moveCard('mairStationDirectorCard','STATION DIRECTOR');for(const id of ['jfmDiagnostics','jfmHealthCard'])$(id)?.classList.add('mairfm-legacy-diagnostics');moveSelfTest();applyOpenState(expanded)}
-function handleClick(e){if(e.target?.closest?.('#mairDiagnosticsToggle')){e.preventDefault();e.stopPropagation();applyOpenState(!expanded);return}if(e.target?.closest?.('#mairDiagnosticsClose')||e.target===$('mairDiagnosticsSheet')){e.preventDefault();showSheet(false)}}
+// Live DJ. De DJ-code is compleet en groen in de tests, maar nog niet op een
+// iPhone met een echte Spotify-sessie gehoord. Daarom staat hij standaard uit
+// en zet je hem hier per toestel aan, in plaats van hem voor iedereen om te
+// zetten. De vlag zelf woont in brand-config.js en wordt pas bij de volgende
+// boot gelezen, dus na omzetten is herladen nodig.
+function ensureDjSwitch(){
+  const body=$('mairDiagnosticsBody');if(!body)return;
+  const sec=addSection('diag-live-dj','LIVE DJ (BETA)');if(!sec)return;
+  let card=$('mairLiveDjCard');
+  if(!card){
+    card=document.createElement('article');card.id='mairLiveDjCard';card.className='card';
+    card.innerHTML='<div class="row between"><h3 style="margin:0">Live DJ</h3><span id="mairLiveDjBadge" class="muted">UIT</span></div><p class="muted" id="mairLiveDjHint">De DJ praat tussen de nummers door: aankondigingen, station-ID, tijd en muziekfeiten. Nog niet op een telefoon getest, dus zet hem alleen aan als je hem wilt beoordelen.</p><button id="mairLiveDjToggle" type="button" class="secondary">Live DJ aanzetten</button>';
+    sec.appendChild(card);
+  }
+  const on=window.MAIR_DJ_ENABLED===true,badge=$('mairLiveDjBadge'),button=$('mairLiveDjToggle');
+  if(badge)badge.textContent=on?'AAN':'UIT';
+  if(button)button.textContent=on?'Live DJ uitzetten':'Live DJ aanzetten';
+}
+function toggleDj(){
+  const next=window.MAIR_DJ_ENABLED!==true;
+  try{window.MAIRFlags?.setDJEnabled?.(next)}catch{}
+  const hint=$('mairLiveDjHint');
+  if(hint)hint.textContent=next?'Live DJ staat aan vanaf de volgende keer laden. MAIRFM wordt nu herladen.':'Live DJ staat uit vanaf de volgende keer laden. MAIRFM wordt nu herladen.';
+  setTimeout(()=>{try{location.reload()}catch{}},700);
+}
+function sync(){purgeRetired();if(!ensureHub())return;ensureDjSwitch();moveVoiceTest();moveControl('mairImagingPreview','diag-imaging-test','SONIC LOGO TEST');moveCard('mairTraceCard','CENTRALE RUNTIME STATUS');moveCard('mairTestLabCard','MAIR TEST LAB');moveCard('mairVoiceCheckCard','COMPLETE VOICE CHECK');moveCard('mairVoiceEngineCard','VOICE ENGINE');moveCard('mairVoiceLabCard','VOICE LAB');moveCard('mairSoakCard','RELIABILITY MONITOR');moveCard('mairStationDirectorCard','STATION DIRECTOR');for(const id of ['jfmDiagnostics','jfmHealthCard'])$(id)?.classList.add('mairfm-legacy-diagnostics');moveSelfTest();applyOpenState(expanded)}
+function handleClick(e){if(e.target?.closest?.('#mairLiveDjToggle')){e.preventDefault();e.stopPropagation();toggleDj();return}if(e.target?.closest?.('#mairDiagnosticsToggle')){e.preventDefault();e.stopPropagation();applyOpenState(!expanded);return}if(e.target?.closest?.('#mairDiagnosticsClose')||e.target===$('mairDiagnosticsSheet')){e.preventDefault();showSheet(false)}}
 document.addEventListener('click',handleClick,false);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&visible)showSheet(false)});
 function boot(){sync();let ticks=0;const timer=setInterval(()=>{sync();if(++ticks>=80)clearInterval(timer)},250)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.addEventListener('pageshow',()=>setTimeout(sync,120));window.addEventListener('mair:diagnostics-open',()=>showSheet(true));

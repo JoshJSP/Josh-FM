@@ -113,8 +113,22 @@ async function testLateAutomaticPreparationIsNotLost(){
 async function testWriterFailureUsesSafeDutchFallback(){
   const h=createHarness({writerSucceeds:false});await prepareAutomaticDue(h);assert.equal(h.state().writer.provider,'local-fallback');assert.match(h.state().writer.text,/MAIR/);assert.doesNotMatch(h.state().writer.text,/\bAI\b|Groq|Spotify API/i);h.natural('D','E');await sleep(700);assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djResume,1);assert.equal(h.state().played,1)
 }
+// H-4. Spotify koos een andere volgende track dan de voorbereiding voorspelde.
+// Of dat de break mag slopen hangt af van de tekst, niet van de voorspelling:
+// een aankondiging van het verkeerde nummer is erger dan stilte, maar een
+// station-ID of tijdmelding klopt nog gewoon en hoorde nooit te sneuvelen.
 async function testChangedNextTrackDropsStaleCopyBeforePause(){
-  const h=createHarness();await prepareAutomaticDue(h);h.natural('D','X');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.match(h.state().lastMissReason,/break-missed/)
+  const h=createHarness({writerText:'Straks hoor je Next van Artist, hier op MAIR.'});await prepareAutomaticDue(h);h.natural('D','X');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.match(h.state().lastMissReason,/break-missed/);assert.match(h.state().error,/volgende Spotify-track wijzigde/)
+}
+async function testChangedNextTrackKeepsIndependentCopy(){
+  // Een feit over het nummer dat net speelde. Welke track Spotify daarna kiest
+  // doet er voor die tekst niet toe, dus de break hoort gewoon te spelen.
+  const h=createHarness({factsEnabled:true,writerText:'Track C staat op een release uit 2026. Nu gaat de muziek door.'});
+  h.natural('A','B');await sleep(20);h.natural('B','C');await sleep(100);
+  assert.equal(h.state().phase,'ARMED');assert.equal(h.state().brain.breakType,'TRACK_FACT');
+  h.natural('C','X');await sleep(700);
+  assert.equal(h.metrics.speak,1,'een break die de volgende track niet noemt blijft geldig en moet de lucht in');
+  assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.djResume,1);assert.equal(h.state().played,1);assert.equal(h.state().missed,0)
 }
 async function testChangedVoiceProfileDropsPreparedBreakBeforePause(){
   const h=createHarness();await prepareAutomaticDue(h);h.setProfile('maya');h.natural('D','E');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.match(h.state().error,/DJ-profiel wijzigde/)
@@ -180,6 +194,7 @@ const tests=[
   ['generic primary transport remains fallback',testWebApiFallbackStillWorks],
   ['writer failure uses safe Dutch fallback',testWriterFailureUsesSafeDutchFallback],
   ['changed next track drops stale DJ copy before pause',testChangedNextTrackDropsStaleCopyBeforePause],
+  ['changed next track keeps a break that never named it',testChangedNextTrackKeepsIndependentCopy],
   ['changed DJ profile drops prepared voice before pause',testChangedVoiceProfileDropsPreparedBreakBeforePause],
   ['stale writer response is cancelled on track change',testStaleWriterResponseIsCancelled],
   ['stale TTS response is cancelled on track change',testStaleTTSResponseIsCancelled],
