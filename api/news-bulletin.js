@@ -24,7 +24,7 @@ export default async function handler(req,res){
  // Claude schrijft het journaal; Groq en daarna het deterministische bulletin
  // vangen op. Het uur moet klinken, ook als er geen model bereikbaar is.
  if(hasClaude()){
-  const c=await claudeText({system,user,maxTokens:4000,effort:'low',timeoutMs:9000});
+  const c=await claudeText({system,user,maxTokens:4000,effort:'low',timeoutMs:6000});
   if(!c.ok)attempts.push({provider:'claude',model:c.model,status:c.status,error:c.error});
   else{const text=cleanOutput(c.text);
    if(acceptable(text))return res.status(200).json({text,provider:'claude-news',model:c.model,source,items:items.length,fallback:false,attempts});

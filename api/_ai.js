@@ -37,7 +37,11 @@ export async function claudeText({system,user,maxTokens=2000,effort='low',timeou
     // deze check lees je een lege content-array en val je nooit door naar Groq.
     if(d?.stop_reason==='refusal')return{ok:false,provider:'claude',model,status:502,error:clip(`Claude weigerde (${d?.stop_details?.category||'onbekend'})`,500)};
     const text=(Array.isArray(d?.content)?d.content:[]).filter(b=>b?.type==='text').map(b=>String(b?.text||'')).join('').trim();
-    if(!text)return{ok:false,provider:'claude',model,status:502,error:d?.stop_reason==='max_tokens'?'Claude raakte max_tokens voor er tekst was':'Claude gaf geen tekst terug'};
+    if(!text)return{ok:false,provider:'claude',model,status:502,error:'Claude gaf geen tekst terug'};
+    // Afgekapte tekst is geen bruikbare tekst. Denken telt mee in max_tokens, dus
+    // een halve zin komt hier echt voorbij - en die zou letterlijk worden
+    // uitgesproken. Liever doorvallen naar Groq dan halverwege afbreken.
+    if(d?.stop_reason==='max_tokens')return{ok:false,provider:'claude',model,status:502,error:'Claude raakte max_tokens; tekst is afgekapt'};
     return{ok:true,provider:'claude',model,text,usage:d?.usage||null};
   }catch(e){const aborted=e?.name==='AbortError';return{ok:false,provider:'claude',model,status:aborted?504:500,error:aborted?'Claude timeout':clip(e?.message||e,500)}}
 }

@@ -23,7 +23,7 @@ function ensureDjSwitch(){
   let card=$('mairLiveDjCard');
   if(!card){
     card=document.createElement('article');card.id='mairLiveDjCard';card.className='card';
-    card.innerHTML='<div class="row between"><h3 style="margin:0">Live DJ</h3><span data-mair-dj-state class="muted">UIT</span></div><p class="muted" data-mair-dj-hint>Dezelfde schakelaar staat ook in Instellingen.</p><button data-mair-dj-toggle type="button" class="secondary">Live DJ aanzetten</button>';
+    card.innerHTML='<div class="row between"><h3 style="margin:0">Live DJ</h3><span data-mair-dj-state class="muted">UIT</span></div><p class="muted" data-mair-dj-hint>Dezelfde schakelaar staat ook in Instellingen.</p><button data-mair-dj-toggle data-mair-dj-label type="button" class="secondary">Live DJ aanzetten</button>';
     sec.appendChild(card);
   }
   paintDjSwitch();
@@ -34,7 +34,7 @@ function ensureDjSwitch(){
 function paintDjSwitch(){
   const on=window.MAIR_DJ_ENABLED===true;
   document.querySelectorAll('[data-mair-dj-state]').forEach(el=>{el.textContent=on?'AAN':'UIT'});
-  document.querySelectorAll('[data-mair-dj-toggle]').forEach(el=>{el.textContent=on?'Live DJ uitzetten':'Live DJ aanzetten'});
+  document.querySelectorAll('[data-mair-dj-toggle][data-mair-dj-label]').forEach(el=>{el.textContent=on?'Live DJ uitzetten':'Live DJ aanzetten'});
 }
 function toggleDj(){
   const next=window.MAIR_DJ_ENABLED!==true;
@@ -48,5 +48,5 @@ function handleClick(e){if(e.target?.closest?.('[data-mair-dj-toggle]')){e.preve
 document.addEventListener('click',handleClick,false);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&visible)showSheet(false)});
 function boot(){paintDjSwitch();sync();let ticks=0;const timer=setInterval(()=>{sync();if(++ticks>=80)clearInterval(timer)},250)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.addEventListener('pageshow',()=>setTimeout(sync,120));window.addEventListener('mair:diagnostics-open',()=>showSheet(true));
-window.MAIRDiagnosticsHub={version:'mair-diagnostics-hub-v2-isolated-sheet',sync,purgeRetired,open:()=>showSheet(true),close:()=>showSheet(false),toggle:()=>showSheet(!visible),get isOpen(){return visible}};
+window.MAIRDiagnosticsHub={version:'mair-diagnostics-hub-v2-isolated-sheet',sync,paintDjSwitch,purgeRetired,open:()=>showSheet(true),close:()=>showSheet(false),toggle:()=>showSheet(!visible),get isOpen(){return visible}};
 })();

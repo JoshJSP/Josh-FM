@@ -56,8 +56,10 @@ export default async function handler(req,res){
 // tracks tegelijk, dus Claude krijgt meer denkruimte dan de DJ-break.
 function providers({instructions,input}){
   const list=[];
-  if(hasClaude())list.push(()=>claudeText({system:instructions,user:input,maxTokens:8000,effort:'medium',timeoutMs:12000}));
-  if(hasGroq())for(const model of GROQ_MODELS)list.push(()=>groqText({model,system:instructions,user:input,maxCompletionTokens:3500,temperature:.2,topP:.7,timeoutMs:9000}));
+  // De aanroeper (channel-click-fix.js) breekt na 10s af, dus de hele keten moet
+  // daarbinnen passen: 5s Claude, daarna 2s per Groq-model.
+  if(hasClaude())list.push(()=>claudeText({system:instructions,user:input,maxTokens:8000,effort:'low',timeoutMs:5000}));
+  if(hasGroq())for(const model of GROQ_MODELS)list.push(()=>groqText({model,system:instructions,user:input,maxCompletionTokens:3500,temperature:.2,topP:.7,timeoutMs:2200}));
   return list;
 }
 

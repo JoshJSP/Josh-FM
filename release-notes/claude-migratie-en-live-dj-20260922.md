@@ -64,6 +64,15 @@ aan, wacht één radiomoment af en kijk in Diagnostiek naar de writer-status:
   geweigerd. De tekst erachter is de reden en zegt precies wat er moet worden
   bijgesteld.
 
+### Eén bewuste afwijking van Anthropics eigen advies
+
+Anthropic raadt aan om bij Opus 5 de server-side `fallbacks`-parameter mee te
+sturen: weigert het model, dan draait dezelfde vraag automatisch op een ander
+Anthropic-model. Die zit hier bewust niet in. MAIRFM heeft al een vangnet dat
+beter past — Groq is gratis en sneller — en `stop_reason: "refusal"` stuurt de
+break daar naartoe. Een tweede, betaalde Anthropic-poging ertussen zou alleen
+geld en tijd kosten in een pad dat elf seconden heeft.
+
 ### Openstaand punt: kosten
 
 Zolang Groq het werk deed was misbruik van `/api/dj-writer` hooguit vervelend.
@@ -229,7 +238,55 @@ eisen dat elke route zijn eigen `fetch` bouwt.
 
 ---
 
-## 6. Wat ik níét heb geverifieerd
+## 6. Wat een review van dit werk zelf opleverde
+
+Ik heb de hele branch daarna nog eens kritisch laten nalopen. Dat leverde
+bruikbare treffers op in mijn eigen werk — deze zijn opgelost:
+
+- **De volumeregeling startte op stil.** `localStorage.getItem` geeft `null` als
+  er niets staat, en `Number(null)` is `0`, niet `NaN`. Op elk toestel dat nog
+  nooit volume had opgeslagen begon MAIR dus op nul, en het eerste apparaat
+  kreeg dat actief opgelegd. Dat is precies de bug die een radio stil maakt
+  zonder dat iemand begrijpt waarom. Er staat nu een test op die de oude versie
+  aantoonbaar laat vallen.
+- **De twee nieuwe kaarten in Instellingen waren onzichtbaar.** `mair-profile.js`
+  dekt die hele tab af met `#tab-settings.mair-profile-tab>:not(#mairProfilePage)
+  {display:none!important}` — precies de valkuil die in dat bestand al beschreven
+  stond. Volume en de Live DJ-schakelaar staan nu in de profielpagina zelf, onder
+  "Geluid & DJ".
+- **Afgekapte Claude-tekst gold als succes.** Denken telt mee in `max_tokens`, dus
+  een halve zin kwam er echt uit — en die zou letterlijk worden uitgesproken.
+  `stop_reason: "max_tokens"` valt nu door naar Groq.
+- **De classifier haalde zijn eigen terugval nooit.** De aanroeper breekt na 10
+  seconden af terwijl Claude alleen al 12 kreeg, dus het zuiverheidsfilter stopte
+  stilletjes met filteren. De hele keten past nu binnen 10 seconden.
+- **Het uurjournaal kon voorbij de Vercel-limiet lopen** (9s Claude plus drie keer
+  8,5s Groq), waardoor het deterministische bulletin aan het eind onbereikbaar
+  werd. Claude staat nu op 6 seconden.
+- **Anthropic ontbrak in de kwaliteitspoort** van de DJ. Toegevoegd. `claude`
+  blijft er bewust uit: dat is ook een gewone voornaam.
+
+Nog open, bewust niet meer aangeraakt op dit uur:
+
+- De DJ-break heeft elf seconden. Claude neemt er nu vier, Groq houdt zeven. Dat
+  is genoeg voor één Groq-model met een seconde marge, niet voor twee. Vóór deze
+  branch kregen beide Groq-modellen een echte kans. Een uitgevallen eerste model
+  kost nu dus de break.
+- `mentionsTrack` is een gewone kleine-letters-substringtest. Een kromme
+  apostrof, een "(Remastered 2011)"-achtervoegsel of een artiest van twee tekens
+  (`U2`) glipt erdoor, en korte titels kunnen juist vals aanslaan.
+- De `attempts`-lijst met upstream-foutteksten gaat mee in het antwoord van
+  `/api/discover` en `/api/category-filter`, ook bij succes. Handig voor
+  diagnose, maar het zijn onbeveiligde routes.
+- De timeout-poort in `app-smoke-check` accepteert nu "importeert `_ai.js`" als
+  bewijs. Dat is zwakker dan de oude eis en laat een toekomstige onbegrensde
+  `fetch` erdoor.
+- `/api/discover` heeft geen enkele aanroeper in de client. Het is levende dode
+  code die nu ook onderhouden moet worden.
+
+---
+
+## 7. Wat ik níét heb geverifieerd
 
 Geen enkele regel hiervan is op een iPhone, in een browser of tegen een echte
 Spotify-sessie getest. Er is ook niet naar één seconde DJ-audio geluisterd. Wat

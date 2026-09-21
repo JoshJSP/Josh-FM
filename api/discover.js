@@ -34,8 +34,8 @@ export default async function handler(req,res){
 // rest nooit aanroept.
 function providers({instructions,input}){
   const list=[];
-  if(hasClaude())list.push(()=>claudeText({system:instructions,user:input,maxTokens:4000,effort:'medium',timeoutMs:12000}));
-  if(hasGroq())for(const model of GROQ_MODELS)list.push(()=>groqText({model,system:instructions,user:input,maxCompletionTokens:1200,temperature:.7,topP:.9,timeoutMs:9000}));
+  if(hasClaude())list.push(()=>claudeText({system:instructions,user:input,maxTokens:4000,effort:'low',timeoutMs:6000}));
+  if(hasGroq())for(const model of GROQ_MODELS)list.push(()=>groqText({model,system:instructions,user:input,maxCompletionTokens:1200,temperature:.7,topP:.9,timeoutMs:4000}));
   return list;
 }
 function parseDiscovery(text){

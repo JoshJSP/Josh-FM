@@ -254,6 +254,20 @@ async function testVolumeClampsAndNeverThrows(){
   assert.equal(await broken.context.JFMPlayback.setVolume(0.5),false,'een mislukte volumezet meldt netjes false');
   assert.equal(broken.context.JFMPlayback.volume,0.5,'de gewenste stand blijft bewaard voor het volgende apparaat');
 }
+async function testFreshInstallStartsAtFullVolume(){
+  // getItem geeft null als er niets staat, en Number(null) is 0 - niet NaN. Zonder
+  // null-controle startte een vers toestel op stil en zette het eerste apparaat
+  // ook nog eens actief het volume op 0.
+  const{context,metrics}=primaryHarness({sdkVolume:true});
+  assert.equal(context.JFMPlayback.volume,1,'een toestel zonder opgeslagen volume hoort op vol te starten');
+  await context.JFMPlayback.ensureDevice();
+  assert.deepEqual(metrics.volumeSdk,[],'zonder bewaarde stand hoort er niets naar de speler te gaan');
+  // Onleesbare of lege opslag mag ook nooit stil opleveren.
+  for(const junk of ['','rommel','NaN']){
+    const h=primaryHarness({sdkVolume:true,storedVolume:junk});
+    assert.equal(h.context.JFMPlayback.volume,1,`opgeslagen waarde ${JSON.stringify(junk)} hoort terug te vallen op vol volume`);
+  }
+}
 async function testStoredVolumeReturnsOnANewDevice(){
   // Een nieuwe Spotify-speler begint altijd op vol volume.
   const{context,metrics}=primaryHarness({sdkVolume:true,storedVolume:'0.3'});
@@ -264,6 +278,6 @@ async function testStoredVolumeReturnsOnANewDevice(){
   assert.deepEqual(metrics.volumeSdk,[0.3],'hetzelfde apparaat wordt niet opnieuw gezet');
 }
 
-const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive],['iOS transport delegates to primary',testIosTransportDelegatesToPrimary],['reloaded playback truth requires fresh confirmation',testReloadedTruthRequiresFreshConfirmation],['transient SDK errors heal after confirmed playback',testTransientSdkErrorsHeal],['skip voice cancel transaction owns exactly one playback action',testSkipCancelTransactionWiring],['SDK context reset is recognised as a natural end',testSdkContextResetEndDetection],['resume guard advances a stuck track exactly once',testResumeGuardStopsRepeatOfSameTrack],['resume guard never loops on the same track',testResumeGuardAdvancesOnlyOncePerTrack],['context end without a next track fails once and visibly',testContextEndWithoutNextTrack],['queue append survives a single refused track',testTolerantQueueAppend],['volume prefers the local player over the Web API',testVolumeUsesLocalPlayerBeforeWebApi],['volume falls back to the Web API for other devices',testVolumeFallsBackToWebApiForOtherDevices],['volume clamps and fails without stopping music',testVolumeClampsAndNeverThrows],['stored volume returns on a new device',testStoredVolumeReturnsOnANewDevice]];
+const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive],['iOS transport delegates to primary',testIosTransportDelegatesToPrimary],['reloaded playback truth requires fresh confirmation',testReloadedTruthRequiresFreshConfirmation],['transient SDK errors heal after confirmed playback',testTransientSdkErrorsHeal],['skip voice cancel transaction owns exactly one playback action',testSkipCancelTransactionWiring],['SDK context reset is recognised as a natural end',testSdkContextResetEndDetection],['resume guard advances a stuck track exactly once',testResumeGuardStopsRepeatOfSameTrack],['resume guard never loops on the same track',testResumeGuardAdvancesOnlyOncePerTrack],['context end without a next track fails once and visibly',testContextEndWithoutNextTrack],['queue append survives a single refused track',testTolerantQueueAppend],['volume prefers the local player over the Web API',testVolumeUsesLocalPlayerBeforeWebApi],['volume falls back to the Web API for other devices',testVolumeFallsBackToWebApiForOtherDevices],['volume clamps and fails without stopping music',testVolumeClampsAndNeverThrows],['stored volume returns on a new device',testStoredVolumeReturnsOnANewDevice],['a fresh install starts at full volume',testFreshInstallStartsAtFullVolume]];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(error){console.error('FAIL',name,'—',error?.stack||error);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`Playback package 1: ${passed}/${tests.length} PASS`);

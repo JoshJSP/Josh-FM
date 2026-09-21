@@ -41,7 +41,9 @@
   // Volume mag nooit playback blokkeren: elke fout blijft binnen deze functies.
   const VOLUME_KEY='mair_volume_v1';
   const clampVolume=v=>Math.max(0,Math.min(1,Number(v)));
-  let volume=(()=>{try{const raw=Number(localStorage.getItem(VOLUME_KEY));return Number.isFinite(raw)?clampVolume(raw):1}catch{return 1}})(),volumeDevice='';
+  // getItem geeft null als er niets staat, en Number(null) is 0 - niet NaN. Zonder
+// de null-controle startte een vers toestel dus op stil.
+let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||raw==='')return 1;const parsed=Number(raw);return Number.isFinite(parsed)?clampVolume(parsed):1}catch{return 1}})(),volumeDevice='';
   function paintVolume(){const slider=$('volume'),label=$('volumeValue'),pct=Math.round(volume*100);if(slider&&document.activeElement!==slider)slider.value=String(pct);if(label)label.textContent=pct+'%';try{window.dispatchEvent(new CustomEvent('mair:volume',{detail:{volume}}))}catch{}}
   async function pushVolume(v){
     try{const p=player();if(p?.setVolume){await p.setVolume(v);return true}}catch{}
@@ -257,7 +259,7 @@
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
   window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),450)});setInterval(()=>watchdog(),5000);/* 5s: de watchdog leest alleen lokale SDK-state zolang muziek speelt; Spotify wordt uitsluitend benaderd als playback daadwerkelijk stilstaat. */
 
-  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,setVolume,get volume(){return volume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
+  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,setVolume,bindVolume,get volume(){return volume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
   window.MAIRRuntime?.register?.('playback-primary',{version:'primary-v17-end-detection-guard',owner:'transport'});
 })();

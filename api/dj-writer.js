@@ -33,7 +33,7 @@ export default async function handler(req,res){
   // Claude schrijft de break. Hij krijgt een begrensde hap uit het budget van
   // 11 seconden zodat Groq altijd zijn volle 6 seconden vangnet overhoudt.
   if(hasClaude()){
-    const budget=Math.min(5000,deadline-Date.now()-6000);
+    const budget=Math.min(4000,deadline-Date.now()-7000);
     const c=budget<750?{ok:false,provider:'claude',model:'',status:504,error:'Geen tijd meer voor Claude binnen de breakdeadline'}:await claudeText({system,user,maxTokens:2000,effort:'low',timeoutMs:budget,requestId});
     if(c.ok){
       const text=safe(c.text,1200).replace(/^['"“”]+|['"“”]+$/g,'').trim();
