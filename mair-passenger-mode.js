@@ -2,7 +2,7 @@
 (()=>{
 'use strict';
 if(window.MAIRPassengerMode)return;
-const $=id=>document.getElementById(id),KEY='mair_passenger_host_v1',QR_LIB='https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+const $=id=>document.getElementById(id),KEY='mair_passenger_host_v1',QR_LIB='./vendor/qrcode.min.js';
 let state=load(),pollTimer=null,processing=false,domSyncQueued=false,qrLoading=null;
 function load(){try{return JSON.parse(sessionStorage.getItem(KEY)||'null')||{active:false,code:'',hostSecret:'',guestUrl:'',requests:[]}}catch{return{active:false,code:'',hostSecret:'',guestUrl:'',requests:[]}}}
 function save(){try{sessionStorage.setItem(KEY,JSON.stringify(state))}catch{}renderBadge()}
