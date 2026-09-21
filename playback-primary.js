@@ -31,8 +31,34 @@
     await ensurePlayer();let id='';
     if(window.JFMSpotifySDK?.ensureDevice)id=await window.JFMSpotifySDK.ensureDevice();
     id=String(id||sdkDeviceId()||deviceId()).trim();if(!id)throw Error('Spotify-device is niet beschikbaar.');
-    if(localStorage.getItem(DEVICE_KEY)!==id)localStorage.setItem(DEVICE_KEY,id);return id
+    if(localStorage.getItem(DEVICE_KEY)!==id)localStorage.setItem(DEVICE_KEY,id);syncVolumeToDevice(id);return id
   }
+  // Volume. Auditpunt H-6, stap 1: MAIR had geen enkele eigen volumeregeling,
+  // dus zachter zetten kon alleen via de systeemknoppen of de Spotify-app zelf.
+  // De lokale speler regelt alleen dit apparaat; speelt MAIR op een speaker of
+  // telefoon elders, dan doet de Web API het werk. Een nieuw apparaat begint
+  // altijd op vol volume, dus de bewaarde stand wordt daar opnieuw gezet.
+  // Volume mag nooit playback blokkeren: elke fout blijft binnen deze functies.
+  const VOLUME_KEY='mair_volume_v1';
+  const clampVolume=v=>Math.max(0,Math.min(1,Number(v)));
+  let volume=(()=>{try{const raw=Number(localStorage.getItem(VOLUME_KEY));return Number.isFinite(raw)?clampVolume(raw):1}catch{return 1}})(),volumeDevice='';
+  function paintVolume(){const slider=$('volume'),label=$('volumeValue'),pct=Math.round(volume*100);if(slider&&document.activeElement!==slider)slider.value=String(pct);if(label)label.textContent=pct+'%';try{window.dispatchEvent(new CustomEvent('mair:volume',{detail:{volume}}))}catch{}}
+  async function pushVolume(v){
+    try{const p=player();if(p?.setVolume){await p.setVolume(v);return true}}catch{}
+    const id=deviceId();
+    await api('/me/player/volume?volume_percent='+Math.round(v*100)+(id?'&device_id='+encodeURIComponent(id):''),{method:'PUT'});
+    return true;
+  }
+  async function setVolume(next){
+    const v=clampVolume(next);if(!Number.isFinite(v))return false;
+    volume=v;try{localStorage.setItem(VOLUME_KEY,String(v))}catch{}
+    paintVolume();
+    try{await pushVolume(v);return true}catch(e){lastError=String(e?.message||e);return false}
+  }
+  function syncVolumeToDevice(id){if(!id||id===volumeDevice)return;volumeDevice=id;if(volume>=1)return;pushVolume(volume).catch(()=>{})}
+  function bindVolume(){const slider=$('volume');if(!slider||slider.dataset.mairVolumeBound==='1')return;slider.dataset.mairVolumeBound='1';slider.value=String(Math.round(volume*100));slider.addEventListener('input',()=>{const label=$('volumeValue');if(label)label.textContent=Math.round(Number(slider.value)||0)+'%'});slider.addEventListener('change',()=>setVolume(Number(slider.value)/100));paintVolume()}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindVolume,{once:true});else bindVolume();
+
   async function transfer(id,play){await api('/me/player',{method:'PUT',body:{device_ids:[id],play:!!play}});await wait(220);return remote()}
   async function ensureActive({preserve=true}={}){const p=await ensurePlayer(),id=await freshDevice();let s=await remote();if(s?.device?.id!==id){s=await transfer(id,preserve&&!!s?.is_playing);deviceHandovers++}return{p,id,state:s}}
   async function restoreReloadPlayback(){
@@ -231,7 +257,7 @@
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
   window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),450)});setInterval(()=>watchdog(),5000);/* 5s: de watchdog leest alleen lokale SDK-state zolang muziek speelt; Spotify wordt uitsluitend benaderd als playback daadwerkelijk stilstaat. */
 
-  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
+  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,setVolume,get volume(){return volume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
   window.MAIRRuntime?.register?.('playback-primary',{version:'primary-v17-end-detection-guard',owner:'transport'});
 })();

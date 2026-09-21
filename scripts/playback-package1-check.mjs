@@ -134,21 +134,22 @@ async function testSdkContextResetEndDetection(){
   assert.equal(ends[0].source,'sdk-paused-end');
 }
 
-function primaryHarness({tracks=['A','B'],nextWorks=true}={}){
+function primaryHarness({tracks=['A','B'],nextWorks=true,sdkVolume=false,storedVolume=null}={}){
   const bus=new Events(),docBus=new Events(),elements={};for(const id of ['start','play','next','prev','queueInfo'])elements[id]=element(id,elements);
-  const metrics={next:0,play:0,resumeSdk:0,watchdog:null};
+  const metrics={next:0,play:0,resumeSdk:0,watchdog:null,volumeApi:[],volumeSdk:[]};
   const queue=tracks.map(id=>({id,uri:'spotify:track:'+id.repeat(22).slice(0,22)}));
   const remote={item:{id:tracks[0],uri:queue[0].uri,duration_ms:240000},device:{id:'device-1'},is_playing:false,progress_ms:0};
-  const player={getCurrentState:async()=>({paused:!remote.is_playing,position:remote.progress_ms,track_window:{current_track:{id:remote.item.id,uri:remote.item.uri,duration_ms:remote.item.duration_ms}}}),activateElement(){},async pause(){remote.is_playing=false},async resume(){metrics.resumeSdk++},async seek(){},async nextTrack(){},async previousTrack(){}};
+  const player={getCurrentState:async()=>({paused:!remote.is_playing,position:remote.progress_ms,track_window:{current_track:{id:remote.item.id,uri:remote.item.uri,duration_ms:remote.item.duration_ms}}}),activateElement(){},async pause(){remote.is_playing=false},async resume(){metrics.resumeSdk++},async seek(){},async nextTrack(){},async previousTrack(){},...(sdkVolume?{async setVolume(v){metrics.volumeSdk.push(v)}}:{})};
   const api=async(path,opt={})=>{
     if(path==='/me/player'&&opt.method==='PUT')return null;
     if(path==='/me/player')return structuredClone(remote);
     if(path.startsWith('/me/player/next')){metrics.next++;if(nextWorks&&queue[1]){remote.item={id:queue[1].id,uri:queue[1].uri,duration_ms:240000};remote.is_playing=true;remote.progress_ms=0}return null}
     if(path.startsWith('/me/player/play?')){metrics.play++;return null}
+    if(path.startsWith('/me/player/volume?')){metrics.volumeApi.push(path);return null}
     throw Error('Unexpected API '+path+' '+(opt.method||'GET'));
   };
   const truth={expectedLive:true,isPlaying:false,trackId:tracks[0],uri:queue[0].uri,progressMs:0,durationMs:240000};
-  const context={window:null,document:{visibilityState:'visible',body:{getAttribute:()=>null},getElementById:id=>elements[id]||null,addEventListener:(...args)=>docBus.addEventListener(...args)},localStorage:storage({jfm_spotify_device_id:'device-1'}),sessionStorage:storage(),CustomEvent:FakeCustomEvent,api,queue,playback:null,renderPlayback(){},setTimeout:(fn,ms=0)=>{if(Number(ms)<=1000)queueMicrotask(fn);return 1},setInterval:(fn)=>{metrics.watchdog=fn;return 1},Promise,Date,Math,console};
+  const context={window:null,document:{visibilityState:'visible',body:{getAttribute:()=>null},getElementById:id=>elements[id]||null,addEventListener:(...args)=>docBus.addEventListener(...args)},localStorage:storage(storedVolume===null?{jfm_spotify_device_id:'device-1'}:{jfm_spotify_device_id:'device-1',mair_volume_v1:String(storedVolume)}),sessionStorage:storage(),CustomEvent:FakeCustomEvent,api,queue,playback:null,renderPlayback(){},setTimeout:(fn,ms=0)=>{if(Number(ms)<=1000)queueMicrotask(fn);return 1},setInterval:(fn)=>{metrics.watchdog=fn;return 1},Promise,Date,Math,console};
   Object.assign(context,{addEventListener:(...args)=>bus.addEventListener(...args),dispatchEvent:(...args)=>bus.dispatchEvent(...args),jfmSpotifyPlayer:player,JFMSpotifySDK:{deviceId:'device-1',ensureDevice:async()=>'device-1'},JFMPlaybackState:{get:()=>({...truth,trackId:remote.item?.id||truth.trackId,isPlaying:!!remote.is_playing}),shouldRecover:()=>!remote.is_playing,ingest(){},setExpectedLive(){},error(){}}});
   context.window=context;vm.createContext(context);vm.runInContext(read('playback-primary.js'),context,{filename:'playback-primary.js'});
   return{context,metrics,remote,bus};
@@ -224,6 +225,45 @@ async function testTolerantQueueAppend(){
   assert.equal(broken.posted.length,3,'repeated failures must stop the round after a small budget');
 }
 
-const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive],['iOS transport delegates to primary',testIosTransportDelegatesToPrimary],['reloaded playback truth requires fresh confirmation',testReloadedTruthRequiresFreshConfirmation],['transient SDK errors heal after confirmed playback',testTransientSdkErrorsHeal],['skip voice cancel transaction owns exactly one playback action',testSkipCancelTransactionWiring],['SDK context reset is recognised as a natural end',testSdkContextResetEndDetection],['resume guard advances a stuck track exactly once',testResumeGuardStopsRepeatOfSameTrack],['resume guard never loops on the same track',testResumeGuardAdvancesOnlyOncePerTrack],['context end without a next track fails once and visibly',testContextEndWithoutNextTrack],['queue append survives a single refused track',testTolerantQueueAppend]];
+// Auditpunt H-6 stap 1. Volume is een eigen laag: de lokale speler regelt dit
+// apparaat, de Web API elk ander apparaat, en een mislukte volumezet mag de
+// muziek nooit stoppen.
+async function testVolumeUsesLocalPlayerBeforeWebApi(){
+  const{context,metrics}=primaryHarness({sdkVolume:true});
+  assert.equal(await context.JFMPlayback.setVolume(0.4),true);
+  assert.deepEqual(metrics.volumeSdk,[0.4],'de lokale speler hoort het volume te zetten');
+  assert.deepEqual(metrics.volumeApi,[],'met een lokale speler is een Web API-aanroep overbodig');
+  assert.equal(context.JFMPlayback.volume,0.4);
+  assert.equal(context.localStorage.getItem('mair_volume_v1'),'0.4','het volume moet een herlaad overleven');
+}
+async function testVolumeFallsBackToWebApiForOtherDevices(){
+  const{context,metrics}=primaryHarness();
+  assert.equal(await context.JFMPlayback.setVolume(0.25),true);
+  assert.equal(metrics.volumeApi.length,1,'zonder lokale speler gaat het volume via de Web API');
+  assert.match(metrics.volumeApi[0],/volume_percent=25/);
+  assert.match(metrics.volumeApi[0],/device_id=device-1/);
+}
+async function testVolumeClampsAndNeverThrows(){
+  const{context,metrics}=primaryHarness({sdkVolume:true});
+  await context.JFMPlayback.setVolume(7);assert.equal(context.JFMPlayback.volume,1);
+  await context.JFMPlayback.setVolume(-3);assert.equal(context.JFMPlayback.volume,0);
+  assert.deepEqual(metrics.volumeSdk,[1,0],'buiten bereik wordt bijgeknipt, niet geweigerd');
+  const broken=primaryHarness();
+  broken.context.jfmSpotifyPlayer.setVolume=async()=>{throw Error('speler weg')};
+  broken.context.api=async()=>{throw Error('Spotify onbereikbaar')};
+  assert.equal(await broken.context.JFMPlayback.setVolume(0.5),false,'een mislukte volumezet meldt netjes false');
+  assert.equal(broken.context.JFMPlayback.volume,0.5,'de gewenste stand blijft bewaard voor het volgende apparaat');
+}
+async function testStoredVolumeReturnsOnANewDevice(){
+  // Een nieuwe Spotify-speler begint altijd op vol volume.
+  const{context,metrics}=primaryHarness({sdkVolume:true,storedVolume:'0.3'});
+  assert.equal(context.JFMPlayback.volume,0.3,'de bewaarde stand wordt bij boot gelezen');
+  await context.JFMPlayback.ensureDevice();
+  assert.deepEqual(metrics.volumeSdk,[0.3],'een nieuw apparaat krijgt de bewaarde stand terug');
+  await context.JFMPlayback.ensureDevice();
+  assert.deepEqual(metrics.volumeSdk,[0.3],'hetzelfde apparaat wordt niet opnieuw gezet');
+}
+
+const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive],['iOS transport delegates to primary',testIosTransportDelegatesToPrimary],['reloaded playback truth requires fresh confirmation',testReloadedTruthRequiresFreshConfirmation],['transient SDK errors heal after confirmed playback',testTransientSdkErrorsHeal],['skip voice cancel transaction owns exactly one playback action',testSkipCancelTransactionWiring],['SDK context reset is recognised as a natural end',testSdkContextResetEndDetection],['resume guard advances a stuck track exactly once',testResumeGuardStopsRepeatOfSameTrack],['resume guard never loops on the same track',testResumeGuardAdvancesOnlyOncePerTrack],['context end without a next track fails once and visibly',testContextEndWithoutNextTrack],['queue append survives a single refused track',testTolerantQueueAppend],['volume prefers the local player over the Web API',testVolumeUsesLocalPlayerBeforeWebApi],['volume falls back to the Web API for other devices',testVolumeFallsBackToWebApiForOtherDevices],['volume clamps and fails without stopping music',testVolumeClampsAndNeverThrows],['stored volume returns on a new device',testStoredVolumeReturnsOnANewDevice]];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(error){console.error('FAIL',name,'—',error?.stack||error);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`Playback package 1: ${passed}/${tests.length} PASS`);
