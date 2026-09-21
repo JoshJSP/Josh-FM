@@ -8,7 +8,7 @@
 6. Start MAIR eenmaal via een zichtbare tik; daarmee mag iOS muziek en DJ-audio afspelen.
 7. Kies in Safari Deel → `Zet op beginscherm`.
 
-De DJ-writer gebruikt Groq; Fish Audio verzorgt de vier Nederlandse DJ-stemmen. `OPENAI_API_KEY` is alleen nodig voor optionele discovery- en categoriefilters, niet voor DJ-copy of TTS.
+De DJ-writer gebruikt Claude, met Groq als vangnet; Fish Audio verzorgt de vier Nederlandse DJ-stemmen. Zonder `ANTHROPIC_API_KEY` schrijft Groq alles, precies zoals voorheen.
 
 Bij problemen open je `Instellingen` → `Diagnose`. Controleer daar Spotify-device, playback, queue, DJ-writer, stem en TTS-status. `Herstel MAIR` synchroniseert veilig cache, device, playerstate en wachtrij zonder persoonlijke voorkeuren te wissen.
 

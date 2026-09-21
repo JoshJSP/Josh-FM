@@ -22,16 +22,17 @@ Vereist voor de volledige ervaring:
 
 - `SPOTIFY_CLIENT_ID`: publieke Spotify-app Client ID. Kan anders lokaal in Instellingen worden ingevoerd.
 - `MAPBOX_PUBLIC_TOKEN`: Mapbox Directions + Geocoding voor de navigatie in Car Mode. Dit hoort een publiek `pk.`-token te zijn met een URL-restrictie op het eigen domein, want `/api/config` geeft het runtime aan de browser. Zonder dit token meldt Car Mode "Mapbox-token ontbreekt" en werkt bestemmingszoeken en routering niet; de radio zelf blijft normaal doorspelen.
-- `GROQ_API_KEY`: Nederlandse DJ-copy via `/api/dj-writer`.
+- `ANTHROPIC_API_KEY`: Claude schrijft DJ-copy, nieuws, discovery en de categoriefilters. Zonder deze sleutel neemt Groq alles over.
+- `GROQ_API_KEY`: vangnet achter Claude voor `/api/dj-writer`, `/api/news-bulletin`, `/api/discover` en `/api/category-filter`. Houd deze ingevuld: hij houdt de radio aan de praat als Anthropic eruit ligt of te traag is.
 - `FISH_AUDIO_API_KEY`: Nederlandse DJ-audio via `/api/tts`.
 
 Optioneel:
 
+- `ANTHROPIC_TEXT_MODEL`: expliciet Claude-model. Zonder override gebruikt MAIR `claude-opus-5`. Kies een model dat `output_config.effort` ondersteunt (Claude 4.6 en nieuwer); oudere modellen geven een 400 en vallen dus altijd door naar Groq.
 - `GROQ_DJ_MODEL`: expliciet ondersteund Groq-model. Zonder override probeert MAIR `openai/gpt-oss-120b` en daarna `openai/gpt-oss-20b`.
 - `FISH_AUDIO_MODEL`: expliciet Fish-model. Zonder override probeert MAIR `s2.1-pro-free` en daarna `s2-pro`.
 - `FISH_AUDIO_VOICE_JOSH`, `FISH_AUDIO_VOICE_MAYA`, `FISH_AUDIO_VOICE_MAX`, `FISH_AUDIO_VOICE_NOAH`: per-DJ voice override.
 - `FISH_AUDIO_VOICE_ID`: algemene voice override als geen profieloverride bestaat.
-- `OPENAI_API_KEY`: alleen nodig voor discovery/category-endpoints die OpenAI gebruiken; niet voor de DJ-writer of TTS.
 
 Een ontbrekende AI- of TTS-key mag playback niet stoppen. MAIR slaat de break over of gebruikt lokale copy en meldt de oorzaak in Diagnose.
 
