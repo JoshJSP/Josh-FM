@@ -34,6 +34,11 @@ const temp=files.filter(f=>/(^|\/)(\.noop|\.placeholder|__noop__|.*-replacement\
   for(const need of ['https://sdk.scdn.co','https://api.spotify.com','https://accounts.spotify.com','blob:'])
     ok(`CSP laat ${need} toe`,!!csp&&csp.includes(need));
   ok('Permissions-Policy aanwezig',head('Permissions-Policy').includes('geolocation=(self)'));
+  // script-src 'self' zonder unsafe-inline betekent dat een inline <script> stil wordt
+  // geblokkeerd. passenger.html had er een; die is op 23-09-2026 naar passenger.js
+  // verplaatst. Deze controle voorkomt dat er ongemerkt een nieuwe bij komt.
+  for(const page of files.filter(f=>f.endsWith('.html')&&!f.includes('/')))
+    ok(`${page} heeft geen inline script`,!/<script(?![^>]*\ssrc=)[^>]*>[\s\S]*?<\/script>/i.test(read(page)));
   ok('Referrer-Policy aanwezig',!!head('Referrer-Policy'));
   ok('X-Content-Type-Options aanwezig',head('X-Content-Type-Options')==='nosniff');
 }
