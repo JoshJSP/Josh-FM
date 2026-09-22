@@ -107,7 +107,7 @@ verouderde lezing is geen trackwissel maar een bron die nog niet is bijgewerkt; 
 nu in dezelfde lus, met vijf pogingen in plaats van drie.
 
 Dit is geen randgeval. In de eerste veertien minuten van de nachtelijke soak stond
-`trace.spotify.context-retry` met de melding *"Spotify meldde nog de vorige track"`
+`trace.spotify.context-retry` met de melding *"Spotify meldde nog de vorige track"*
 **drie keer** in de tijdlijn — één keer per voorbereiding, en alle drie hersteld. Vóór
 deze reparatie waren dat drie verloren breaks geweest.
 
