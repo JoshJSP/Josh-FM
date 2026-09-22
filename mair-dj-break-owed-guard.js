@@ -15,7 +15,9 @@ function inspect(d){if(!d||typeof d!=='object')return;const previous=lastState;l
 function refresh(){try{inspect(window.MAIRDJ?.state?.())}catch{}}
 window.addEventListener('mair:dj-v2-state',e=>inspect(e.detail||null));
 window.addEventListener('pageshow',()=>setTimeout(refresh,400));
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(refresh,400)});
+// Fase 2 (refresh) van het wake-protocol. De vertraging van 400 ms was een gok
+// dat playback-primary intussen klaar zou zijn; nu wacht de eigenaar daar echt op.
+window.addEventListener('mair:wake',e=>{if(e?.detail?.phase==='refresh')refresh()});
 setInterval(refresh,5000);
 window.MAIRDJBreakOwedGuard={version:'mair-dj-break-owed-guard-v1',status,refresh};
 setTimeout(refresh,800);

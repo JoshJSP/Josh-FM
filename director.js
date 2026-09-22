@@ -36,7 +36,9 @@ function hideLegacyRadioMode(){const modeTitle=[...document.querySelectorAll('#t
 // aanmaakt, en renderNext() doet er zonder JFMSpotifyUpcomingTruth ook nog een
 // Spotify-aanroep bij. Elke 3 seconden, ook met de app in de achtergrond (audit M-12).
 function paintWhenVisible(){if(document.hidden)return;hideLegacyRadioMode();renderNext()}
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)paintWhenVisible()});
+// Fase 3 (paint) van het wake-protocol in mair-background-guard.js. Deze regel
+// tekende vroeger op 0 ms na terugkomst, met de gegevens van voor het scherm uitging.
+window.addEventListener('mair:wake',e=>{if(e?.detail?.phase==='paint')paintWhenVisible()});
 let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(id&&id!==seen){seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;m.lastPlayed=m.lastPlayed||{};m.lastPlayed[id]=Date.now();if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);invalidateUpcoming('trackchange')}paintWhenVisible()},3000);
 window.addEventListener('jfm:trackchange',()=>{invalidateUpcoming('trackchange-event');paintNext();if(!window.JFMSpotifyUpcomingTruth)syncSpotifyUpcoming(true).catch(()=>{})});
 window.addEventListener('jfm:requests-change',()=>{const sig=requestSig();if(sig!==lastRequestSig){lastRequestSig=sig;invalidateUpcoming('request-change');if(!window.JFMSpotifyUpcomingTruth)syncSpotifyUpcoming(true).catch(()=>{})}});

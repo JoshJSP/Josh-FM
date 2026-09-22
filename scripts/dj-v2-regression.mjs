@@ -24,7 +24,12 @@ ok(resume.includes('__mairLegacyDJSchedulerDisabled=true')&&resume.includes('leg
 ok(dj.includes("truthApi()?.begin?.('dj-handoff'")&&dj.includes('endHandoff'),'DJ handoff must block recovery as one explicit operation');
 ok(dj.includes('if(paused&&uri)')&&dj.includes('if(!await userChangedTrack(uri))')&&dj.includes('await restoreMusic(uri,{rewind:false})'),'Failed voice handoff must restore Spotify once without rewind/retry unless the user changed track');
 ok(dj.includes("miss('break-missed',error)")&&!dj.includes('failed-break-dropped'),'Failed break must be dropped and replanned, never retried');
-ok(dj.includes('async function liveSnapshot(')&&dj.includes('async function snapshot(')&&dj.includes("api('/me/player/queue'")&&dj.includes('snapshot(controller.signal,breakId)'),'DJ must separate critical live snapshot from preparation queue lookup');
+ok(dj.includes('async function liveSnapshot(')&&dj.includes('async function snapshot(')&&dj.includes("api('/me/player/queue'")&&dj.includes('snapshot(controller.signal,breakId'),'DJ must separate critical live snapshot from preparation queue lookup');
+// De voorbereiding geeft sinds 23-09-2026 ook de verwachte track mee. Spotify's
+// Web API loopt vlak na een wissel achter en meldde dan nog de vorige track,
+// waarop elke automatische break sneuvelde met 'Track veranderde voor
+// voorbereiding' (zeven van zeven, gemeten tegen een echte sessie).
+ok(dj.includes('expectTrackId')&&dj.includes("lastError=Error('Spotify meldde nog de vorige track')"),'A stale Spotify read must be retried, not treated as a track change');
 ok(dj.includes('transport.djPause')&&dj.includes('transport.djResume')&&dj.includes('transport.djRewind'),'DJ must prefer SDK-first primary transport helpers');
 ok(primary.includes('player()?.activateElement')&&primary.includes('djPauseDirect')&&primary.includes('djResumeDirect')&&primary.includes('djRewindDirect'),'Primary playback must own SDK-first DJ transport');
 ok(primary.includes('primary-v17-end-detection-guard'),'Primary background auto-next transport version missing');
