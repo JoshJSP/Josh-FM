@@ -4,7 +4,13 @@
   if(window.MAIRBackgroundGuard)return;
   let hiddenAt=0,wasPlaying=false,trackId='',recovering=false,lastReason='boot',backgroundSkipArmed=false,cancelling=false;
   const state=()=>window.JFMPlaybackState?.get?.()||{};
-  const remote=async()=>{try{return await api('/me/player')}catch{return null}};
+  // Een lege catch hier maakte van elke netwerkfout een stille 'er speelt niets',
+  // waarna deze wacht een herstelactie begon voor een probleem dat er niet was.
+  // Het gedrag blijft hetzelfde - null betekent nog steeds onbekend - maar het
+  // verschil tussen 'niets aan het spelen' en 'ik kon het niet vragen' staat nu
+  // in de tijdlijn.
+  const note=(stage,error,extra={})=>{try{window.MAIRRuntime?.record?.('background.'+stage,{module:'mair-background-guard',error:String(error?.message||error||'onbekend').slice(0,300),...extra},'warn')}catch{}};
+  const remote=async()=>{try{return await api('/me/player')}catch(e){note('remote-read-failed',e);return null}};
   const isHidden=()=>document.visibilityState==='hidden'||document.body?.getAttribute('data-mair-background')==='1';
   // Dezelfde voorwaarde als ensureVoiceReady() in mair-dj-v2.js: alleen in de
   // native shell met een lopende keep-alive weten we dat de pagina blijft leven.
@@ -45,7 +51,7 @@
         if(ok){emit('background-dj-resumed',{cause:reason,route:'djResume'});return true}
       }
       const live=await remote();
-      if(live?.is_playing){try{window.JFMPlaybackState?.ingest?.(live,'background-fail-open-playing')}catch{};return true}
+      if(live?.is_playing){try{window.JFMPlaybackState?.ingest?.(live,'background-fail-open-playing')}catch(e){note('state-ingest-failed',e,{at:'fail-open'})};return true}
       if(typeof window.JFMPlayback?.resume==='function'){
         const ok=await window.JFMPlayback.resume().catch(()=>false);
         if(ok){emit('background-dj-resumed',{cause:reason,route:'resume'});return true}
@@ -61,8 +67,8 @@
     cancelling=true;
     emit('background-dj-cancel',{cause:reason,phase});
     Promise.resolve().then(async()=>{
-      try{await dj?.cancelActive?.('background-hidden')}catch{}
-      try{await resumeFailOpen(reason)}catch{}
+      try{await dj?.cancelActive?.('background-hidden')}catch(e){note('dj-cancel-failed',e,{phase})}
+      try{await resumeFailOpen(reason)}catch(e){note('resume-fail-open-failed',e,{cause:reason})}
     }).finally(()=>{cancelling=false});
     return true;
   }
@@ -71,7 +77,7 @@
     const s=snapshot('hidden');
     document.body?.setAttribute('data-mair-background','1');
     if(s.isPlaying||s.expectedLive){
-      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-preserve')}catch{}
+      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-preserve')}catch(e){note('expected-live-write-failed',e,{at:'hidden'})}
       try{navigator.mediaSession.playbackState='playing'}catch{}
       try{window.JFMPWA?.reassertMediaSession?.(false)}catch{}
       // Never let a browser-owned DJ handoff pause Spotify while iOS can suspend JS.
@@ -135,7 +141,7 @@
       const parkedAtEnd=Number(live?.item?.duration_ms||0)>0&&Number(live?.progress_ms||0)>=Number(live.item.duration_ms);
       if(live?.is_playing&&!parkedAtEnd){
         try{window.JFMPlaybackState?.ingest?.(live,'background-return-playing')}catch{}
-        try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-return-playing')}catch{}
+        try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-return-playing')}catch(e){note('expected-live-write-failed',e,{at:'visible'})}
         emit('visible-still-playing',{awayMs});
         reconciled=true;
         return;
@@ -165,7 +171,7 @@
     if(!isHidden())return;
     const detail=event?.detail||{},s=snapshot('hidden-natural-end');
     if(s.isPlaying||s.expectedLive||wasPlaying){
-      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-natural-passive')}catch{}
+      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-natural-passive')}catch(e){note('expected-live-write-failed',e,{at:'hidden-natural-end'})}
       try{navigator.mediaSession.playbackState='playing'}catch{}
     }
     emit('hidden-natural-observed',{endedTrackId:String(detail.trackId||detail.endedTrackId||'')});
