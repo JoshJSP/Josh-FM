@@ -322,9 +322,53 @@ schakelaar daar aan staat, anders zoek je naar een DJ die per instelling zwijgt.
 
 ---
 
-## 8. Nachtelijke soak
+## 8. De DJ is op de lucht geweest
 
-Zie `soak.log` naast dit rapport. De app speelt door op `localhost:3100` met de DJ aan,
-wisselt elk half uur zes minuten naar verborgen en terug, en heeft een harde grens van
-drie betaalde aanroepen — is die op, dan worden `dj-writer` en `tts` geweigerd. Dat is
-meteen de echte degradatietest: de muziek hoort dan gewoon door te spelen.
+Om 01:36 ging de DJ voor het eerst volautomatisch op de lucht, zonder dat ik iets
+aanraakte. Het volledige spoor uit de tijdlijn:
+
+```
+01:33:38  dj.break-created            PREPARING
+01:33:38  trace.spotify.context-retry WARNING     <- de verouderde lezing, opnieuw gevraagd
+01:33:39  trace.spotify.context       PASS        <- en nu wel de juiste track
+01:33:39  trace.brain.decision        PASS        cadence, time-since-break,
+                                                  defensible-music-link, next-track-known
+01:33:40  trace.llm.response          PASS        1.155 ms
+01:33:40  trace.validation            PASS
+01:33:46  trace.tts.response          PASS        5.943 ms
+01:33:46  trace.break.armed           PASS
+   ... twee en een halve minuut wachten op de trackwissel ...
+01:36:04  transition.classified       NATURAL_END
+01:36:05  trace.spotify.duck          PASS        203 ms   <- zachter, niet gepauzeerd
+01:36:05  trace.tts.playback-start    PASS
+01:36:16  trace.tts.playback-end      PASS        11.164 ms
+01:36:16  trace.spotify.unduck        PASS        221 ms
+01:36:16  dj.break-terminal           COMPLETED   played
+```
+
+`gespeeld: 1`, `gemist: 0`, totale handoff 12.176 ms, route `web-audio`, provider `fish`,
+`playbackSuccess: true`. De muziek is geen moment gestopt: `playing` bleef `true`,
+`ducked` ging van `false` naar `true` naar `false`.
+
+De tekst die hij uitsprak:
+
+> *"Na 'Bare Minimum' van Frsh, KM en LA\$\$A, gaan we meteen door naar 'Feels Pt. twee'
+> van Son Mieux, beide uit twee duizend zesentwintig."*
+
+Drie van de vijf reparaties uit §2 zijn hier tegelijk zichtbaar. Zonder 2.1 was
+`transition.classified` `EXTERNAL_CHANGE` geweest en had de teller nooit 2 gehaald. Zonder
+2.4 was de voorbereiding om 01:33:38 gesneuveld op die `context-retry` — die regel staat
+er als `WARNING` omdat de Web API op dat moment inderdaad nog de vorige track meldde. En
+dat `duck` in plaats van `pause` is de commit die je zelf gisteren maakte, nu voor het
+eerst in het wild waargenomen.
+
+Wat dit **niet** bewijst: hoe het klonk, en of hij dit ook doet met het scherm uit op een
+iPhone. Zie §7.
+
+## 9. Nachtelijke soak
+
+Zie `soak.log` in de scratchpad van deze sessie. De app speelt door op `localhost:3100`
+met de DJ aan, wisselt elk half uur zes minuten naar verborgen en terug, en heeft een
+harde grens van drie betaalde aanroepen — is die op, dan worden `dj-writer` en `tts`
+geweigerd. Dat is meteen de echte degradatietest: de muziek hoort dan gewoon door te
+spelen.
