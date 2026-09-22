@@ -114,7 +114,10 @@ document.addEventListener('click',()=>setTimeout(sync,60),true);
 for(const name of ['mair:car-sleep-ready','mair:sleep','mair:mode-change','jfm:trackchange'])window.addEventListener(name,()=>setTimeout(sync,60));
 window.addEventListener('pageshow',()=>setTimeout(sync,120));
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(back())sync()});
-setInterval(sync,600);
+// Met het scherm uit verandert er geen UI om aan te haken, dus deze poller
+// slaat over en draait eenmalig in zodra MAIR weer zichtbaar is (audit H-5).
+setInterval(()=>{if(document.hidden)return;sync()},600);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)sync()});
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>sync(),{once:true});else sync();
 

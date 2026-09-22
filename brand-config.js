@@ -11,14 +11,17 @@
   // MAIRFM feature flags. Eén plek, vroeg in de boot (brand-config.js is het derde
   // script in index.html), zodat elke latere loader hem kan lezen.
   //
-  // MAIR_DJ_ENABLED staat standaard UIT. Uit betekent: mair-dj-v2.js (de enige
+  // MAIR_DJ_ENABLED staat standaard AAN. Uit betekent: mair-dj-v2.js (de enige
   // scheduler/orchestrator) wordt niet geladen, dus window.MAIRDJ bestaat niet.
   // Alle playback-hooks gebruiken optional chaining op window.MAIRDJ en worden
   // daardoor vanzelf no-ops - er is geen DJ die transport kan overnemen, geen
-  // automatische break en geen praatmoment. Zet op true om de DJ terug te zetten.
-  // Overschrijfbaar per toestel via localStorage 'mair_dj_enabled_v1' = '1'.
+  // automatische break en geen praatmoment.
+  //
+  // Per toestel uit te zetten met localStorage 'mair_dj_enabled_v1' = '0', via
+  // de schakelaar in Instellingen of window.MAIRFlags.setDJEnabled(false). Een
+  // toestel dat eerder '1' schreef blijft gewoon aan staan.
   const djOverride=(()=>{try{return localStorage.getItem('mair_dj_enabled_v1')}catch{return null}})();
-  window.MAIR_DJ_ENABLED=djOverride==='1';
+  window.MAIR_DJ_ENABLED=djOverride!=='0';
   window.MAIR_PUBLIC_DJ_ENABLED=window.MAIR_DJ_ENABLED;
   window.MAIRFlags={version:'mair-flags-v1',get djEnabled(){return !!window.MAIR_DJ_ENABLED},
     setDJEnabled(on){try{localStorage.setItem('mair_dj_enabled_v1',on?'1':'0')}catch{};return'Herlaad MAIRFM om de DJ-instelling toe te passen.'}};

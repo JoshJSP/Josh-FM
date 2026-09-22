@@ -83,8 +83,9 @@ assert.match(appSource,/\$\('skipTalk'\)\?\.addEventListener/,'Verwijderde skipT
 // De DJ staat sinds 2026-09-01 standaard UIT achter een centrale feature flag.
 // Deze drie asserties bewaakten de omgekeerde, inmiddels vervallen productregel
 // ("publieke DJ moet expliciet aan staan") en bewaken nu de nieuwe regel.
-assert.match(brandConfigSource,/window\.MAIR_DJ_ENABLED=djOverride==='1'/,'MAIR_DJ_ENABLED is geen expliciete opt-in meer');
-assert.ok(!/window\.MAIR_DJ_ENABLED\s*=\s*true/.test(brandConfigSource),'De DJ-vlag staat hard aan in plaats van standaard uit');
+assert.match(brandConfigSource,/window\.MAIR_DJ_ENABLED=djOverride!=='0'/,'De DJ hoort standaard aan te staan en per toestel uitzetbaar te zijn');
+assert.match(brandConfigSource,/localStorage\.getItem\('mair_dj_enabled_v1'\)/,'zonder de per-toestel override is de DJ niet meer uit te zetten');
+assert.ok(!/window\.MAIR_DJ_ENABLED\s*=\s*(true|false)\s*;/.test(brandConfigSource),'De vlag mag niet hard bedraad staan; hij hoort uit de override te volgen');
 assert.match(build7Source,/window\.MAIR_PUBLIC_DJ_ENABLED=djOn/,'build7 zet de publieke DJ-status niet af van de centrale vlag');
 assert.ok(!/window\.MAIR_PUBLIC_DJ_ENABLED=true/.test(build7Source),'build7 activeert de publieke DJ nog hard');
 assert.match(djQueueSource,/if\(window\.MAIR_DJ_ENABLED===true\)await loadDJ\(\)/,'mair-dj-v2 wordt niet achter de vlag geladen');
@@ -92,6 +93,16 @@ assert.match(djQueueSource,/await load\('\.\/mair-dj-v2\.js'/,'De DJ-orchestrato
 for(const runtimeModule of ['progress-clock-v226.js','mair-observability.js','mair-audio-unlock-v1.js','mair-background-guard.js'])
   assert.match(djQueueSource,new RegExp(`loadRuntime\\(\\)[\\s\\S]*${runtimeModule.replace(/\./g,'\\.')}`),`${runtimeModule} hoort altijd te laden, ook zonder DJ`);
 assert.ok(swSource.includes("'./mair-public-dj-off.js'"),'De DJ-uit-laag hoort in de PWA-cache te staan');
+
+// De bootgraaf werd alleen met de DJ uit nagelopen. Zet iemand de vlag aan, dan
+// laadt loadDJ() zes extra bestanden - en een bestand dat niet in CORE staat
+// breekt de DJ pas na installatie, offline, zonder foutmelding. Deze poort
+// loopt de aan-tak af en eist dat elk bestand erin gecached wordt.
+const loadDjBody=djQueueSource.slice(djQueueSource.indexOf('async function loadDJ()'),djQueueSource.indexOf('async function loadDJOff()'));
+const djModules=[...loadDjBody.matchAll(/load\('\.\/([^']+)'/g)].map(m=>m[1]);
+assert.ok(djModules.length>=5,`loadDJ() hoort de DJ-keten te laden, gevonden: ${djModules.join(', ')||'niets'}`);
+for(const djModule of djModules)
+  assert.ok(swSource.includes(`'./${djModule}'`),`${djModule} wordt door loadDJ() geladen maar staat niet in de PWA-cache; met de DJ aan breekt dat pas offline`);
 
 const discoveryRun=discoveryRuntime();
 assert.equal(await discoveryRun.discovery.rebuild(true),true);

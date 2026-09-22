@@ -52,14 +52,14 @@ try{
   res=await call(tts,{method:'POST',body:{text:'Geen HTML als audio.'}});
   assert.equal(res.statusCode,502);assert.equal(calls.length,2);assert.match(res.body.detail,/instead of audio/i);
 
-  process.env.GROQ_API_KEY='test-key';
+  process.env.GROQ_API_KEY='test-key';delete process.env.ANTHROPIC_API_KEY;delete process.env.ANTHROPIC_TEXT_MODEL;
   globalThis.fetch=async()=>({ok:false,status:429,json:async()=>({error:{message:'rate limited'}})});
   res=await call(writer,{method:'POST',headers:{},body:writerBody('rate-upstream')});
   assert.equal(res.statusCode,429);assert.equal(res.body.error,'rate limited');
 
   process.env.GROQ_DJ_MODEL='llama-3.3-70b-versatile';calls=[];let writerBodies=[];
   globalThis.fetch=async(url,opt)=>{const body=JSON.parse(opt.body);writerBodies.push(body);calls.push(body.model);return calls.length===1?{ok:false,status:400,json:async()=>({error:{message:'model unavailable'}})}:{ok:true,status:200,json:async()=>({choices:[{message:{content:'Dit is betrouwbare Nederlandse radiotekst.'}}]})}};
-  res=await call(writer,{method:'POST',headers:{},body:writerBody('model-fallback')});assert.equal(res.statusCode,200);assert.deepEqual(calls,['llama-3.3-70b-versatile','openai/gpt-oss-120b']);assert.equal(res.body.model,'openai/gpt-oss-120b');assert.equal(res.body.attempts.length,1);assert.equal(writerBodies[1].max_completion_tokens,420);assert.equal(writerBodies[1].reasoning_effort,'low');assert.equal(writerBodies[1].include_reasoning,false);assert.equal('max_tokens'in writerBodies[1],false);assert.equal(res.body.promptVersion,'1.0.0');
+  res=await call(writer,{method:'POST',headers:{},body:writerBody('model-fallback')});assert.equal(res.statusCode,200);assert.deepEqual(calls,['llama-3.3-70b-versatile','openai/gpt-oss-120b']);assert.equal(res.body.model,'openai/gpt-oss-120b');assert.equal(res.body.attempts.length,1);assert.equal(writerBodies[1].max_completion_tokens,420);assert.equal(writerBodies[1].reasoning_effort,'low');assert.equal(writerBodies[1].include_reasoning,false);assert.equal('max_tokens'in writerBodies[1],false);assert.equal(res.body.promptVersion,'1.1.0');
 
   globalThis.fetch=async()=>({ok:true,status:200,json:async()=>({choices:[{message:{content:'   '}}]})});
   res=await call(writer,{method:'POST',headers:{},body:writerBody('empty')});assert.equal(res.statusCode,502);assert.match(res.body.error,/geen DJ-tekst/);assert.equal(res.body.attempts.length,2);
@@ -76,6 +76,43 @@ try{
   globalThis.fetch=async()=>fishResponse(Buffer.from([0x49,0x44,0x33,1]));
   for(let i=0;i<20;i++){res=await call(tts,{method:'POST',headers:{'x-forwarded-for':'198.51.100.21'},body:{text:'Limiettest.'}});assert.equal(res.statusCode,200)}
   res=await call(tts,{method:'POST',headers:{'x-forwarded-for':'198.51.100.21'},body:{text:'Limiettest.'}});assert.equal(res.statusCode,429);assert.equal(res.body.error,'rate_limited');assert.ok(Number(res.headers['Retry-After'])>=1);
+
+  // Claude schrijft de break; Groq wordt dan niet eens gebeld.
+  process.env.ANTHROPIC_API_KEY='claude-test-key';delete process.env.GROQ_DJ_MODEL;delete process.env.ANTHROPIC_TEXT_MODEL;
+  calls=[];const claudeCalls=[];
+  globalThis.fetch=async(url,opt)=>{const u=String(url);calls.push(u);if(u.includes('api.anthropic.com')){claudeCalls.push({headers:opt.headers,body:JSON.parse(opt.body)});return{ok:true,status:200,json:async()=>({stop_reason:'end_turn',content:[{type:'thinking',thinking:''},{type:'text',text:'Claude schrijft deze radiolink.'}],usage:{input_tokens:10,output_tokens:5}})}}return{ok:true,status:200,json:async()=>({choices:[{message:{content:'Groq had niet gebeld mogen worden.'}}]})}};
+  res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.40'},body:writerBody('claude-primary')});
+  assert.equal(res.statusCode,200);assert.equal(res.body.provider,'claude');assert.equal(res.body.model,'claude-opus-5');
+  assert.equal(res.body.text,'Claude schrijft deze radiolink.');assert.equal(res.body.persona,'josh');
+  assert.equal(calls.length,1);assert.ok(calls[0].includes('api.anthropic.com'));
+  assert.equal(claudeCalls[0].headers['x-api-key'],'claude-test-key');assert.equal(claudeCalls[0].headers['anthropic-version'],'2023-06-01');
+  assert.equal(claudeCalls[0].body.model,'claude-opus-5');assert.ok(claudeCalls[0].body.max_tokens>=2000);
+  assert.equal(claudeCalls[0].body.output_config.effort,'low');assert.ok(claudeCalls[0].body.system.includes('on-air DJ van MAIRFM'));
+
+  // Een weigering komt als HTTP 200 binnen. Groq moet het dan overnemen.
+  calls=[];
+  globalThis.fetch=async url=>{const u=String(url);calls.push(u);if(u.includes('api.anthropic.com'))return{ok:true,status:200,json:async()=>({stop_reason:'refusal',stop_details:{category:'cyber'},content:[]})};return{ok:true,status:200,json:async()=>({choices:[{message:{content:'Groq vangt de weigering op.'}}]})}};
+  res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.41'},body:writerBody('claude-refusal')});
+  assert.equal(res.statusCode,200);assert.equal(res.body.provider,'groq');assert.equal(res.body.text,'Groq vangt de weigering op.');
+  assert.equal(calls.length,2);assert.equal(res.body.attempts.length,1);
+  assert.equal(res.body.attempts[0].provider,'claude');assert.match(res.body.attempts[0].error,/weigerde/);
+
+  // Claude valt om met een echte foutcode: ook dan blijft de radio praten.
+  calls=[];
+  globalThis.fetch=async url=>{const u=String(url);calls.push(u);if(u.includes('api.anthropic.com'))return{ok:false,status:500,json:async()=>({error:{message:'overloaded'}})};return{ok:true,status:200,json:async()=>({choices:[{message:{content:'Groq neemt over na een serverfout.'}}]})}};
+  res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.42'},body:writerBody('claude-500')});
+  assert.equal(res.statusCode,200);assert.equal(res.body.provider,'groq');assert.equal(res.body.attempts[0].status,500);
+
+  // Zonder Groq-sleutel is Claude alleen genoeg; geen 503 meer.
+  delete process.env.GROQ_API_KEY;calls=[];
+  globalThis.fetch=async url=>{calls.push(String(url));return{ok:true,status:200,json:async()=>({stop_reason:'end_turn',content:[{type:'text',text:'Claude alleen, zonder vangnet.'}]})}};
+  res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.43'},body:writerBody('claude-only')});
+  assert.equal(res.statusCode,200);assert.equal(res.body.provider,'claude');assert.equal(calls.length,1);
+
+  // Geen enkele sleutel: nog steeds een nette 503, playback blijft ongemoeid.
+  delete process.env.ANTHROPIC_API_KEY;
+  res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.44'},body:writerBody('no-keys')});
+  assert.equal(res.statusCode,503);
 
   console.log('MAIR API failure behavior: PASS');
 }finally{globalThis.fetch=originalFetch;restoreEnv()}

@@ -105,7 +105,10 @@ function retireRoadtrip(){
 }
 function boot(){
   installPlanner();retireRoadtrip();
-  setInterval(()=>{installPlanner();retireRoadtrip()},1800);
+// Met het scherm uit verandert er geen UI om aan te haken, dus deze poller
+// slaat over en draait eenmalig in zodra MAIR weer zichtbaar is (audit H-5).
+  setInterval(()=>{if(document.hidden)return;installPlanner();retireRoadtrip()},1800);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)return;installPlanner();retireRoadtrip()});
   window.addEventListener('mair:journey-context',e=>scheduleReplan(e.detail||window.MAIRJourneyContext));
   window.addEventListener('mair:foundation-ready',()=>setTimeout(retireRoadtrip,100));
   const current=journey();if(current)scheduleReplan(current);

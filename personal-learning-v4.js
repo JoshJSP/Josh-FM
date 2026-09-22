@@ -14,6 +14,9 @@ function current(){try{const id=window.JFMPlaybackState?.get?.()?.trackId||windo
 function bind(id,type,value){const b=document.getElementById(id);if(!b||b.dataset.tasteV4)return;b.dataset.tasteV4='1';b.addEventListener('click',()=>{const t=current();if(t)event(type,t,value)})}
 let last='';window.addEventListener('jfm:trackchange',e=>{const id=e?.detail?.trackId||'';if(!id||id===last)return;last=id;const t=(window.queue||[]).find(x=>x?.id===id);if(t)event('play',t,.35)});
 function install(){bind('loveTrack','love',8);bind('banTrack','ban',-12)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();setInterval(install,3000);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();// Met het scherm uit verandert er geen UI om aan te haken, dus deze poller
+// slaat over en draait eenmalig in zodra MAIR weer zichtbaar is (audit H-5).
+setInterval(()=>{if(document.hidden)return;install()},3000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)install()});
 window.JFMTasteModel={version:'personal-learning-v4',score,event,get profile(){return model()},reset(){save(K,blank());window.JFMMusicIntelligence?.rerank?.()}};
 })();

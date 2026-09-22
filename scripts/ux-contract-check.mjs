@@ -22,7 +22,7 @@ ok('UX assets load after legacy handoff',loader.includes("load('mairfmUXState',`
 ok('UX assets are offline-cached',['./mair-ux-state.js','./mair-ux-v1.js','./mair-ux-v1.css'].every(x=>sw.includes(`'${x}'`)));
 ok('normal copy hides implementation terms',!(/Groq|TTS|SDK|voice provider|client ID/i.test(ux)));
 ok('auth and primary actions use the user error model',app.includes("notifyUserError('auth'")&&app.includes("notifyUserError('station'")&&!app.includes("connect().catch(e=>alert"));
-ok('deployment example covers all active providers',['SPOTIFY_CLIENT_ID','OPENAI_API_KEY','GROQ_API_KEY','FISH_AUDIO_API_KEY'].every(key=>env.includes(`${key}=`)));
+ok('deployment example covers all active providers',['SPOTIFY_CLIENT_ID','ANTHROPIC_API_KEY','GROQ_API_KEY','FISH_AUDIO_API_KEY'].every(key=>env.includes(`${key}=`)));
 ok('disconnected diagnostics has a route back to Spotify connect',ux.includes("mairfmDiagnosticsBack")&&ux.includes("activate?.('radio')")&&ux.includes('Terug naar Spotify verbinden'));
 ok('UI installs one action-listener owner',(ux.match(/function actions\(\)/g)||[]).length===1);
 ok('welcome isolates the onboarding from legacy radio cards',css.includes('.mairfm-welcome:not(.hidden)~*:not(.mairfm-connect)'));

@@ -5,7 +5,7 @@ const originalFetch=globalThis.fetch,originalKey=process.env.GROQ_API_KEY,origin
 function response(){return{statusCode:0,body:null,headers:{},status(code){this.statusCode=code;return this},setHeader(k,v){this.headers[k]=v},json(v){this.body=v;return this}}}
 async function call(body,ip){const res=response();await writer({method:'POST',headers:{'x-forwarded-for':ip},body},res);return res}
 try{
-  process.env.GROQ_API_KEY='test-key';delete process.env.GROQ_DJ_MODEL;
+  process.env.GROQ_API_KEY='test-key';delete process.env.GROQ_DJ_MODEL;delete process.env.ANTHROPIC_API_KEY;
   const bodies=[];
   globalThis.fetch=async(url,opt)=>{const parsed=JSON.parse(opt.body);bodies.push(parsed);return{ok:true,status:200,json:async()=>({choices:[{message:{content:'Korte radiotekst die natuurlijk klinkt.'}}]})}};
   const makeBody=(djProfile,daypart='avond')=>({breakId:`personality-${djProfile}`,breakType:'STATION_ID',targetWords:8,energy:'NORMAL',djProfile,context:{schemaVersion:'1.0.0',break:{breakType:'STATION_ID',targetWords:8,maxDurationSeconds:6,energy:'NORMAL',mustMention:[],permittedTopics:['station'],prohibitedTopics:[]},onAir:{previous:null,next:null,future:[],relationship:null},session:{station:'MAIR',localTime:'20:08',day:'woensdag',daypart,durationMinutes:30,narrative:{}},memory:{revision:0,recentBreaks:[],usedFactIds:[]},allowedFacts:[],doNot:[]}});

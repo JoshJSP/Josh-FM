@@ -2,7 +2,7 @@
 (()=>{
 'use strict';
 if(window.MAIRPassengerMode)return;
-const $=id=>document.getElementById(id),KEY='mair_passenger_host_v1',QR_LIB='https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+const $=id=>document.getElementById(id),KEY='mair_passenger_host_v1',QR_LIB='./vendor/qrcode.min.js';
 let state=load(),pollTimer=null,processing=false,domSyncQueued=false,qrLoading=null;
 function load(){try{return JSON.parse(sessionStorage.getItem(KEY)||'null')||{active:false,code:'',hostSecret:'',guestUrl:'',requests:[]}}catch{return{active:false,code:'',hostSecret:'',guestUrl:'',requests:[]}}}
 function save(){try{sessionStorage.setItem(KEY,JSON.stringify(state))}catch{}renderBadge()}
@@ -36,5 +36,5 @@ function syncDom(){if(domSyncQueued)return;domSyncQueued=true;requestAnimationFr
 // zodra ze er zijn; de bestaande tik van 1800 ms blijft het vangnet (audit M-7).
 const observer=new MutationObserver(syncDom);let overlayWatched=false,radioWatched=false;
 function watchTargets(){if(!radioWatched){const radio=$('tab-radio');if(radio){radioWatched=true;observer.observe(radio,{subtree:true,childList:true})}}if(!overlayWatched){const overlay=$('mairCarWaveOverlay');if(overlay){overlayWatched=true;observer.observe(overlay,{childList:true})}}}
-watchTargets();window.addEventListener('mair:car-mode',()=>{watchTargets();setTimeout(syncDom,100)});if(state.active)startPoll();setInterval(()=>{watchTargets();syncDom()},1800);syncDom();window.MAIRPassengerMode={version:'2026-08-30-v5-qr-iphone-fix',open:openPanel,create,close,refresh,state:()=>({...state,requests:[...(state.requests||[])]})};
+watchTargets();window.addEventListener('mair:car-mode',()=>{watchTargets();setTimeout(syncDom,100)});if(state.active)startPoll();setInterval(()=>{if(document.hidden)return;watchTargets();syncDom()},1800);document.addEventListener('visibilitychange',()=>{if(!document.hidden){watchTargets();syncDom()}});syncDom();window.MAIRPassengerMode={version:'2026-08-30-v5-qr-iphone-fix',open:openPanel,create,close,refresh,state:()=>({...state,requests:[...(state.requests||[])]})};
 })();
