@@ -2,7 +2,11 @@
 
 - **Datum:** 22/23-09-2026
 - **Branch:** `claude/achtergrondgedrag-20260922`
-- **Status:** ontwerp goedgekeurd door Josh (richting B, smalle variant). Nog geen code geschreven.
+- **Status:** uitgevoerd op 23-09-2026. Zie `2026-09-23-testrapport.md` voor wat er
+  gebouwd is en wat er onderweg anders bleek. Twee dingen stonden niet in dit ontwerp en
+  waren wel nodig: `ensureVoiceReady()` in `mair-dj-v2.js` weigerde onvoorwaardelijk te
+  praten met het scherm uit, en de achtergrondwacht brak elke lopende break af. Zolang die
+  twee er onvoorwaardelijk staan, haalt geen enkele keep-alive het succescriterium.
 
 ## 1. De eis
 
