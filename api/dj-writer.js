@@ -42,5 +42,13 @@ export default async function handler(req,res){
     }else attempts.push({provider:'claude',model:c.model,status:c.status,error:c.error});
   }
   if(key)for(const model of models){try{const remaining=deadline-Date.now();if(remaining<750){attempts.push({model,status:504,error:'Groq total deadline exceeded'});break}const r=await timedFetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json','X-MAIR-Request-ID':requestId},body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:user}],temperature:.64,max_completion_tokens:420,top_p:.88,reasoning_effort:'low',include_reasoning:false})},Math.min(6000,remaining)),d=await r.json().catch(()=>({}));if(!r.ok){const error=safe(d?.error?.message||`Groq HTTP ${r.status}`,500);attempts.push({model,status:r.status,error});if([401,403,429].includes(r.status))break;continue}const text=safe(d?.choices?.[0]?.message?.content,1200).replace(/^['"“”]+|['"“”]+$/g,'').trim();if(!text){attempts.push({model,status:502,error:'Groq gaf geen DJ-tekst terug'});continue}return res.status(200).json({text,estimatedWords:text.split(/\s+/).filter(Boolean).length,breakType:p.breakType,promptVersion:MAIR_DJ_PROMPT_VERSION,provider:'groq',model,requestId,persona:p.djProfile,usage:d?.usage||null,attempts})}catch(e){attempts.push({model,status:e?.name==='AbortError'?504:500,error:e?.name==='AbortError'?'Groq timeout':safe(e?.message||e,500)})}}
-  const last=attempts.at(-1)||{model:models[0],status:502,error:'Groq gaf geen DJ-tekst terug'},status=[401,403,429].includes(last.status)?last.status:last.status===504?504:502;return res.status(status).json({error:last.error,provider:last.provider||'groq',model:last.model,requestId,promptVersion:MAIR_DJ_PROMPT_VERSION,attempts})
+  const last=attempts.at(-1)||{model:models[0],status:502,error:'Groq gaf geen DJ-tekst terug'},status=[401,403,429].includes(last.status)?last.status:last.status===504?504:502;
+  // De enige regel die deze route bij een storing achterlaat. Zonder dit staat er
+  // in de productielogs niets over een DJ die zweeg: het hele backend-oppervlak
+  // had een console.error. De ruis eromheen (DEP0169 url.parse) komt uit de
+  // Vercel-runtime en is niet van ons; het prefix maakt onze eigen regels
+  // vindbaar met: vercel logs <url> | grep 'MAIRFM!'
+  // Geen prompt, geen tekst, geen sleutels - alleen wat er misging.
+  console.error('MAIRFM!',JSON.stringify({route:'dj-writer',status,provider:last.provider||'groq',model:last.model,error:String(last.error||'').slice(0,300),attempts:attempts.length,requestId}));
+  return res.status(status).json({error:last.error,provider:last.provider||'groq',model:last.model,requestId,promptVersion:MAIR_DJ_PROMPT_VERSION,attempts})
 }

@@ -21,4 +21,20 @@ ok('release features wired at runtime',index.includes('<script src="music-choice
 ok('legacy alternate TTS APIs removed',!exists('api/tts-elevenlabs.js')&&!exists('api/tts-piper.js')&&!exists('api/elevenlabs-voices.js'));ok('Fish remains primary TTS endpoint',exists('api/tts.js')&&read('debug-tts.js').includes("fetch('/api/tts'"));
 ok('api/_ai.js timeout',read('api/_ai.js').includes('AbortController')&&read('api/_ai.js').includes('timedFetch'));for(const f of ['api/fact.js','api/discover.js','api/dj.js'])if(exists(f))ok(`${f} timeout`,(src=>src.includes('timedFetch')||src.includes("from './_ai.js'"))(read(f)));if(exists('personal-top40.js')){const t=read('personal-top40.js');ok('Top 40 dedupe/clear',t.includes('canonicalKey')&&t.includes('mergeEntries')&&t.includes('clearTop40'))}
 const temp=files.filter(f=>/(^|\/)(\.noop|\.placeholder|__noop__|.*-replacement\.js|.*\.tmp)$/.test(f));ok('no temporary deploy files',temp.length===0,temp.join(', '));for(const j of ['package.json','vercel.json','manifest.webmanifest'])if(exists(j)){try{JSON.parse(read(j));pass.push(`valid JSON ${j}`)}catch(e){fail.push(`valid JSON ${j} — ${e.message}`)}}
+// Beveiligingskoppen. Toegevoegd op 23-09-2026 en lokaal getest tegen de
+// draaiende app: opstarten, Spotify-SDK, albumhoezen, de DJ-stem en een
+// hoorbare testbreak gaven nul overtredingen. Deze controle bestaat omdat een
+// CSP die stilletjes verdwijnt niets meer beschermt, en een CSP die te streng
+// wordt de app breekt zonder dat een test dat merkt.
+{
+  const cfg=JSON.parse(read('vercel.json')),all=(cfg.headers||[]).find(h=>h.source==='/(.*)'),head=k=>((all&&all.headers||[]).find(x=>x.key===k)||{}).value||'';
+  const csp=head('Content-Security-Policy');
+  ok('Content-Security-Policy aanwezig',!!csp);
+  ok('CSP staat geen losse scripts toe',!!csp&&csp.includes("script-src 'self'")&&!csp.includes("'unsafe-eval'")&&!/script-src[^;]*'unsafe-inline'/.test(csp));
+  for(const need of ['https://sdk.scdn.co','https://api.spotify.com','https://accounts.spotify.com','blob:'])
+    ok(`CSP laat ${need} toe`,!!csp&&csp.includes(need));
+  ok('Permissions-Policy aanwezig',head('Permissions-Policy').includes('geolocation=(self)'));
+  ok('Referrer-Policy aanwezig',!!head('Referrer-Policy'));
+  ok('X-Content-Type-Options aanwezig',head('X-Content-Type-Options')==='nosniff');
+}
 console.log(`Josh FM predeploy: ${pass.length} PASS, ${fail.length} FAIL`);if(fail.length){for(const x of fail)console.error('FAIL:',x);process.exit(1)}for(const x of pass.filter(x=>!x.startsWith('syntax ')))console.log('PASS:',x);
