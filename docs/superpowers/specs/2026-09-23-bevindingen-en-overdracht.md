@@ -124,6 +124,25 @@ Zeg dit in het eindrapport expliciet, niet als "groen":
 Desktop-Chrome bevriest een achtergrondtabblad anders dan iOS Safari een PWA. Een groene
 browsertest zegt niets over de eis "DJ praat door met scherm uit".
 
+## Nog niet gedaan, wel beloofd
+
+**Beveiligingscontrole op de vier open AI-routes.** Stond op de lijst van de vorige
+sessie en is er niet van gekomen. Wat er ligt:
+
+- `/api/dj-writer`, `/api/discover`, `/api/category-filter` en `/api/news-bulletin` zijn
+  zonder authenticatie bereikbaar.
+- De rate limit in die routes is een `Map` in het geheugen van de lambda, dus hij werkt
+  **per instance** — bij opschaling schaalt de limiet mee omhoog.
+- Zolang Groq het werk gratis doet is misbruik hooguit vervelend. Zodra er een betaalde
+  sleutel in gaat, kost het geld. Beslis dit vóór die sleutel erin gaat.
+- Er is **nergens een Content-Security-Policy**: niet in `vercel.json` (dat zet alleen
+  `Referrer-Policy` en `X-Content-Type-Options`) en niet als meta-tag in `index.html`.
+- `/api/config` geeft ongeauthenticeerd de `spotifyClientId` en een Mapbox `pk.`-token.
+  Allebei publieke waarden die in de client horen — geen lek, wel het vermelden waard.
+
+Draai `/security-review` hierop en leg de uitkomst aan Josh voor voordat er iets
+verandert.
+
 ## Volgorde die Josh heeft goedgekeurd
 
 1. Achtergrondgedrag, **smalle variant** — zie
