@@ -16,14 +16,14 @@ class FakeCustomEvent{constructor(type,options={}){this.type=type;this.detail=op
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:['2026-08-26T10:30:00Z']))}static now(){return Date.now()}}
 function makeElement(extra={}){return{value:'',textContent:'',dataset:{},checked:false,addEventListener(){},querySelector(){return null},cloneNode(){return makeElement({...this})},replaceWith(){},...extra}}
 
-function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTransport=true,writerSucceeds=true,writerDelay=0,prepareDelay=0,prepareFailures=0,playerFailures=0,writerText='Dit is een voorbereide MAIR DJ-break.',writerTexts=null,factsEnabled=false,requestTrackId='',writerAttempts=null}={}){
+function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTransport=true,writerSucceeds=true,writerDelay=0,prepareDelay=0,prepareFailures=0,playerFailures=0,writerText='Dit is een voorbereide MAIR DJ-break.',writerTexts=null,factsEnabled=false,requestTrackId='',writerAttempts=null,ducking=true}={}){
   const bus=new FakeEventTarget();
   const elements={talk:makeElement({value:'1'}),facts:makeElement({checked:factsEnabled}),talkValue:makeElement(),djBreakTime:makeElement(),djText:makeElement()};
   const document={readyState:'complete',visibilityState:hidden?'hidden':'visible',getElementById:id=>elements[id]||null,addEventListener(){}};
   const storage=new Map([['jfm_spotify_device_id','device-test']]);
   const localStorage={getItem:k=>storage.has(k)?storage.get(k):null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},sessionStorage=localStorage;
   const remote={id:'A',uri:'spotify:track:A',playing:true,progress:4000};
-  const metrics={genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,speak:0,speakAborted:0,playbackActions:0,prepare:0,prepareAborted:0,writerAborted:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0,requestConsume:0};
+  const metrics={genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,djDuck:0,djUnduck:0,speak:0,speakAborted:0,playbackActions:0,prepare:0,prepareAborted:0,writerAborted:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0,requestConsume:0};
   let operation=null,expectedLive=true;
   const playbackTruth={
     get:()=>({trackId:remote.id,uri:remote.uri,isPlaying:remote.playing,expectedLive,operation}),
@@ -53,6 +53,12 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
     JFMPlayback.djResume=async uri=>{assert.equal(uri,remote.uri);metrics.djResume++;remote.playing=true;return true};
     JFMPlayback.djRewind=async uri=>{assert.equal(uri,remote.uri);metrics.djRewind++;remote.progress=0;return true};
   }
+  // De echte transportlaag kan sinds de duckingwijziging het volume wegdraaien.
+  // De muziek blijft daarbij spelen: remote.playing wordt bewust niet aangeraakt.
+  if(ducking){
+    JFMPlayback.djDuck=async()=>{metrics.djDuck++;return true};
+    JFMPlayback.djUnduck=async()=>{metrics.djUnduck++;return true};
+  }
   const window={addEventListener:(...a)=>bus.addEventListener(...a),removeEventListener:(...a)=>bus.removeEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:playbackTruth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}},jfmIsRequest:t=>!!requestTrackId&&String(t?.id||'')===String(requestTrackId),JFMRequests:{consumeCurrentRequest:t=>{if(requestTrackId&&String(t?.id||'')===String(requestTrackId)){metrics.requestConsume++;return{requestId:'test-request',trackId:requestTrackId}}return null}}};
   const math=Object.create(Math);math.random=()=>0;
   const context={window,document,localStorage,sessionStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText,setTimeout,clearTimeout,AbortController,Promise,Date:FixedDate,Math:math,console};
@@ -70,10 +76,11 @@ async function prepareAutomaticDue(h){h.natural('A','B');await sleep(20);h.natur
 
 async function testSuccessfulAutomaticBreak(){
   const h=createHarness();await prepareAutomaticDue(h);const queuesBeforeAir=h.metrics.queueCalls;h.natural('D','E');await sleep(700);
-  assert.equal(h.metrics.djPause,1,`successful break uses SDK-first DJ pause exactly once: ${JSON.stringify(h.state())}`);
+  assert.equal(h.metrics.djDuck,1,`successful break ducks the music exactly once: ${JSON.stringify(h.state())}`);
+  assert.equal(h.metrics.djPause,0,'ducking mag de muziek nooit stoppen');
   assert.equal(h.metrics.speak,1,'successful break speaks exactly once');
-  assert.equal(h.metrics.djRewind,1,'successful break rewinds exactly once');
-  assert.equal(h.metrics.djResume,1,'successful break resumes exactly once');
+  assert.equal(h.metrics.djRewind,0,'een geduckte break speelt door, dus er valt niets terug te spoelen');
+  assert.equal(h.metrics.djUnduck,1,'successful break restores the volume exactly once');assert.equal(h.metrics.djResume,0);
   assert.equal(h.metrics.genericPause,0,'generic pause must not own DJ handoff');
   assert.equal(h.metrics.genericResume,0,'generic resume must not own DJ handoff');
   assert.equal(h.metrics.queueCalls,queuesBeforeAir,'critical on-air handoff must not fetch Spotify queue');
@@ -81,12 +88,12 @@ async function testSuccessfulAutomaticBreak(){
 }
 async function testDuplicateNaturalEventCannotDoubleAir(){
   const h=createHarness();await prepareAutomaticDue(h);h.natural('D','E');h.natural('D','E');await sleep(700);
-  assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djResume,1);assert.equal(new Set(h.state().terminalBreaks.map(x=>x.breakId)).size,h.state().terminalBreaks.length,'ieder breakId bereikt exact één terminal state');assert.equal(h.state().terminalBreaks.filter(x=>x.status==='COMPLETED').length,1)
+  assert.equal(h.metrics.djDuck,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djUnduck,1);assert.equal(new Set(h.state().terminalBreaks.map(x=>x.breakId)).size,h.state().terminalBreaks.length,'ieder breakId bereikt exact één terminal state');assert.equal(h.state().terminalBreaks.filter(x=>x.status==='COMPLETED').length,1)
 }
 async function testVoiceFailureRestoresOnceAndNeverRetries(){
   const h=createHarness({speakSucceeds:false});await prepareAutomaticDue(h);h.natural('D','E');await sleep(800);const first={...h.metrics};
-  assert.equal(first.djPause,1);assert.equal(first.speak,1);assert.equal(first.djResume,1,'failed voice restores music once');assert.equal(first.djRewind,0,'failed voice must not rewind before restore');assert.equal(h.state().missed,1);
-  await sleep(1900);assert.equal(h.metrics.djPause,first.djPause);assert.equal(h.metrics.speak,first.speak);assert.equal(h.metrics.djResume,first.djResume)
+  assert.equal(first.djDuck,1);assert.equal(first.speak,1);assert.equal(first.djUnduck,1,'failed voice restores the volume once');assert.equal(first.djRewind,0,'failed voice must not rewind before restore');assert.equal(first.djPause,0,'een mislukte stem mag de muziek niet hebben gestopt');assert.equal(h.state().missed,1);
+  await sleep(1900);assert.equal(h.metrics.djDuck,first.djDuck);assert.equal(h.metrics.speak,first.speak);assert.equal(h.metrics.djUnduck,first.djUnduck)
 }
 async function testManualSkipCancelsPreparedBreakWithoutTouchingMusic(){
   const h=createHarness();h.window.MAIRDJ.armManual();await sleep(80);assert.equal(h.state().phase,'ARMED');h.changed('A','B','primary-next');await sleep(1900);
@@ -98,20 +105,22 @@ async function testBackgroundedBreakNeverPausesMusic(){
 }
 async function testManualDJAtNextNaturalTransition(){
   const h=createHarness();assert.equal(h.window.MAIRDJ.armManual(),true);await sleep(80);assert.equal(h.state().phase,'ARMED');h.natural('A','B');await sleep(700);
-  assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djResume,1);assert.equal(h.state().played,1)
+  assert.equal(h.metrics.djDuck,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djUnduck,1);assert.equal(h.state().played,1)
 }
 async function testWebApiFallbackStillWorks(){
-  const h=createHarness({sdkTransport:false});await prepareAutomaticDue(h);h.natural('D','E');await sleep(1300);
+  // ducking uit: deze test bewijst juist dat de oude pauzeroute over de Web API
+  // nog werkt als de transportlaag niet kan ducken.
+  const h=createHarness({sdkTransport:false,ducking:false});await prepareAutomaticDue(h);h.natural('D','E');await sleep(1300);
   assert.equal(h.metrics.genericPause,1,'fallback uses generic primary pause');assert.equal(h.metrics.genericResume,1,'fallback uses generic primary resume');assert.equal(h.metrics.speak,1);assert.equal(h.state().played,1);assert.equal(h.state().transport,'web-api-fallback')
 }
 async function testLateManualPreparationRebasesSafely(){
-  const h=createHarness({writerDelay:180});assert.equal(h.window.MAIRDJ.armManual(),true);await sleep(25);h.natural('A','B');await sleep(40);assert.equal(h.metrics.writerAborted,1,'oude writer hoort bij track A en wordt geannuleerd');assert.equal(h.metrics.djPause,0);await sleep(430);assert.equal(h.state().phase,'ARMED',`manual break should re-arm for B: ${JSON.stringify(h.state())}`);assert.equal(h.state().retries.prepareRebases,1);h.natural('B','C');await sleep(700);assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.state().played,1)
+  const h=createHarness({writerDelay:180});assert.equal(h.window.MAIRDJ.armManual(),true);await sleep(25);h.natural('A','B');await sleep(40);assert.equal(h.metrics.writerAborted,1,'oude writer hoort bij track A en wordt geannuleerd');assert.equal(h.metrics.djPause,0);await sleep(430);assert.equal(h.state().phase,'ARMED',`manual break should re-arm for B: ${JSON.stringify(h.state())}`);assert.equal(h.state().retries.prepareRebases,1);h.natural('B','C');await sleep(700);assert.equal(h.metrics.djDuck,1);assert.equal(h.metrics.speak,1);assert.equal(h.state().played,1)
 }
 async function testLateAutomaticPreparationIsNotLost(){
-  const h=createHarness({writerDelay:180});h.natural('A','B');await sleep(25);h.natural('B','C');await sleep(25);h.natural('C','D');await sleep(25);h.natural('D','E');await sleep(40);assert.equal(h.metrics.writerAborted,1,'oude automatische writer wordt bij de overgang geannuleerd');await sleep(430);assert.equal(h.state().phase,'ARMED',`automatic break should be prepared for E: ${JSON.stringify(h.state())}`);assert.equal(h.state().retries.prepareRebases,1);h.natural('E','F');await sleep(700);assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.state().played,1)
+  const h=createHarness({writerDelay:180});h.natural('A','B');await sleep(25);h.natural('B','C');await sleep(25);h.natural('C','D');await sleep(25);h.natural('D','E');await sleep(40);assert.equal(h.metrics.writerAborted,1,'oude automatische writer wordt bij de overgang geannuleerd');await sleep(430);assert.equal(h.state().phase,'ARMED',`automatic break should be prepared for E: ${JSON.stringify(h.state())}`);assert.equal(h.state().retries.prepareRebases,1);h.natural('E','F');await sleep(700);assert.equal(h.metrics.djDuck,1);assert.equal(h.metrics.speak,1);assert.equal(h.state().played,1)
 }
 async function testWriterFailureUsesSafeDutchFallback(){
-  const h=createHarness({writerSucceeds:false});await prepareAutomaticDue(h);assert.equal(h.state().writer.provider,'local-fallback');assert.match(h.state().writer.text,/MAIR/);assert.doesNotMatch(h.state().writer.text,/\bAI\b|Groq|Spotify API/i);h.natural('D','E');await sleep(700);assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djResume,1);assert.equal(h.state().played,1)
+  const h=createHarness({writerSucceeds:false});await prepareAutomaticDue(h);assert.equal(h.state().writer.provider,'local-fallback');assert.match(h.state().writer.text,/MAIR/);assert.doesNotMatch(h.state().writer.text,/\bAI\b|Groq|Spotify API/i);h.natural('D','E');await sleep(700);assert.equal(h.metrics.djDuck,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djUnduck,1);assert.equal(h.state().played,1)
 }
 // H-4. Spotify koos een andere volgende track dan de voorbereiding voorspelde.
 // Of dat de break mag slopen hangt af van de tekst, niet van de voorspelling:
@@ -128,7 +137,7 @@ async function testChangedNextTrackKeepsIndependentCopy(){
   assert.equal(h.state().phase,'ARMED');assert.equal(h.state().brain.breakType,'TRACK_FACT');
   h.natural('C','X');await sleep(700);
   assert.equal(h.metrics.speak,1,'een break die de volgende track niet noemt blijft geldig en moet de lucht in');
-  assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.djResume,1);assert.equal(h.state().played,1);assert.equal(h.state().missed,0)
+  assert.equal(h.metrics.djDuck,1);assert.equal(h.metrics.djUnduck,1);assert.equal(h.state().played,1);assert.equal(h.state().missed,0)
 }
 async function testChangedVoiceProfileDropsPreparedBreakBeforePause(){
   const h=createHarness();await prepareAutomaticDue(h);h.setProfile('maya');h.natural('D','E');await sleep(650);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,0);assert.equal(h.metrics.djResume,0);assert.equal(h.state().missed,1);assert.match(h.state().error,/DJ-profiel wijzigde/)
@@ -140,7 +149,7 @@ async function testStaleTTSResponseIsCancelled(){
   const h=createHarness({prepareDelay:220});h.window.MAIRDJ.armManual();await sleep(30);h.changed('A','B');await sleep(300);assert.equal(h.metrics.prepareAborted,1);assert.equal(h.metrics.djPause,0);assert.equal(h.state().prepared,null);assert.equal(h.state().phase,'COUNTING')
 }
 async function testUserOverrideDuringBreakWins(){
-  const h=createHarness({speakDelay:350});await prepareAutomaticDue(h);h.natural('D','E');await sleep(260);h.changed('E','X');await sleep(700);assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.speakAborted,1);assert.equal(h.metrics.djResume,0,'DJ mag de door de gebruiker gekozen track niet vervangen');assert.equal(h.state().played,0);assert.equal(h.state().phase,'COUNTING');assert.equal(h.state().terminalBreaks.at(-1).status,'ABORTED_USER_ACTION')
+  const h=createHarness({speakDelay:350});await prepareAutomaticDue(h);h.natural('D','E');await sleep(260);h.changed('E','X');await sleep(700);assert.equal(h.metrics.djDuck,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.speakAborted,1);assert.equal(h.metrics.djResume,0,'DJ mag de door de gebruiker gekozen track niet vervangen');assert.equal(h.metrics.djUnduck,1,'het volume moet ook bij een overname terug, anders blijft de muziek permanent zacht');assert.equal(h.state().played,0);assert.equal(h.state().phase,'COUNTING');assert.equal(h.state().terminalBreaks.at(-1).status,'ABORTED_USER_ACTION')
 }
 async function testSkipCancelsVoiceAtRaceBoundaries(){
   for(const delay of [0,120,480]){const h=createHarness({speakDelay:650});await prepareAutomaticDue(h);h.natural('D','E');for(let i=0;i<30&&h.state().phase!=='SPEAKING';i++)await sleep(10);assert.equal(h.state().phase,'SPEAKING',`voice did not start for delay ${delay}`);if(delay)await sleep(delay);await h.window.MAIRDJ.cancelActive('USER_NEXT');h.changed('E',`X-${delay}`);await sleep(220);assert.equal(h.metrics.speak,1,`delay ${delay}: one voice started`);assert.equal(h.metrics.speakAborted,1,`delay ${delay}: active voice stopped once`);assert.equal(h.metrics.playbackActions,1,`delay ${delay}: exactly one playback action`);assert.equal(h.metrics.djResume,0,`delay ${delay}: no stale DJ resume`);assert.equal(h.state().played,0,`delay ${delay}: cancelled voice is not committed as aired`);assert.equal(h.state().terminalBreaks.at(-1).status,'ABORTED_USER_ACTION',`delay ${delay}: terminal cancel state`);assert.equal(new Set(h.state().terminalBreaks.map(x=>x.breakId)).size,h.state().terminalBreaks.length,`delay ${delay}: one terminal state per break`)}
@@ -200,6 +209,17 @@ async function testUpstreamFallbackReasonStaysVisible(){
   assert.equal(clean.state().writer.upstream,'','zonder afhakers hoort er geen ruis in de diagnostiek te staan');
 }
 
+// Kan de transportlaag niet ducken, dan mag de break niet sneuvelen: hij valt
+// terug op de beproefde pauzeroute, inclusief terugspoelen omdat de track dan
+// wel echt heeft stilgestaan.
+async function testBreakFallsBackToPauseWhenDuckingIsUnavailable(){
+  const h=createHarness({ducking:false});await prepareAutomaticDue(h);h.natural('D','E');await sleep(700);
+  assert.equal(h.metrics.djDuck,0);
+  assert.equal(h.metrics.djPause,1,'zonder ducking pauzeert de DJ zoals voorheen');
+  assert.equal(h.metrics.djRewind,1,'de pauzeroute spoelt wel terug, want de track heeft stilgestaan');
+  assert.equal(h.metrics.djResume,1);assert.equal(h.metrics.speak,1);assert.equal(h.state().played,1);assert.equal(h.state().missed,0);
+}
+
 const tests=[
   ['automatic break uses SDK-first critical path',testSuccessfulAutomaticBreak],
   ['duplicate natural event is idempotent',testDuplicateNaturalEventCannotDoubleAir],
@@ -213,6 +233,7 @@ const tests=[
   ['writer failure uses safe Dutch fallback',testWriterFailureUsesSafeDutchFallback],
   ['changed next track drops stale DJ copy before pause',testChangedNextTrackDropsStaleCopyBeforePause],
   ['changed next track keeps a break that never named it',testChangedNextTrackKeepsIndependentCopy],
+  ['a break falls back to pausing when ducking is unavailable',testBreakFallsBackToPauseWhenDuckingIsUnavailable],
   ['a provider that dropped out stays visible in diagnostics',testUpstreamFallbackReasonStaysVisible],
   ['changed DJ profile drops prepared voice before pause',testChangedVoiceProfileDropsPreparedBreakBeforePause],
   ['stale writer response is cancelled on track change',testStaleWriterResponseIsCancelled],

@@ -278,6 +278,57 @@ async function testStoredVolumeReturnsOnANewDevice(){
   assert.deepEqual(metrics.volumeSdk,[0.3],'hetzelfde apparaat wordt niet opnieuw gezet');
 }
 
-const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive],['iOS transport delegates to primary',testIosTransportDelegatesToPrimary],['reloaded playback truth requires fresh confirmation',testReloadedTruthRequiresFreshConfirmation],['transient SDK errors heal after confirmed playback',testTransientSdkErrorsHeal],['skip voice cancel transaction owns exactly one playback action',testSkipCancelTransactionWiring],['SDK context reset is recognised as a natural end',testSdkContextResetEndDetection],['resume guard advances a stuck track exactly once',testResumeGuardStopsRepeatOfSameTrack],['resume guard never loops on the same track',testResumeGuardAdvancesOnlyOncePerTrack],['context end without a next track fails once and visibly',testContextEndWithoutNextTrack],['queue append survives a single refused track',testTolerantQueueAppend],['volume prefers the local player over the Web API',testVolumeUsesLocalPlayerBeforeWebApi],['volume falls back to the Web API for other devices',testVolumeFallsBackToWebApiForOtherDevices],['volume clamps and fails without stopping music',testVolumeClampsAndNeverThrows],['stored volume returns on a new device',testStoredVolumeReturnsOnANewDevice],['a fresh install starts at full volume',testFreshInstallStartsAtFullVolume]];
+// Ducking. De muziek zakt weg onder de stem in plaats van te stoppen. Drie
+// eigenschappen die hier echt toe doen: het is een fractie van het volume van
+// de luisteraar (niet een vaste waarde), het raakt zijn bewaarde stand niet
+// aan, en het laat de muziek nooit zacht achter.
+async function testDuckingIsAFractionOfTheListenersVolume(){
+  const{context,metrics}=primaryHarness({sdkVolume:true});
+  await context.JFMPlayback.setVolume(0.8);
+  metrics.volumeSdk.length=0;
+  assert.equal(await context.JFMPlayback.djDuck(),true);
+  assert.equal(context.JFMPlayback.ducked,true);
+  assert.ok(metrics.volumeSdk.length>1,'het volume hoort in stappen te zakken; een harde sprong klinkt als een storing');
+  const bottom=metrics.volumeSdk.at(-1);
+  assert.ok(Math.abs(bottom-0.8*0.18)<0.0001,`ducking hoort naar een fractie van 0.8 te gaan, niet naar een vaste waarde (werd ${bottom})`);
+  assert.equal(context.localStorage.getItem('mair_volume_v1'),'0.8','ducking mag de bewaarde stand nooit overschrijven');
+  assert.equal(context.JFMPlayback.volume,0.8);
+  await context.JFMPlayback.djUnduck();
+  assert.equal(context.JFMPlayback.ducked,false);
+  assert.equal(metrics.volumeSdk.at(-1),0.8,'na de break staat het volume weer op de stand van de luisteraar');
+}
+async function testVolumeChangeDuringABreakKeepsTheMusicDucked(){
+  const{context,metrics}=primaryHarness({sdkVolume:true});
+  await context.JFMPlayback.setVolume(0.9);
+  await context.JFMPlayback.djDuck();
+  metrics.volumeSdk.length=0;
+  await context.JFMPlayback.setVolume(0.5);
+  assert.deepEqual(metrics.volumeSdk,[],'aan het volume draaien terwijl de DJ praat mag de ducking niet opheffen');
+  assert.equal(context.localStorage.getItem('mair_volume_v1'),'0.5','de nieuwe stand wordt wel onthouden');
+  await context.JFMPlayback.djUnduck();
+  assert.equal(metrics.volumeSdk.at(-1),0.5,'na de break geldt de nieuwe stand, niet de oude');
+}
+async function testDuckingIsIdempotentAndReportsWhenItCannot(){
+  const{context,metrics}=primaryHarness({sdkVolume:true});
+  await context.JFMPlayback.djDuck();
+  const afterDuck=metrics.volumeSdk.length;
+  await context.JFMPlayback.djDuck();
+  assert.equal(metrics.volumeSdk.length,afterDuck,'twee keer ducken mag niet twee keer zakken');
+  await context.JFMPlayback.djUnduck();
+  const afterRestore=metrics.volumeSdk.length;
+  await context.JFMPlayback.djUnduck();
+  assert.equal(metrics.volumeSdk.length,afterRestore,'twee keer terugdraaien is een no-op');
+  // Zonder speler en zonder device kan er niet geduckt worden. Dan hoort djDuck
+  // eerlijk false te melden, zodat de DJ terugvalt op pauzeren in plaats van
+  // stilletjes over een onveranderd volume heen te praten.
+  const bare=primaryHarness({sdkVolume:true});
+  delete bare.context.jfmSpotifyPlayer;
+  bare.context.JFMSpotifySDK.deviceId='';
+  bare.context.localStorage.removeItem('jfm_spotify_device_id');
+  assert.equal(await bare.context.JFMPlayback.djDuck(),false);
+  assert.equal(bare.context.JFMPlayback.ducked,false,'een mislukte duck mag de vlag niet laten hangen');
+}
+
+const tests=[['auth refresh single-flight, timeout and 401 retry',testAuthSingleFlightAndRetry],['primary singleton and natural-end idempotency',testPrimarySingletonAndNaturalEnd],['Spotify SDK singleton',testSdkSingleton],['runtime-ready reentrancy guard',testRuntimeReadyIsNotRecursive],['iOS transport delegates to primary',testIosTransportDelegatesToPrimary],['reloaded playback truth requires fresh confirmation',testReloadedTruthRequiresFreshConfirmation],['transient SDK errors heal after confirmed playback',testTransientSdkErrorsHeal],['skip voice cancel transaction owns exactly one playback action',testSkipCancelTransactionWiring],['SDK context reset is recognised as a natural end',testSdkContextResetEndDetection],['resume guard advances a stuck track exactly once',testResumeGuardStopsRepeatOfSameTrack],['resume guard never loops on the same track',testResumeGuardAdvancesOnlyOncePerTrack],['context end without a next track fails once and visibly',testContextEndWithoutNextTrack],['queue append survives a single refused track',testTolerantQueueAppend],['volume prefers the local player over the Web API',testVolumeUsesLocalPlayerBeforeWebApi],['volume falls back to the Web API for other devices',testVolumeFallsBackToWebApiForOtherDevices],['volume clamps and fails without stopping music',testVolumeClampsAndNeverThrows],['stored volume returns on a new device',testStoredVolumeReturnsOnANewDevice],['a fresh install starts at full volume',testFreshInstallStartsAtFullVolume],['ducking is a fraction of the listener volume',testDuckingIsAFractionOfTheListenersVolume],['changing volume mid-break keeps the music ducked',testVolumeChangeDuringABreakKeepsTheMusicDucked],['ducking is idempotent and reports when it cannot',testDuckingIsIdempotentAndReportsWhenItCannot]];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(error){console.error('FAIL',name,'—',error?.stack||error);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`Playback package 1: ${passed}/${tests.length} PASS`);

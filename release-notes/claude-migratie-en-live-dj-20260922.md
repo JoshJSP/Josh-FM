@@ -154,6 +154,49 @@ wat je hoorde.
 
 ---
 
+## 2b. Ducking — de DJ praat nu over de muziek heen
+
+Auditpunt H-6 stap 2. Tot nu toe **stopte** de muziek als de DJ praatte: pauze,
+stem, hervatten, en daarna de track terugspoelen naar nul. Nu zakt het volume
+weg onder de stem en speelt het nummer door.
+
+Wat je hoort verandert hierdoor merkbaar. Vroeger begon het nieuwe nummer
+opnieuw na de break; nu spelen de eerste seconden zacht onder de DJ door, zoals
+op echte radio. Dat is de opzet, maar het is wel het eerste dat je zult opmerken.
+
+Drie dingen die de implementatie bewaakt:
+
+- **Ducking is een fractie van jouw volume**, niet een vaste waarde. Staat MAIR
+  al zacht, dan wordt de break niet ineens harder. De fractie is `DUCK_RATIO` in
+  `playback-primary.js`, nu `.18`. Dat getal is een gok op basis van niets —
+  klinkt het te zacht of te hard onder de stem, dan is dat de knop.
+- **Het zakken gaat in zes stappen** over ruim een kwart seconde. Een harde
+  sprong naar een vijfde klinkt onder een stem als een storing. De ramp draait
+  alleen op de lokale speler; via de Web API zou hij zes HTTP-calls kosten in een
+  pad dat een paar honderd milliseconden mag duren, dus daar is het één stap.
+- **Het volume gaat altijd terug.** Ook als de stem faalt, ook als jij midden in
+  een break een ander nummer kiest. Dat laatste was een echte bug in mijn eerste
+  versie: bij pauzeren is niet-hervatten juist correct (jij koos een andere
+  track), maar bij ducking is er niets gestopt om mee te vechten — alleen volume
+  om te herstellen. Zonder die correctie bleef de muziek permanent op een vijfde
+  staan. Een test bewaakt dat nu.
+
+Kan de transportlaag niet ducken — geen speler en geen bekend apparaat — dan
+valt de break terug op de oude pauzeroute, inclusief terugspoelen. Die route is
+niet weggegooid.
+
+**Wat dit opent:** de reden dat de DJ met het scherm uit zwijgt is dat pauzeren
+de audio stopt, en een app die geen audio meer produceert kan door iOS worden
+opgeschort — met de muziek permanent uit als gevolg. Ducking stopt de audio
+nooit. Daarmee vervalt de belangrijkste reden achter die blokkade. Ik heb hem
+niet weggehaald: dat is een aparte wijziging die je eerst met deze in je hand
+wilt beoordelen.
+
+De voice-check in Diagnostiek blijft bewust pauzeren. Daar wil je de stem juist
+kaal horen.
+
+---
+
 ## 3. Verder verbeterd
 
 **Volumeregeling** (auditpunt H-6 stap 1). MAIR had er geen enkele; zachter

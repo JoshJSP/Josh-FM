@@ -43,18 +43,55 @@
   const clampVolume=v=>Math.max(0,Math.min(1,Number(v)));
   // getItem geeft null als er niets staat, en Number(null) is 0 - niet NaN. Zonder
 // de null-controle startte een vers toestel dus op stil.
-let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||raw==='')return 1;const parsed=Number(raw);return Number.isFinite(parsed)?clampVolume(parsed):1}catch{return 1}})(),volumeDevice='';
+let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||raw==='')return 1;const parsed=Number(raw);return Number.isFinite(parsed)?clampVolume(parsed):1}catch{return 1}})(),volumeDevice='',appliedVolume=1,ducked=false;
   function paintVolume(){const slider=$('volume'),label=$('volumeValue'),pct=Math.round(volume*100);if(slider&&document.activeElement!==slider)slider.value=String(pct);if(label)label.textContent=pct+'%';try{window.dispatchEvent(new CustomEvent('mair:volume',{detail:{volume}}))}catch{}}
   async function pushVolume(v){
-    try{const p=player();if(p?.setVolume){await p.setVolume(v);return true}}catch{}
+    try{const p=player();if(p?.setVolume){await p.setVolume(v);appliedVolume=v;return true}}catch{}
     const id=deviceId();
     await api('/me/player/volume?volume_percent='+Math.round(v*100)+(id?'&device_id='+encodeURIComponent(id):''),{method:'PUT'});
-    return true;
+    appliedVolume=v;return true;
+  }
+  // Een harde sprong naar een vijfde van het volume klinkt onder een stem als een
+  // storing, niet als radio. Zes stappen in ruim een kwart seconde is genoeg om
+  // het als een bewuste beweging te laten klinken. De ramp draait alleen op de
+  // lokale speler: via de Web API zou hij zes HTTP-calls kosten in een pad dat
+  // een paar honderd milliseconden mag duren.
+  async function rampVolume(target){
+    const p=player();
+    if(!p?.setVolume){try{await pushVolume(target);return true}catch{return false}}
+    const from=appliedVolume,steps=6;
+    for(let i=1;i<=steps;i++){
+      try{await p.setVolume(clampVolume(from+(target-from)*(i/steps)))}catch{return false}
+      if(i<steps)await wait(40);
+    }
+    appliedVolume=target;return true;
+  }
+  // Ducking voor de DJ-overgang. Bewust géén setVolume(): de stand van Josh moet
+  // ongemoeid blijven, dit is tijdelijk. DUCK_RATIO is een fractie van zijn
+  // volume, niet een absolute waarde, anders wordt zachtluisteren juist harder.
+  const DUCK_RATIO=.18;
+  async function djDuck(){
+    if(ducked)return true;
+    if(!player()?.setVolume&&!deviceId())return false;
+    const ok=await rampVolume(clampVolume(volume*DUCK_RATIO));
+    if(ok)ducked=true;
+    return ok;
+  }
+  async function djUnduck(){
+    if(!ducked)return true;
+    const ok=await rampVolume(volume);
+    // Ook bij mislukking loslaten: blijven hangen op 'ducked' zou de muziek
+    // permanent zacht houden en elke volgende unduck overslaan.
+    ducked=false;
+    return ok;
   }
   async function setVolume(next){
     const v=clampVolume(next);if(!Number.isFinite(v))return false;
     volume=v;try{localStorage.setItem(VOLUME_KEY,String(v))}catch{}
     paintVolume();
+    // Tijdens een DJ-break alleen het basisniveau onthouden; de speler staat
+    // dan bewust zacht en mag daar niet uit worden geduwd.
+    if(ducked)return true;
     try{await pushVolume(v);return true}catch(e){lastError=String(e?.message||e);return false}
   }
   function syncVolumeToDevice(id){if(!id||id===volumeDevice)return;volumeDevice=id;if(volume>=1)return;pushVolume(volume).catch(()=>{})}
@@ -259,7 +296,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
   window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),450)});setInterval(()=>watchdog(),5000);/* 5s: de watchdog leest alleen lokale SDK-state zolang muziek speelt; Spotify wordt uitsluitend benaderd als playback daadwerkelijk stilstaat. */
 
-  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,playUri,recover,setVolume,bindVolume,get volume(){return volume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
+  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,djDuck,djUnduck,playUri,recover,setVolume,bindVolume,get ducked(){return ducked},get volume(){return volume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
   window.MAIRRuntime?.register?.('playback-primary',{version:'primary-v17-end-detection-guard',owner:'transport'});
 })();
