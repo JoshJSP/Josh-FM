@@ -48,6 +48,24 @@ async function testPrimarySingletonAndNaturalEnd(){
   remote.item={id:'C',uri:'spotify:track:CCCCCCCCCCCCCCCCCCCCCC'};remote.progress_ms=0;remote.is_playing=false;remote.device={id:'stale-page-device'};sdkPlaying=false;allowResume=false;const playsBeforeRecover=metrics.play,transfersBeforeRecover=metrics.transfer,handoversBeforeRecover=context.JFMPlayback.health.deviceHandovers,failuresBeforeRecover=context.JFMPlayback.health.failures;assert.equal(await context.JFMPlayback.recover('reload-test'),false);assert.equal(metrics.transfer,transfersBeforeRecover+1,'reload recovery must hand playback to the current browser SDK device');assert.equal(metrics.play,playsBeforeRecover+1,'a stale paused SDK context must be replaced by the persisted live track');assert.equal(context.JFMPlayback.health.reloadNeedsGesture,true,'blocked autoplay must request one explicit play gesture');assert.equal(context.JFMPlayback.health.failures,failuresBeforeRecover,'browser autoplay policy must not count as a playback failure');allowResume=true;assert.equal(await context.JFMPlayback.playPause(),true,'the explicit play gesture must finish the exact restore');assert.equal(metrics.play,playsBeforeRecover+2,'the gesture restore must retry the exact URI');assert.equal(remote.item.id,'B','reload recovery must restore the intended track');assert.ok(remote.progress_ms>=42000,'reload recovery must preserve or advance playback position');assert.equal(remote.is_playing,true,'an active radio must remain playing through exact reload restore');assert.equal(context.JFMPlayback.health.deviceHandovers,handoversBeforeRecover+1,'device handovers must be visible in diagnostics');assert.equal(context.JFMPlayback.health.reloadRestores,1,'exact reload restores must be visible in diagnostics');assert.equal(context.JFMPlayback.health.reloadNeedsGesture,false,'successful gesture restore must clear the autoplay prompt');
   const playsBeforeEndedRecovery=metrics.play;remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};remote.progress_ms=239000;remote.is_playing=false;remote.device={id:'device-1'};sdkPlaying=false;assert.equal(await context.JFMPlayback.recover('foreground-return'),true,'foreground recovery must recognize a track that ended while browser events were suspended');assert.equal(metrics.play,playsBeforeEndedRecovery+1,'ended foreground recovery must advance exactly once');assert.equal(remote.item.id,'B');
   const playsBeforeWatchdog=metrics.play;remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};remote.progress_ms=239000;remote.is_playing=false;sdkPlaying=false;await metrics.watchdog();assert.equal(metrics.play,playsBeforeWatchdog+1,'SDK watchdog must recover one missed ended event without a duplicate skip');assert.equal(remote.item.id,'B');
+
+  // Een vastgelopen speler: paused blijft false, de SDK-klok loopt door voorbij de duur
+  // en Spotify meldt gewoon is_playing true. Gemeten op 23-09-2026 stond de muziek zo ruim
+  // twee minuten stil zonder dat iets het opmerkte, want de watchdog eiste paused.
+  const playsBeforeStall=metrics.play;
+  remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};
+  remote.progress_ms=325665;remote.is_playing=true;sdkPlaying=true;
+  await metrics.watchdog();
+  assert.equal(metrics.play,playsBeforeStall+1,'een speler die voorbij de duur doorloopt moet als afgelopen gelden, ook zonder paused');
+  assert.equal(remote.item.id,'B');
+
+  // En de play-knop mag zo'n speler nooit als spelend zien, anders pauzeert hij iets
+  // wat al stil staat in plaats van opnieuw te starten.
+  remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};
+  remote.progress_ms=240000;remote.is_playing=true;sdkPlaying=true;
+  const pausesBeforeStallToggle=metrics.pauseSdk;
+  await context.JFMPlayback.playPause();
+  assert.equal(metrics.pauseSdk,pausesBeforeStallToggle,'de play-knop mag een vastgelopen speler niet pauzeren');
 }
 
 async function testSdkSingleton(){

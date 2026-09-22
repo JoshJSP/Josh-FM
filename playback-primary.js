@@ -111,9 +111,17 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   async function verifySdk(predicate,tries=8){const p=player();if(!p)return null;for(let i=0;i<tries;i++){try{const s=await p.getCurrentState();if(s&&predicate(s))return s}catch{}await wait(45+i*25)}return null}
   async function nudgeSdkPlayback(){if(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,4))return true;try{await player()?.resume?.()}catch(e){note('sdk-nudge-failed',e)}return!!(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,6))}
   const sdkUri=s=>String(s?.track_window?.current_track?.uri||'');
+  // Een speler die voorbij de duur doorloopt maakt geen geluid meer, hoe hard hij
+  // ook volhoudt dat hij speelt. Zonder deze controle zou de play-knop bij een
+  // vastgelopen speler pauzeren in plaats van opnieuw te starten - precies het
+  // tegenovergestelde van wat je dan wilt.
+  const parkedPastEnd=(durationMs,positionMs)=>Number(durationMs||0)>0&&Number(positionMs||0)>=Number(durationMs);
   async function observedPlaying(){
-    try{const sdk=await player()?.getCurrentState?.();if(sdk?.track_window?.current_track)return!sdk.paused}catch{}
-    const s=await remote();if(s?.item)return!!s.is_playing;
+    try{
+      const sdk=await player()?.getCurrentState?.(),current=sdk?.track_window?.current_track;
+      if(current){if(!sdk.paused&&parkedPastEnd(current.duration_ms,sdk.position))return false;return!sdk.paused}
+    }catch(e){note('sdk-state-read-failed',e)}
+    const s=await remote();if(s?.item)return!!s.is_playing&&!parkedPastEnd(s.item.duration_ms,s.progress_ms);
     const t=truth()?.get?.();if(t?.trackId||t?.uri)return!!t.isPlaying;
     return null
   }

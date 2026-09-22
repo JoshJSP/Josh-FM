@@ -51,7 +51,10 @@
         if(ok){emit('background-dj-resumed',{cause:reason,route:'djResume'});return true}
       }
       const live=await remote();
-      if(live?.is_playing){try{window.JFMPlaybackState?.ingest?.(live,'background-fail-open-playing')}catch(e){note('state-ingest-failed',e,{at:'fail-open'})};return true}
+      // Ook hier telt een track die op zijn duur geparkeerd staat niet als spelend:
+      // dan is de muziek niet hervat maar vastgelopen, en moet het herstelpad door.
+      const stillLive=live?.is_playing&&!(Number(live?.item?.duration_ms||0)>0&&Number(live?.progress_ms||0)>=Number(live.item.duration_ms));
+      if(stillLive){try{window.JFMPlaybackState?.ingest?.(live,'background-fail-open-playing')}catch(e){note('state-ingest-failed',e,{at:'fail-open'})};return true}
       if(typeof window.JFMPlayback?.resume==='function'){
         const ok=await window.JFMPlayback.resume().catch(()=>false);
         if(ok){emit('background-dj-resumed',{cause:reason,route:'resume'});return true}
