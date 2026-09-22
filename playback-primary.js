@@ -266,10 +266,15 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   }
 
   function endedPlayback(state,currentTruth=truth()?.get?.()){
-    if(!state?.item||state.is_playing)return null;
+    if(!state?.item)return null;
+    const parked=Number(state.progress_ms||0)>0&&Number(state.item.duration_ms||0)>0&&Number(state.progress_ms)>=Number(state.item.duration_ms);
+    if(state.is_playing&&!parked)return null;
     const remoteId=String(state.item.id||''),truthId=String(currentTruth?.trackId||''),sameTruth=!truthId||truthId===remoteId;
     const duration=Math.max(0,Number(state.item.duration_ms||0),sameTruth?Number(currentTruth?.durationMs||0):0);
     const position=Math.max(0,Number(state.progress_ms||0),sameTruth?Number(currentTruth?.progressMs||0):0);
+    // is_playing van Spotify sluit een afgelopen track niet uit: een vastgelopen
+    // speler blijft is_playing true melden met de positie geparkeerd op de duur.
+    // Die vorm werd hierboven al weggefilterd; vandaar dat hij hier apart terugkomt.
     if(!remoteId||duration<=0||position<Math.max(0,duration-3500))return null;
     return{trackId:remoteId,uri:String(state.item.uri||currentTruth?.uri||''),durationMs:duration,positionMs:position,source:'primary-ended-recovery'}
   }
@@ -279,7 +284,17 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     const t=truth()?.get?.();if(!t?.expectedLive)return false;
     try{
       const sdk=await player()?.getCurrentState?.(),track=sdk?.track_window?.current_track,duration=Number(track?.duration_ms||0),position=Number(sdk?.position||0);
-      if(track?.id&&sdk.paused&&duration>0&&position>=Math.max(0,duration-3500))return handleNaturalEnd({trackId:String(track.id),uri:String(track.uri||''),durationMs:duration,positionMs:position,source:'primary-sdk-watchdog'});
+      // Twee vormen van een afgelopen track, en de tweede werd gemist. Gepauzeerd
+      // vlak voor de duur is de bekende vorm. De andere is een vastgelopen speler:
+      // de SDK houdt paused op false en laat zijn klok gewoon doorlopen voorbij de
+      // duur, terwijl er geen geluid meer is. Gemeten op 23-09-2026: positie 325665
+      // op een track van 173976 ms, paused false, en Spotify's Web API meldde
+      // ondertussen is_playing true. Geen enkele bewaking zag dat, dus MAIR stond
+      // ruim twee minuten stil zonder het te merken. Een positie voorbij de duur kan
+      // bij gezond afspelen niet voorkomen - dan is de volgende track er al - dus
+      // dit is een veilig en ondubbelzinnig signaal.
+      const ended=duration>0&&(sdk?.paused?position>=Math.max(0,duration-3500):position>=duration);
+      if(track?.id&&ended)return handleNaturalEnd({trackId:String(track.id),uri:String(track.uri||''),durationMs:duration,positionMs:Math.min(position,duration),source:sdk?.paused?'primary-sdk-watchdog':'primary-sdk-watchdog-stalled'});
     }catch{}
     return recover('watchdog')
   }

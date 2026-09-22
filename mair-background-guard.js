@@ -80,12 +80,19 @@
     try{
       await new Promise(r=>setTimeout(r,180));
       const live=await remote();
-      if(live?.is_playing){
+      // is_playing alleen is geen bewijs dat er geluid is. Een vastgelopen speler
+      // meldt is_playing true met de positie geparkeerd op de duur; gemeten op
+      // 23-09-2026 kwam deze wacht zo drie keer achter elkaar terug met
+      // visible-still-playing terwijl de muziek al minuten stil stond. Sta dat
+      // alleen toe zolang de track nog niet aan zijn eind geparkeerd staat.
+      const parkedAtEnd=Number(live?.item?.duration_ms||0)>0&&Number(live?.progress_ms||0)>=Number(live.item.duration_ms);
+      if(live?.is_playing&&!parkedAtEnd){
         try{window.JFMPlaybackState?.ingest?.(live,'background-return-playing')}catch{}
         try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-return-playing')}catch{}
         emit('visible-still-playing',{awayMs});
         return;
       }
+      if(parkedAtEnd)emit('visible-parked-at-end',{awayMs,trackId:String(live?.item?.id||'')});
       // Foreground recovery is emergency-only. Normal hidden track-to-track playback
       // should be owned by Spotify's already-loaded context, not by this guard.
       const ok=await window.JFMPlayback?.recover?.('foreground-return');

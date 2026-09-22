@@ -9,12 +9,17 @@
     'mair-dj-v2':'djEngine','mair-voice-engine':'voiceEngine','mair-observability':'diagnostics'
   };
   const sessionId=(()=>{try{const key='mair_runtime_session_v1',old=sessionStorage.getItem(key);if(old)return old;const id=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;sessionStorage.setItem(key,id);return id}catch{return`volatile-${Date.now().toString(36)}`}})();
+  // De dieptegrens bestaat om recursie en payloadgrootte te begrenzen. Een getal,
+  // een boolean of een korte string kan geen van beide veroorzaken, dus die gaan
+  // op elke diepte gewoon mee. Stond de grens er wel voor, dan werd bijvoorbeeld
+  // snapshot().trace[i].detail.status - precies wat het diagnosepaneel toont -
+  // vervangen door de tekst [depth-limit]. Alleen containers worden nog afgekapt,
+  // en dan met een regel die zegt wat er stond in plaats van dat er iets weg is.
   const safe=(value,depth=0)=>{
-    if(depth>3)return'[depth-limit]';
     if(value==null||typeof value==='boolean'||typeof value==='number')return value;
     if(typeof value==='string'){const x=value.slice(0,500);return /bearer\s+[a-z0-9._~+\/-]{10,}|(?:token|secret|api[_-]?key|client[_-]?secret|password)\s*[:=]\s*\S+/i.test(x)?'[redacted]':x}
-    if(Array.isArray(value))return value.slice(0,20).map(x=>safe(x,depth+1));
-    if(typeof value==='object'){const out={};for(const[k,v]of Object.entries(value).slice(0,30)){if(/token|secret|authorization|cookie|code_verifier/i.test(k))out[k]='[redacted]';else out[k]=safe(v,depth+1)}return out}
+    if(Array.isArray(value))return depth>3?`[… ${value.length} items]`:value.slice(0,20).map(x=>safe(x,depth+1));
+    if(typeof value==='object'){if(depth>3)return `{… ${Object.keys(value).length} velden}`;const out={};for(const[k,v]of Object.entries(value).slice(0,30)){if(/token|secret|authorization|cookie|code_verifier/i.test(k))out[k]='[redacted]';else out[k]=safe(v,depth+1)}return out}
     return String(value).slice(0,200)
   };
   function record(type,detail={},level='info'){
@@ -24,7 +29,10 @@
     try{window.dispatchEvent(new CustomEvent('mair:timeline',{detail:event}))}catch{}
     return event
   }
-  function trace(correlationId,stage,detail={},level='info'){return record(`trace.${String(stage||'step').toLowerCase().replace(/[^a-z0-9.-]+/g,'-')}`,{...safe(detail),correlationId:String(correlationId||'').slice(0,140)},level)}
+  // record() saniteert zelf; hier nog een keer safe() draaien was dubbel werk op
+  // elk event, en het maakte bij zoeken naar [depth-limit] onduidelijk welke van de
+  // passes de waarde had afgekapt.
+  function trace(correlationId,stage,detail={},level='info'){return record(`trace.${String(stage||'step').toLowerCase().replace(/[^a-z0-9.-]+/g,'-')}`,{...detail,correlationId:String(correlationId||'').slice(0,140)},level)}
   function correlated(correlationId,limit=100){const id=String(correlationId||'');return events.filter(x=>x.correlationId===id).slice(-Math.max(1,Math.min(MAX_EVENTS,Number(limit)||100))).map(x=>({...x,detail:safe(x.detail)}))}
   function register(id,meta={}){
     id=String(id||'').trim();if(!id)return{installed:false,duplicate:false};

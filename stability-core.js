@@ -51,7 +51,21 @@
         player.addListener('player_state_changed',state=>{
           if(!state)return;const t=state.track_window?.current_track;
           if(!t){try{window.JFMPlaybackState?.ingest?.({item:null,is_playing:false,progress_ms:0,device:{id:deviceId,name:'MAIRFM'}},'sdk-empty')}catch{};lastObserved=null;return}
-          if(lastObserved?.id&&lastObserved.id!==t.id&&lastObserved.durationMs>0&&lastObserved.positionMs>=Math.max(0,lastObserved.durationMs-2500))signalNatural({...lastObserved,source:'sdk-track-advance'});
+          // De Web Playback SDK stuurt geen positie-updates; hij meldt alleen echte
+          // toestandswisselingen. Gemeten op 23-09-2026 kwam de laatste meting voor een
+          // trackwissel dertien seconden voor het eind binnen (Osso, 188 s van 201 s).
+          // De oude test - laatst gemeten positie binnen 2,5 s van de duur - kon daardoor
+          // vrijwel nooit slagen. Zonder dit signaal classificeert transition-controller.js
+          // elke natuurlijke wissel als EXTERNAL_CHANGE, en mair-dj-v2.js telt alleen
+          // NATURAL_END: de DJ telde dus nooit af en kwam nooit op de lucht.
+          // Reken daarom met de wandklok door vanaf de laatste meting. Een gepauzeerde
+          // track schuift niet op, en een gebruikersactie wordt in transition-controller.js
+          // altijd eerst gematcht, dus een skip blijft een skip.
+          if(lastObserved?.id&&lastObserved.id!==t.id&&lastObserved.durationMs>0){
+            const advancedAt=Date.now(),elapsed=lastObserved.paused?0:Math.max(0,advancedAt-Number(lastObserved.at||advancedAt));
+            const projected=Number(lastObserved.positionMs||0)+elapsed;
+            if(projected>=Math.max(0,lastObserved.durationMs-2500))signalNatural({...lastObserved,positionMs:Math.min(projected,lastObserved.durationMs),source:'sdk-track-advance'});
+          }
           const fake={item:{id:t.id,uri:t.uri,name:t.name,duration_ms:t.duration_ms,artists:(t.artists||[]).map(a=>({name:a.name})),album:{name:t.album?.name||'',images:t.album?.images||[]},external_urls:{spotify:t.id?`https://open.spotify.com/track/${t.id}`:''}},progress_ms:state.position,is_playing:!state.paused,device:{id:deviceId,name:'MAIRFM'}};
           playback=fake;try{renderPlayback(fake)}catch{};try{window.JFMPlaybackState?.ingest?.(fake,'sdk')}catch{};if(!state.paused&&playbackErrorTimer){clearTimeout(playbackErrorTimer);playbackErrorTimer=null;message('MAIR speelt.')}
           const duration=Number(t.duration_ms||0),position=Number(state.position||0),nearEnd=duration>0&&position>=Math.max(0,duration-1300);
@@ -67,7 +81,7 @@
           // transitieclassificatie accepteert alleen bewijs binnen 3,5s van de duur.
           else if(collapsedFromEnd)signalNatural({id:t.id,uri:t.uri,durationMs:lastObserved.durationMs,positionMs:lastObserved.durationMs,source:'sdk-context-reset'});
           else if(!state.paused)lastEndSignal=''
-          lastObserved={id:t.id,uri:t.uri,durationMs:duration,positionMs:position,paused:!!state.paused}
+          lastObserved={id:t.id,uri:t.uri,durationMs:duration,positionMs:position,paused:!!state.paused,at:Date.now()}
         })
       });
       ready.catch(()=>{});
