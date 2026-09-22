@@ -327,12 +327,19 @@ iOS Safari een PWA, en de keep-alive is er juist voor het geval dát iOS wil bev
    verder niets stuk, maar werkt het ook niet.
 3. **Blijft de muziek doorspelen tijdens een break met het scherm uit?** De DJ duckt nu in
    plaats van te pauzeren. Als er iets misgaat hoort de muziek zacht te worden, niet stil.
-4. **Klopt het scherm bij terugkomst?** Geen sprong, geen inhaalslag, geen late DJ. Dat is
+4. **Duwt de keep-alive de Spotify-app weg?** Dit is het risico dat ik niet kan meten en
+   dat je meteen hoort. De keep-alive speelt een lus van stilte *vanuit de webview*. Een
+   webview kan zijn audiosessie-categorie niet zelf kiezen, dus het is mogelijk dat iOS
+   die stilte als "deze app speelt nu audio" opvat en de Spotify-app dempt of onderbreekt.
+   Merk je dat de muziek zachter wordt of hapert zodra MAIRFM opent, zet hem dan uit met
+   `window.JFMDJAudio.keepAliveStop()` in de console, of meld het en ik haal hem eruit.
+   Gaat er niets mis, dan is dit het hele punt van het ontwerp.
+5. **Klopt het scherm bij terugkomst?** Geen sprong, geen inhaalslag, geen late DJ. Dat is
    wat het wake-protocol moet oplossen.
-5. **Car Mode in een echte auto**, met bluetooth-overdracht, een tunnel en mobiele data.
-6. **Hoe het klínkt.** Dat een verzoek vuurde en een element speelde is aantoonbaar; of de
+6. **Car Mode in een echte auto**, met bluetooth-overdracht, een tunnel en mobiele data.
+7. **Hoe het klínkt.** Dat een verzoek vuurde en een element speelde is aantoonbaar; of de
    stem goed klinkt en of de DJ iets zinnigs zegt, niet.
-7. **Twee apparaten tegelijk** (`deviceHandovers` in `playback-primary.js`).
+8. **Twee apparaten tegelijk** (`deviceHandovers` in `playback-primary.js`).
 
 Eén praktisch ding: in het testprofiel stond `mair_dj_enabled_v1` op `'0'`, dus de DJ was
 daar uitgezet. Ik heb hem aangezet om te kunnen testen. Controleer op je telefoon of de
