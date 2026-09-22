@@ -114,5 +114,21 @@ try{
   res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.44'},body:writerBody('no-keys')});
   assert.equal(res.statusCode,503);
 
+  // De rate limit sloeg op het eerste element van x-forwarded-for, en dat is precies de
+  // waarde die een client zelf meestuurt: met een willekeurige header was de limiet dus
+  // te omzeilen. x-real-ip wordt door het platform gezet en is dat niet.
+  {
+    const echt='203.0.113.77';
+    let laatste=null;
+    for(let i=0;i<21;i++){
+      laatste=await call(writer,{method:'POST',
+        headers:{'x-real-ip':echt,'x-forwarded-for':`10.0.0.${i}, ${echt}`},
+        body:writerBody('no-keys')});
+    }
+    assert.equal(laatste.statusCode,429,'een wisselende x-forwarded-for mag de limiet niet omzeilen zolang x-real-ip gelijk blijft');
+    const ander=await call(writer,{method:'POST',headers:{'x-real-ip':'203.0.113.78'},body:writerBody('no-keys')});
+    assert.notEqual(ander.statusCode,429,'een echt ander adres hoort nog gewoon bediend te worden');
+  }
+
   console.log('MAIR API failure behavior: PASS');
 }finally{globalThis.fetch=originalFetch;restoreEnv()}

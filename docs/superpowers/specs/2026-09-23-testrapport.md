@@ -267,6 +267,19 @@ stemvoorbereiding en een hoorbaar afgespeelde testbreak gaven samen **nul** over
 `unsafe-eval`. `scripts/predeploy-check.mjs` bewaakt dat de koppen blijven staan en dat de
 CSP niet stilletjes wordt opgerekt.
 
+**De rate limit was met één header te omzeilen.** Alle vijf de AI/TTS-routes sloegen hun
+teller op `x-forwarded-for`, en namen daar het **eerste** element van. Dat is precies de
+waarde die een client zelf meestuurt: met een willekeurige `X-Forwarded-For` per verzoek
+telde elke aanroep als een nieuwe bezoeker en gold er in de praktijk geen limiet.
+`x-real-ip` wordt door het platform gezet en is niet door de client te kiezen; daar hangt
+de teller nu aan, met als terugval het laatste element van de keten in plaats van het
+eerste.
+
+Aangetoond in `scripts/api-failure-behavior-check.mjs`: eenentwintig verzoeken met steeds
+een ander verzonnen `x-forwarded-for` maar hetzelfde `x-real-ip` lopen nu tegen een 429
+aan, en een echt ander adres wordt nog gewoon bediend. Met de oude code faalt die test —
+dat is nagelopen door hem er even in terug te zetten.
+
 **Niet aangeraakt, wel gemeld.** `/api/dj-writer`, `/api/discover`, `/api/category-filter`
 en `/api/news-bulletin` zijn nog zonder authenticatie bereikbaar, en hun rate limit is een
 `Map` in het geheugen van de lambda — die schaalt dus mee omhoog zodra Vercel opschaalt.

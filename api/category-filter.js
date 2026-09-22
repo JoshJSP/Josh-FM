@@ -2,7 +2,13 @@ import {claudeText,groqText,hasClaude,hasGroq} from './_ai.js';
 // Deze route doet zelf geen fetch meer: _ai.js bewaakt de deadlines.
 const GROQ_MODELS=['openai/gpt-oss-120b','openai/gpt-oss-20b'];
 const RATE=new Map();
-function rateLimit(req,res){const windowMs=60000,limit=20,ip=String(req.headers?.['x-forwarded-for']||req.headers?.['x-real-ip']||'unknown').split(',')[0].trim().slice(0,80),now=Date.now(),fresh=(RATE.get(ip)||[]).filter(at=>now-at<windowMs);if(fresh.length>=limit){const retry=Math.max(1,Math.ceil((windowMs-(now-fresh[0]))/1000));res.setHeader('Retry-After',String(retry));res.status(429).json({error:'rate_limited',detail:`Probeer het over ${retry} seconden opnieuw.`});return false}fresh.push(now);RATE.set(ip,fresh);if(RATE.size>512)for(const[k,hits]of RATE)if(!hits.some(at=>now-at<windowMs))RATE.delete(k);return true}
+// x-real-ip wordt door het platform gezet en is niet door de client te kiezen.
+// x-forwarded-for mag de client wel aanvullen, en het eerste element daarvan is precies
+// de waarde die hij zelf meestuurt; daarop limiteren betekende dat iedereen de limiet met
+// een willekeurige header kon omzeilen. Val daarom terug op het laatste element, want dat
+// is het element dat het platform er zelf achter zet.
+const clientIp=req=>{const real=String(req.headers?.['x-real-ip']||'').trim();if(real)return real.slice(0,80);const chain=String(req.headers?.['x-forwarded-for']||'').split(',').map(x=>x.trim()).filter(Boolean);return (chain.at(-1)||'unknown').slice(0,80)};
+function rateLimit(req,res){const windowMs=60000,limit=20,ip=clientIp(req),now=Date.now(),fresh=(RATE.get(ip)||[]).filter(at=>now-at<windowMs);if(fresh.length>=limit){const retry=Math.max(1,Math.ceil((windowMs-(now-fresh[0]))/1000));res.setHeader('Retry-After',String(retry));res.status(429).json({error:'rate_limited',detail:`Probeer het over ${retry} seconden opnieuw.`});return false}fresh.push(now);RATE.set(ip,fresh);if(RATE.size>512)for(const[k,hits]of RATE)if(!hits.some(at=>now-at<windowMs))RATE.delete(k);return true}
 
 const RULES={
   nl:'Accepteer alleen als de gezongen tekst echt hoofdzakelijk Nederlands is: als strenge richtlijn minstens ongeveer 90% van de hoorbare songtekst Nederlands, inclusief het grootste deel van refrein en coupletten. Een paar Nederlandse woorden, een Nederlandstalige intro, een tweetalig nummer met veel Engels, of een Nederlandse/Vlaamse artiest met een Engelstalig nummer is NIET genoeg. Instrumentale tracks, volledig Engelstalige tracks en ieder twijfelgeval afwijzen.',
