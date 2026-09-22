@@ -106,6 +106,11 @@ retry-lus ving alleen een *leeg* antwoord af, niet een *verouderd* antwoord. Een
 verouderde lezing is geen trackwissel maar een bron die nog niet is bijgewerkt; die zit
 nu in dezelfde lus, met vijf pogingen in plaats van drie.
 
+Dit is geen randgeval. In de eerste veertien minuten van de nachtelijke soak stond
+`trace.spotify.context-retry` met de melding *"Spotify meldde nog de vorige track"`
+**drie keer** in de tijdlijn — één keer per voorbereiding, en alle drie hersteld. Vóór
+deze reparatie waren dat drie verloren breaks geweest.
+
 ### 2.5 De diagnostiek loog over wat er gebeurd was
 
 `emit(reason, extra)` in de achtergrondwacht zette `extra` achteraan, dus een aanroeper
