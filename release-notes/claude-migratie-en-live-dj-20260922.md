@@ -128,15 +128,20 @@ een mislukte break definitief is, is een bewuste veiligheidskeuze: opnieuw
 proberen midden in een overgang riskeert twee audio-eigenaren tegelijk. Beide
 blijven staan.
 
-### Hoe je hem aanzet
+### Hij staat aan
 
-De schakelaar staat nu op twee plekken: **Instellingen → Live DJ** en in
-Diagnostiek. Aanzetten schrijft `mair_dj_enabled_v1` en herlaadt MAIRFM.
+`MAIR_DJ_ENABLED` staat sinds 22 september standaard op **aan**, op verzoek van
+Josh. De vlag volgt nu `djOverride !== '0'`: nooit ingesteld betekent aan, en een
+toestel dat eerder `'1'` schreef blijft gewoon aan.
 
-De globale standaard blijft **uit**. Dat is opzet: de code is groen, maar niemand
-heeft deze DJ met een echte Spotify-sessie gehoord, en de voorwaarde was dat hij
-goed moet werken. Zet hem per toestel aan, luister een half uur, en zet dan pas
-`window.MAIR_DJ_ENABLED` hard op `true` in `brand-config.js` als hij bevalt.
+Uitzetten kan per toestel via **Instellingen → Geluid & DJ** of in Diagnostiek;
+dat schrijft `'0'` en herlaadt MAIRFM.
+
+Dit ging in tegen mijn advies, en dat blijft de eerlijke stand van zaken: niemand
+heeft deze DJ met een echte Spotify-sessie gehoord. De code is groen in 27
+gedragstests, maar dat is simulatie. De lijst hieronder is daarom geen
+formaliteit — als één van die vijf punten niet klopt, zet hem dan uit en meld
+wat je hoorde.
 
 ### Waar je op moet letten bij het luisteren
 

@@ -12,11 +12,11 @@ function moveCard(id,sectionTitle){const card=$(id);if(!card||card.closest('#mai
 function moveSelfTest(){const b=$('selfTest');const card=b?.closest('article.card');if(!card||card.closest('#mairDiagnosticsBody'))return;const sec=addSection('diag-selftest','VOLLEDIGE MAIR CHECK');sec?.appendChild(card)}
 function moveVoiceTest(){const btn=$('testVoice');if(!btn||btn.closest('#mairDiagnosticsBody'))return;const sec=addSection('diag-voice-test','STEMTEST');const info=$('voiceInfo');sec?.appendChild(btn);if(info)sec?.appendChild(info)}
 function moveControl(id,sectionId,title){const control=$(id);if(!control||control.closest('#mairDiagnosticsBody'))return;addSection(sectionId,title)?.appendChild(control)}
-// Live DJ. De DJ-code is compleet en groen in de tests, maar nog niet op een
-// iPhone met een echte Spotify-sessie gehoord. Daarom staat hij standaard uit
-// en zet je hem hier per toestel aan, in plaats van hem voor iedereen om te
-// zetten. De vlag zelf woont in brand-config.js en wordt pas bij de volgende
-// boot gelezen, dus na omzetten is herladen nodig.
+// Live DJ. Staat sinds 22 september 2026 standaard aan. Deze schakelaar zet
+// hem per toestel uit en weer aan; de vlag zelf woont in brand-config.js en
+// wordt pas bij de volgende boot gelezen, dus na omzetten is herladen nodig.
+// Hij staat ook hier in Diagnostiek omdat de DJ-uit-laag alle gewone
+// DJ-bediening verbergt zodra je hem uitzet.
 function ensureDjSwitch(){
   const body=$('mairDiagnosticsBody');if(!body)return;
   const sec=addSection('diag-live-dj','LIVE DJ (BETA)');if(!sec)return;

@@ -83,8 +83,9 @@ assert.match(appSource,/\$\('skipTalk'\)\?\.addEventListener/,'Verwijderde skipT
 // De DJ staat sinds 2026-09-01 standaard UIT achter een centrale feature flag.
 // Deze drie asserties bewaakten de omgekeerde, inmiddels vervallen productregel
 // ("publieke DJ moet expliciet aan staan") en bewaken nu de nieuwe regel.
-assert.match(brandConfigSource,/window\.MAIR_DJ_ENABLED=djOverride==='1'/,'MAIR_DJ_ENABLED is geen expliciete opt-in meer');
-assert.ok(!/window\.MAIR_DJ_ENABLED\s*=\s*true/.test(brandConfigSource),'De DJ-vlag staat hard aan in plaats van standaard uit');
+assert.match(brandConfigSource,/window\.MAIR_DJ_ENABLED=djOverride!=='0'/,'De DJ hoort standaard aan te staan en per toestel uitzetbaar te zijn');
+assert.match(brandConfigSource,/localStorage\.getItem\('mair_dj_enabled_v1'\)/,'zonder de per-toestel override is de DJ niet meer uit te zetten');
+assert.ok(!/window\.MAIR_DJ_ENABLED\s*=\s*(true|false)\s*;/.test(brandConfigSource),'De vlag mag niet hard bedraad staan; hij hoort uit de override te volgen');
 assert.match(build7Source,/window\.MAIR_PUBLIC_DJ_ENABLED=djOn/,'build7 zet de publieke DJ-status niet af van de centrale vlag');
 assert.ok(!/window\.MAIR_PUBLIC_DJ_ENABLED=true/.test(build7Source),'build7 activeert de publieke DJ nog hard');
 assert.match(djQueueSource,/if\(window\.MAIR_DJ_ENABLED===true\)await loadDJ\(\)/,'mair-dj-v2 wordt niet achter de vlag geladen');
