@@ -48,4 +48,23 @@ function harness(){const bus=new Bus(),out=[];const window={addEventListener:(..
 {
   const h=harness();h.state('B',2);h.state('B',3);assert.equal(h.out.length,1,'SDK + polling van dezelfde track levert maximaal één canonical transition')
 }
-console.log('MAIR transition controller: 13/13 PASS');
+// Sinds 23-09-2026 rekent stability-core.js de eindpositie door met de wandklok, waardoor
+// er veel vaker natuurlijk-einde-bewijs binnenkomt dan voorheen. Het risico daarvan is dat
+// een gebruikersactie vlak voor het eind ten onrechte als natuurlijk einde geldt. Dat mag
+// niet: een gemarkeerde actie wint altijd.
+{
+  const h=harness();
+  h.window.MAIRTransitionController.natural({trackId:'A',positionMs:199000,durationMs:200000,source:'sdk-track-advance'});
+  h.window.MAIRTransitionController.mark('NEXT',{fromTrackId:'A'});
+  h.state('B',2);
+  assert.equal(h.out[0].cause,'USER_NEXT','een gemarkeerde gebruikersactie wint van natuurlijk-einde-bewijs');
+  assert.equal(h.out[0].confidence,1);
+}
+{
+  const h=harness();
+  h.window.MAIRTransitionController.natural({trackId:'A',positionMs:199000,durationMs:200000,source:'sdk-track-advance'});
+  h.window.MAIRTransitionController.mark('STATION_CHANGE',{fromTrackId:'A',expectedTrackId:'B'});
+  h.state('B',2);
+  assert.equal(h.out[0].cause,'STATION_CHANGE','een zenderwissel blijft een zenderwissel, ook vlak voor het eind van een track');
+}
+console.log('MAIR transition controller: 15/15 PASS');

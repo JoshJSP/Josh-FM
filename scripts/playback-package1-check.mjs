@@ -93,12 +93,17 @@ function sdkHarness(){
   const elements={queueInfo:{textContent:'',style:{}},status:{classList:{toggle(){}},textContent:''}};
   const context={window:null,document:{getElementById:id=>elements[id]||null,head:{appendChild(){}},createElement:()=>({})},localStorage,sessionStorage,location:{search:'',pathname:'/'},history:{replaceState(){}},URLSearchParams,CustomEvent:FakeCustomEvent,spotifyClientId:'client',ensure:async()=>'token',timedFetch:async()=>response(200,{}),api:async()=>({devices:[{id:'device-1',is_restricted:false}]}),setConnected(){},renderPlayback(){},playback:null,token:'token',refreshToken:'refresh',saveToken(){},setTimeout:(fn,ms)=>ms<250?setTimeout(fn,ms):1,clearTimeout(){},setInterval:()=>1,clearInterval(){},Promise,Date,console,Spotify:{Player}};
   Object.assign(context,{addEventListener:(...args)=>bus.addEventListener(...args),dispatchEvent:(...args)=>bus.dispatchEvent(...args),JFMPlaybackState:{patch(){},ingest(){}}});
+  // Een stuurbare klok, want de projectie van de eindpositie rekent met wandkloktijd.
+  // new Date(x) blijft gewoon werken; alleen Date.now() volgt deze klok.
+  const RealDate=Date;let klok=RealDate.now();
+  context.Date=class extends RealDate{static now(){return klok}};
+  const tik=ms=>{klok+=ms};
   context.window=context;vm.createContext(context);vm.runInContext(read('stability-core.js'),context,{filename:'stability-core.js'});
-  return{context,ends,listeners};
+  return{context,ends,listeners,tik};
 }
 
 async function testSdkContextResetEndDetection(){
-  const{context,ends,listeners}=sdkHarness();
+  const{context,ends,listeners,tik}=sdkHarness();
   await context.JFMSpotifySDK.init();
   const onState=listeners.get('player_state_changed'),onNotReady=listeners.get('not_ready');
   assert.equal(typeof onState,'function','the SDK must expose a player_state_changed listener');
@@ -132,6 +137,24 @@ async function testSdkContextResetEndDetection(){
   ends.length=0;onState(state('E',239500,false));onState(state('E',239500,true));
   assert.equal(ends.length,1,'a track paused at its duration must still signal a natural end');
   assert.equal(ends[0].source,'sdk-paused-end');
+
+  // (d) De Web Playback SDK stuurt geen positie-updates. Gemeten op 23-09-2026 kwam de
+  // laatste melding voor een trackwissel dertien seconden voor het eind binnen. De oude
+  // test - laatst gemeten positie binnen 2,5 s van de duur - kon daardoor vrijwel nooit
+  // slagen, en zonder dat signaal telde de DJ nooit af en kwam hij nooit op de lucht.
+  ends.length=0;onState(state('F',DURATION-13000,false));tik(13000);onState(state('G',0,false));
+  assert.equal(ends.length,1,'a track advance after a reporting gap must still signal a natural end');
+  assert.equal(ends[0].trackId,'F');
+  assert.equal(ends[0].source,'sdk-track-advance');
+  assert.equal(ends[0].positionMs,DURATION,'de doorgerekende positie wordt op de duur afgekapt, zodat transition-controller het bewijs accepteert');
+
+  // (e) Midden in een nummer wegklikken blijft een gebruikersactie, geen einde.
+  ends.length=0;onState(state('H',60000,false));tik(1200);onState(state('I',0,false));
+  assert.equal(ends.length,0,'een wissel ver van het eind mag nooit als natuurlijk einde gelden');
+
+  // (f) Een gepauzeerde track schuift niet op, hoe lang hij ook stilstaat.
+  ends.length=0;onState(state('J',DURATION-13000,true));tik(600000);onState(state('K',0,false));
+  assert.equal(ends.length,0,'een gepauzeerde track mag niet doorgerekend worden naar zijn eind');
 }
 
 function primaryHarness({tracks=['A','B'],nextWorks=true,sdkVolume=false,storedVolume=null}={}){
