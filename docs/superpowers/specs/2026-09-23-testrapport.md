@@ -676,7 +676,24 @@ Dit geeft ook een concreet antwoord op de vraag uit §3 over `mair-category-puri
 is wel degelijk een kwaliteitsgat, al richt dat filter zich op slaapgeluid en niet op
 vulmuziek.
 
-## 13. Verzoeken en Car Mode
+## 13. Nog één die eronder vandaan kwam
+
+Mijn eigen nieuwe waarschuwing uit bevinding 2 verdiende zich meteen terug. In de
+tijdlijn stond `playback.shuffle-off-failed` — terwijl `shuffle` aantoonbaar op `false`
+stond. De melding: *"Unexpected token 'e', \"eM_A1d-s_f\"... is not valid JSON"*.
+
+Spotify's stuurcommando's — `seek`, `shuffle`, `repeat`, `volume` — antwoorden met **200
+en een body die geen JSON is** (een trace-id). `api()` in `app.js` deed daarop
+`r.json()`, en dat gooit. Een geslaagde opdracht zag er dus uit als een storing. Omdat
+elke aanroeper dat afvangt is het jarenlang onzichtbaar gebleven; pas toen ik die lege
+`catch` verving door een regel in de tijdlijn kreeg het een naam.
+
+Een geslaagd antwoord zonder JSON is gewoon leeg, net als een 204. Nu ook zo behandeld.
+
+Dit is precies waarvoor bevinding 2 bedoeld was, en het kwam binnen een uur na de
+reparatie boven.
+
+## 14. Verzoeken en Car Mode
 
 Beide vielen buiten de vijf bevindingen maar staan hoog in de prioriteitenlijst van
 `CLAUDE.md`, dus ze zijn alsnog aangeraakt.
