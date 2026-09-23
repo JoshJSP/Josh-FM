@@ -141,8 +141,20 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   function stationIndex(stateOrUri){const q=stationQueue(),uri=typeof stateOrUri==='string'?stateOrUri:stateOrUri?.item?.uri,id=typeof stateOrUri==='string'?'':stateOrUri?.item?.id;let i=uri?q.findIndex(t=>t?.uri===uri):-1;if(i<0&&id)i=q.findIndex(t=>t?.id===id);return i}
   function stationContext(uri,max=30){const q=stationQueue(),i=stationIndex(uri);if(i<0)return uri?[uri]:[];return [...new Set(q.slice(i,i+max).map(t=>t?.uri).filter(Boolean))]}
   function stationNeighbor(state,delta){const q=stationQueue(),i=stationIndex(state);if(i<0)return'';return q[i+delta]?.uri||''}
+  // MAIR programmeert zijn eigen volgorde: mair-radio-sequencer.js spreidt de lijst,
+  // bewaakt een herhaalvenster van 24 tracks en zet nooit twee nummers van dezelfde
+  // artiest achter elkaar. Staat Spotify's eigen shuffle aan, dan gooit Spotify die hele
+  // programmering weg. Gemeten op 23-09-2026: een zender met 41 tracks in de wachtrij en
+  // een herhaalvenster van 24 speelde in twintig minuten vier unieke nummers, steeds
+  // opnieuw. Een radiozender bepaalt zijn eigen volgorde, dus zet hem uit bij het starten.
+  // Mislukken mag nooit het starten blokkeren; dan klinkt de volgorde alleen minder goed.
+  async function disableSpotifyShuffle(id){
+    try{await api('/me/player/shuffle?state=false'+(id?'&device_id='+encodeURIComponent(id):''),{method:'PUT'})}
+    catch(e){note('shuffle-off-failed',e,{deviceId:id?'[present]':''})}
+  }
   async function playContextDirect(uri,id,source='primary-uri'){
     const uris=stationContext(uri);if(!uris.length)throw Error('De track staat niet meer in de MAIRFM-radioset.');
+    await disableSpotifyShuffle(id);
     await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&uris.includes(x.item?.uri),10);if(!s)throw Error('Spotify bevestigde geen afspeelbare track uit de radioset.');
     await nudgeSdkPlayback();ingest(s,source);truth()?.setExpectedLive?.(true,'play-track');return s
@@ -157,7 +169,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     // vertraagde daardoor de hele start. Nu vuurt hij los en loopt hij desnoods
     // over de intro heen, precies zoals een radiojingle hoort te doen.
     if($('jingles')?.checked&&typeof speakText==='function'){Promise.resolve(speakText('MAIRFM. Jouw muziek, jouw radio.',true)).catch(()=>false)}
-    info('Muziek wordt gestart…');await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
+    info('Muziek wordt gestart…');await disableSpotifyShuffle(id);await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&!!x.item?.id);if(!s)throw Error('Spotify bevestigde het starten niet.');await nudgeSdkPlayback();
     try{session=[];lastTrackId=null;renderHistory();scheduleTalk();startPolling()}catch{};ingest(s,'primary-start');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;info(`MAIRFM is live · ${queue.length} tracks klaar.`);return true
   }
@@ -245,6 +257,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     const fallbackUri=stationNeighbor(s,1);
     if(fallbackUri){
       const id=await freshDevice(),uris=stationContext(fallbackUri);
+      await disableSpotifyShuffle(id);
       await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
       s=await verify(x=>x.device?.id===id&&x.is_playing&&uris.includes(x.item?.uri),6);
       if(s){ingest(s,'primary-natural-fast');truth()?.setExpectedLive?.(true,'radio-live');return s}
