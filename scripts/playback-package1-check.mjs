@@ -35,7 +35,8 @@ async function testPrimarySingletonAndNaturalEnd(){
   const bus=new Events(),docBus=new Events(),elements={};for(const id of ['start','play','next','prev','queueInfo'])elements[id]=element(id,elements);
   const localStorage=storage({jfm_spotify_device_id:'device-1'}),sessionStorage=storage({jfm_playback_truth_v1:JSON.stringify({trackId:'B',uri:'spotify:track:BBBBBBBBBBBBBBBBBBBBBB',progressMs:42000,durationMs:240000,isPlaying:false,expectedLive:true,intent:'dj-handoff',operation:{id:9,type:'dj-handoff',expiresAt:Date.now()+50000},deviceId:'stale-page-device',updatedAt:Date.now()})}),metrics={intervals:0,watchdog:null,play:0,transfer:0,pauseSdk:0,resumeSdk:0,previous:0,previousSdk:0},remote={item:{id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'},device:{id:'device-1'},is_playing:false,progress_ms:0};let remoteVisible=true,sdkPlaying=false,allowResume=true;
   const player={getCurrentState:async()=>({paused:!sdkPlaying,position:remote.progress_ms,track_window:{current_track:{id:remote.item.id,uri:remote.item.uri,duration_ms:remote.item.duration_ms||240000}}}),activateElement(){},async pause(){metrics.pauseSdk++;sdkPlaying=false},async resume(){metrics.resumeSdk++;if(allowResume)sdkPlaying=true},async seek(position){remote.progress_ms=position},async previousTrack(){metrics.previousSdk++;remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'};remote.progress_ms=0}};
-  const api=async(path,opt={})=>{if(path==='/me/player'&&opt.method==='PUT'){metrics.transfer++;remote.device={id:opt.body.device_ids[0]};remote.is_playing=!!opt.body.play;return null}if(path==='/me/player')return remoteVisible?structuredClone(remote):null;if(path.startsWith('/me/player/shuffle')){metrics.shuffleCalls=(metrics.shuffleCalls||0)+1;metrics.shuffleUit=/state=false/.test(path);return null}if(path.startsWith('/me/player/play?')){metrics.play++;if(opt.body?.uris)metrics.shuffleVoorLijst=(metrics.shuffleCalls||0)>0&&metrics.shuffleUit===true;const uri=opt.body?.uris?.[0]||'spotify:track:BBBBBBBBBBBBBBBBBBBBBB';remote.item={id:uri.split(':').pop()==='BBBBBBBBBBBBBBBBBBBBBB'?'B':uri.split(':').pop(),uri};remote.is_playing=true;remote.progress_ms=Number(opt.body?.position_ms||0);remote.device={id:'device-1'};return null}if(path.startsWith('/me/player/previous?')){metrics.previous++;if(remote.progress_ms>3000)remote.progress_ms=0;else{remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'};remote.progress_ms=0}return null}throw Error(`Unexpected API ${path} ${opt.method||'GET'}`)};
+  let staleRondes=0,staleItem=null;
+  const api=async(path,opt={})=>{if(path==='/me/player'&&opt.method==='PUT'){metrics.transfer++;remote.device={id:opt.body.device_ids[0]};remote.is_playing=!!opt.body.play;return null}if(path==='/me/player'){if(!remoteVisible)return null;if(staleRondes>0){staleRondes--;return structuredClone({...remote,item:staleItem||remote.item})}return structuredClone(remote)}if(path.startsWith('/me/player/shuffle')){metrics.shuffleCalls=(metrics.shuffleCalls||0)+1;metrics.shuffleUit=/state=false/.test(path);return null}if(path.startsWith('/me/player/play?')){metrics.play++;if(opt.body?.uris)metrics.shuffleVoorLijst=(metrics.shuffleCalls||0)>0&&metrics.shuffleUit===true;const uri=opt.body?.uris?.[0]||'spotify:track:BBBBBBBBBBBBBBBBBBBBBB';remote.item={id:uri.split(':').pop()==='BBBBBBBBBBBBBBBBBBBBBB'?'B':uri.split(':').pop(),uri};remote.is_playing=true;remote.progress_ms=Number(opt.body?.position_ms||0);remote.device={id:'device-1'};return null}if(path.startsWith('/me/player/previous?')){metrics.previous++;if(remote.progress_ms>3000)remote.progress_ms=0;else{remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'};remote.progress_ms=0}return null}throw Error(`Unexpected API ${path} ${opt.method||'GET'}`)};
   const context={window:null,document:{visibilityState:'visible',body:{getAttribute:()=>null},getElementById:id=>elements[id]||null,addEventListener:(...args)=>docBus.addEventListener(...args)},localStorage,sessionStorage,CustomEvent:FakeCustomEvent,api,queue:[{id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'},{id:'B',uri:'spotify:track:BBBBBBBBBBBBBBBBBBBBBB'}],playback:null,renderPlayback(){},setTimeout:fn=>{queueMicrotask(fn);return 1},setInterval:fn=>{metrics.intervals++;metrics.watchdog=fn;return 1},Promise,Date,Math,console};
   Object.assign(context,{addEventListener:(...args)=>bus.addEventListener(...args),dispatchEvent:(...args)=>bus.dispatchEvent(...args),jfmSpotifyPlayer:player,JFMSpotifySDK:{deviceId:'device-1',ensureDevice:async()=> 'device-1'},JFMPlaybackState:{get:()=>({expectedLive:true,isPlaying:true,trackId:remote.item?.id||'',uri:remote.item?.uri||'',progressMs:remote.progress_ms||0,durationMs:remote.item?.duration_ms||0}),shouldRecover:()=>false,ingest(){},setExpectedLive(){},error(){}}});context.window=context;
   vm.createContext(context);const source=read('playback-primary.js');vm.runInContext(source,context,{filename:'playback-primary.js'});vm.runInContext(source,context,{filename:'playback-primary-duplicate.js'});
@@ -58,6 +59,26 @@ async function testPrimarySingletonAndNaturalEnd(){
   await metrics.watchdog();
   assert.equal(metrics.play,playsBeforeStall+1,'een speler die voorbij de duur doorloopt moet als afgelopen gelden, ook zonder paused');
   assert.equal(remote.item.id,'B');
+
+  // Spotify is zelf doorgegaan, maar de Web API meldt de eerste keren nog de track die
+  // net afgelopen is. MAIR concludeerde dan "Spotify ging niet door" en zette er een
+  // eigen track overheen, precies een seconde na de natuurlijke wissel. Daardoor bleef de
+  // zender in een handvol nummers rondcirkelen terwijl er eenenveertig in de wachtrij
+  // stonden. Een verouderde lezing is geen stilstand.
+  {
+    remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};
+    remote.progress_ms=239000;remote.is_playing=true;remote.device={id:'device-1'};sdkPlaying=true;
+    const playsVoor=metrics.play;
+    // Spotify staat al op B, maar de eerste twee lezingen melden nog A.
+    staleItem={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};
+    staleRondes=2;
+    remote.item={id:'B',uri:'spotify:track:BBBBBBBBBBBBBBBBBBBBBB',duration_ms:240000};
+    remote.progress_ms=1000;
+    await context.JFMPlayback.handleNaturalEnd({trackId:'A'});
+    assert.equal(metrics.play,playsVoor,'een verouderde lezing mag geen eigen track over de natuurlijke wissel heen zetten');
+    assert.equal(remote.item.id,'B','de track waar Spotify zelf naartoe ging blijft staan');
+    staleItem=null;staleRondes=0;
+  }
 
   // Spotify's eigen shuffle gooit de programmering van mair-radio-sequencer.js weg:
   // gemeten speelde een zender met 41 tracks en een herhaalvenster van 24 er vier, steeds

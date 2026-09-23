@@ -250,6 +250,13 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   }
   async function fastNaturalAdvance(endedId){
     let s=await remote();
+    // Spotify's Web API loopt vlak na een wissel achter en meldt dan nog de track die
+    // net afgelopen is. Zonder deze controle concludeert MAIR "Spotify is niet
+    // doorgegaan" en zet hij er een eigen track overheen - precies één seconde na de
+    // natuurlijke wissel. Gemeten op 23-09-2026: Spotify ging zelf naar B, MAIR zette er
+    // C overheen, en daardoor bleef de zender in een handvol nummers rondcirkelen terwijl
+    // er eenenveertig in de wachtrij stonden. Geef de bron eerst even de tijd.
+    if(!s?.item?.id||s.item.id===endedId)s=await verify(x=>x.item?.id&&x.item.id!==endedId,4)||s;
     if(s?.item?.id&&s.item.id!==endedId){
       if(!s.is_playing){const id=await freshDevice();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.item?.id!==endedId&&x.is_playing,4)||s}
       ingest(s,'primary-natural-auto');return s
