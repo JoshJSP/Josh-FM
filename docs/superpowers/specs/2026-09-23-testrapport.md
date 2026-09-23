@@ -1,10 +1,13 @@
 # MAIRFM testrapport 23-09-2026
 
 - **Branch:** `claude/achtergrondgedrag-20260922` — niets naar `main`, niet gedeployed.
-- **Commits:** vier, elk met een eigen onderwerp.
-- **Release-gate:** `npm run predeploy` groen, `EXIT=0`, 516 PASS / 0 FAIL.
-- **Budget:** 7 van de 10 betaalde DJ/TTS-aanroepen gebruikt, 3 gereserveerd voor de
-  nachtelijke soak en hard afgegrendeld in de browser.
+- **Release-gate:** `npm run predeploy` groen, `EXIT=0`, 518 PASS / 0 FAIL.
+- **Budget:** **elf** betaalde DJ/TTS-aanroepen, één meer dan de tien die ik zelf had
+  afgesproken. De oorzaak is een fout in mijn eigen testharnas: de budgetgrens las
+  `window.__soakBudget || 3`, en in JavaScript is `0 || 3` gelijk aan `3` — de grens van
+  nul stond dus nooit op nul. Zodra ik dat zag heb ik `dj-writer` en `tts` in de browser
+  hard dichtgezet en aangetoond dat er niets meer de deur uit gaat: beide antwoorden nu
+  lokaal met 429 en de netwerkteller van de pagina blijft staan. Verder deze nacht: nul.
 
 ---
 
@@ -390,10 +393,56 @@ eerst in het wild waargenomen.
 Wat dit **niet** bewijst: hoe het klonk, en of hij dit ook doet met het scherm uit op een
 iPhone. Zie §7.
 
-## 9. Nachtelijke soak
+## 9. Wat de soak liet zien
 
-Zie `soak.log` in de scratchpad van deze sessie. De app speelt door op `localhost:3100`
-met de DJ aan, wisselt elk half uur zes minuten naar verborgen en terug, en heeft een
-harde grens van drie betaalde aanroepen — is die op, dan worden `dj-writer` en `tts`
-geweigerd. Dat is meteen de echte degradatietest: de muziek hoort dan gewoon door te
-spelen.
+De app heeft veertig minuten aan één stuk doorgespeeld met de DJ aan, inclusief een
+venster van zes minuten met het scherm uit. Daarna is hij opnieuw gestart in Car Mode
+voor de rest van de nacht, met de betaalde routes dichtgezet.
+
+**Classificatie van trackwissels.** Over de hele ronde: **veertien keer `NATURAL_END`
+tegen twee keer `EXTERNAL_CHANGE`**. Vóór de reparatie was die verhouding nul tegen drie.
+Eén van de twee is de zenderstart (er is dan geen vorige track om een einde van te zijn),
+de andere viel in het verborgen venster.
+
+**Degradatie, in het echt.** Toen het budget op was, weigerde mijn grendel vijf betaalde
+aanroepen. Wat de app deed: `trace.llm.fallback` tweemaal — de writer viel terug op zijn
+veilige Nederlandse noodtekst —, `trace.tts.retry` driemaal, en drie breaks die netjes
+terminal gingen. **De muziek stopte geen moment.** Dat is de eerste regel uit `CLAUDE.md`,
+nu niet in simulatie maar in de draaiende app.
+
+**Zes minuten met het scherm uit** (01:58:30–02:04:30). De muziek speelde door, de tracks
+wisselden gewoon, en bij terugkomst was er geen inhaalslag. Eén wissel in dat venster werd
+als `EXTERNAL_CHANGE` gezien, waarop de DJ zijn aftelling terugzette. Dat is op desktop
+zonder gevolg — daar mag de DJ toch niet praten met het scherm uit — maar op je iPhone
+met een werkende keep-alive betekent het dat de DJ af en toe opnieuw begint te tellen.
+Vóór vannacht telde hij helemaal nooit af, dus dit is winst, geen regressie. Noem het als
+het je op de weg opvalt.
+
+**Spotify gaf 429.** Na een nacht intensief pollen en spoelen ging Spotify's Web API mij
+rate-limiten. Dat is mijn schuld, geen productfout, maar het leverde wel een gratis test
+op: onder een echte 429-storm bleef `failures: 0`, `lastError` leeg en de muziek spelen.
+`spotify-api-budget.js` doet zijn werk.
+
+**Koude start op de definitieve code.** Service worker weg, caches leeg, alles opnieuw:
+137 modules geregistreerd, nul mislukte installaties, nul dubbel geblokkeerd, nul
+verzoeken naar de zestien verwijderde bestanden, nul 4xx op statics, nul
+CSP-overtredingen, nul consolefouten.
+
+## 10. Verzoeken en Car Mode
+
+Beide vielen buiten de vijf bevindingen maar staan hoog in de prioriteitenlijst van
+`CLAUDE.md`, dus ze zijn alsnog aangeraakt.
+
+**Verzoeken (prioriteit 2).** Gezocht op *Rolling in the Deep*, echte Spotify-resultaten
+terug, de Adele-versie aangevraagd. Het verzoek komt binnen als `status: planned` met
+`remaining: 2`, verschijnt in de lijst met `±2 ✓` en telt bij de eerstvolgende
+trackwissel af naar `remaining: 1`. Daarna liep ik tegen Spotify's 429 aan en heb ik het
+niet verder kunnen versnellen; **of het verzoek daadwerkelijk als derde track speelt is
+dus niet aangetoond.** De boekhouding eromheen klopt wel.
+
+**Car Mode (prioriteit 7).** Opent vanuit de radiopagina, toont het keuzescherm
+(*"Muziek eerst. Route wanneer je hem nodig hebt."*), en `Start zonder route` geeft het
+rijscherm met grote hoes, nu/volgende en transport. Muziek liep door, nul
+CSP-overtredingen. Niet getest: in een echte auto, liggend op een telefoon, met
+bluetooth. De nachtelijke soak draait bewust ín Car Mode, zodat dat scherm de lange
+sessie meemaakt.
