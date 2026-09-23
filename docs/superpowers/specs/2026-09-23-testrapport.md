@@ -569,6 +569,39 @@ te halen: dan faalt hij.
 Dat ik eerst de verkeerde oorzaak aanwees staat hier expliciet, want de shuffle-wijziging
 blijft er wel in — op eigen merites, niet omdat hij dit probleem oploste.
 
+### En er lag er nog één onder
+
+Met de misclassificatie weg (`gemist: 0` over zes wissels) bleef de zender alsnog in
+dezelfde vier nummers rondcirkelen. Toen ik ging kijken wat MAIR eigenlijk aan Spotify
+geeft:
+
+```
+wachtrij:            42 tracks
+huidige track:       staat er NIET in  (index -1)
+stationContext():    1 track
+```
+
+MAIR gaf Spotify dus **één nummer per keer**. Spotify speelt dat af en kiest daarna zelf
+verder — en omdat die volgende keuze ook niet in de set staat, blijft het een lijst van
+één. De drie nummers die achter elkaar speelden zaten geen van alle in de wachtrij van
+42; die had Spotify gekozen. De hele programmering van `mair-radio-sequencer.js` —
+gespreid, herhaalvenster 24, geen twee nummers van dezelfde artiest achter elkaar — kwam
+niet bij de luisteraar aan.
+
+De schuldige is één regel in `stationContext()`:
+
+```js
+if(i<0) return uri?[uri]:[];   // speelt er iets buiten de set: geef alleen dat
+```
+
+Dat is op zichzelf verdedigbaar — er is geen positie om vanaf te snijden — maar het
+resultaat is een doodlopende lijst. Nu staat wat er speelt vooraan en de set erachter:
+eerst dit, dan de radio verder.
+
+Gecontroleerd dat het niet aan het starten ligt: bij een verse start staat de huidige
+track op positie 0 met een context van 30, en bij een zenderwissel ook. Het treedt pas op
+als het afspelen van de set is afgedwaald, en dáár kwam MAIR er nooit meer uit.
+
 **Dit is de enige wijziging van vannacht die een instelling van je Spotify-account
 aanraakt.** Een radiozender hoort zijn eigen volgorde te bepalen, dus ik vind het
 verdedigbaar — maar het is jouw account. Wil je het niet, dan gaat het om de aanroepen
