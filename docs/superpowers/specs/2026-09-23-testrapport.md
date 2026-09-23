@@ -33,6 +33,12 @@ Verder: het achtergrondontwerp is uitgevoerd (één eigenaar, wake-protocol, kee
 er staat een gemeten Content-Security-Policy op, de rate limit van de API-routes was met
 één header te omzeilen en is dat niet meer, en zestien dode bestanden zijn weg.
 
+En er is één ding dat ik gevonden heb maar bewust **niet** gerepareerd: Spotify speelt de
+radioset niet. MAIR geeft dertig nummers mee, en twee tracks later bestaat Spotify's eigen
+wachtrij uit een lus van drie nummers die geen van alle in MAIR's set van veertig staan.
+Dat is het verschil tussen "mijn eigen radiozender" en "Spotify-radio met een MAIR-jasje",
+en het is de eerste die ik morgen zou oppakken. Zie §12.
+
 Wat je zelf moet doen staat in §7. Het succescriterium — praat de DJ door met het scherm
 uit — is hier niet te bewijzen en staat daarom nergens als vinkje.
 
