@@ -36,7 +36,7 @@ dezelfde functies die die knoppen aanroepen.
 
 | Knop | Uitkomst |
 |---|---|
-| Test Spotify | WARNING vóór het starten (geen actief apparaat), PASS erna |
+| Test Spotify | WARNING vóór het starten (geen actief apparaat), PASS met muziek aan: *"Speelt · FEVER DREAM"* |
 | Test LLM | PASS — Groq `openai/gpt-oss-120b`, score 100 |
 | Test TTS | PASS — Fish `s2.1-pro-free` |
 | Generate Test Break | PASS — script geldig |
@@ -150,10 +150,12 @@ foutmelding. De deprecation-ruis is **bewust niet onderdrukt**: hij is niet van 
 
 ### Bevinding 2 — weggeslikte fouten
 
-Veertien van de 373 lege `catch`-blokken aangepast, alleen waar een fout gedrag verbergt.
-In `playback-primary.js` de vier plekken waar de SDK-route faalt en stil wordt
-teruggevallen op de Web API, het niet kunnen bijwerken van de afspeelwaarheid, en drie
-mislukte SDK-herstelpogingen. In `mair-background-guard.js` werd elke netwerkfout op
+Zeventien plekken laten nu een regel achter waar eerder niets stond, alleen waar een fout
+gedrag verbergt. In de twee bestanden die het afspelen bezitten ging het aantal lege
+`catch`-blokken van 28 en 12 naar 20 en 7. In `playback-primary.js` gaat het om de vier
+plekken waar de SDK-route faalt en stil wordt teruggevallen op de Web API, het niet kunnen
+bijwerken van de afspeelwaarheid, en drie mislukte SDK-herstelpogingen. In
+`mair-background-guard.js` werd elke netwerkfout op
 `/me/player` een stille "er speelt niets", waarna die wacht een herstelactie begon voor
 een probleem dat er niet was.
 
