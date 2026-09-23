@@ -362,6 +362,8 @@ allebei publieke waarden die in de client horen — geen lek.
 | De rate limit gedeeld maken | Vraagt gedeelde opslag; dat is infrastructuur, geen nachtwerk. |
 | Blokovergangen | Eigen ontwerp, volgende ronde — zoals afgesproken. |
 | `Full Station Test` | Samenstelling van vier tests die los al gedraaid zijn; zou twee betaalde aanroepen kosten voor niets nieuws. |
+| **Spotify speelt de radioset niet** (§12.1) | De zwaarste vondst van de nacht, en juist daarom niet om vier uur 's nachts aangeraakt. MAIR doet maar één `play`-aanroep; wie Spotify's wachtrij daarna vult heb ik niet vastgesteld. Een gok hier kost je de muziek. |
+| **De CHILL-zender vol vulmuziek** (§12.2) | Een selectieprobleem, geen bug in de code die ik vannacht bekeek. Vraagt een keuze over hoe zenders gevuld worden. |
 | De Web Playback SDK op iOS meten | Aparte meting, staat als zodanig in het ontwerp. |
 
 Eén opmerking over de testsuite zelf, want die verdient aandacht: **vier van de tests die
