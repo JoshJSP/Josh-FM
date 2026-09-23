@@ -608,7 +608,67 @@ verdedigbaar — maar het is jouw account. Wil je het niet, dan gaat het om de a
 van `disableSpotifyShuffle` in `playback-primary.js`; die weghalen kost één minuut en de
 test vertelt je precies welke drie.
 
-## 12. Verzoeken en Car Mode
+## 12. Twee dingen die ik heb gevonden maar bewust niet heb gerepareerd
+
+Deze twee raken de luisterervaring hard, maar ik heb de oorzaak niet ver genoeg
+teruggevolgd om er om vier uur 's nachts in te snijden. Het bewijs staat er wel, zodat je
+er morgen meteen mee verder kunt.
+
+### 12.1 Spotify speelt de radioset niet
+
+Het scherpste bewijs van de nacht. MAIR gaf Spotify bij het starten netjes **30 nummers**
+mee — één `play`-aanroep, gecontroleerd met een onderschepte `fetch`, en er kwam er daarna
+geen tweede. Twee nummers later vroeg ik Spotify wat er in zijn eigen wachtrij staat:
+
+```
+speelt nu:  Repeat It
+daarna:     My Body Isn't Ready → Note To Self → Repeat It →
+            My Body Isn't Ready → Note To Self → Repeat It
+```
+
+Een lus van drie nummers. **Geen enkele daarvan staat in MAIR's set van veertig.**
+
+Dus: MAIR programmeert een lijst, geeft die door, en Spotify speelt er het eerste nummer
+van en gaat daarna zijn eigen gang. Dit verklaart alles wat ik eerder zag — vier unieke
+nummers in twintig minuten, tracks die niet in de wachtrij staan, de misclassificaties.
+
+Wat ik niet heb kunnen vaststellen: wie die lus in Spotify's wachtrij zet. MAIR doet maar
+één `play`-aanroep. Mijn beste hypothese is dat een `uris`-lijst op een Web Playback
+SDK-device niet als volwaardige wachtrij blijft staan en dat Spotify's eigen autoplay het
+overneemt. Als dat zo is, is de oplossing structureel — een echte context (een playlist)
+in plaats van een losse `uris`-lijst — en dat is een ontwerpbeslissing, geen nachtwerk.
+
+**Dit zou ik als eerste oppakken.** Het is het verschil tussen "mijn eigen radiozender"
+en "Spotify-radio met een MAIR-jasje".
+
+### 12.2 De CHILL-zender staat vol vulmuziek
+
+Toen ik MAIR's eigen set bekeek, bleek het probleem niet alleen bij Spotify te liggen:
+
+| Positie | Titel | Artiest |
+|---|---|---|
+| 0 | Chill Pop | Rick Elmore |
+| 2 | Chill Pop | Ashish Shiva Ram Kumar |
+| 3 | Chill Pop | Jazz Funk Studio, Popyoursoul |
+| 4 | Chill Pop | Male Jazz Background Tracks |
+| 8 | Chill Pop | SnukiChan |
+| 26–29 | Soft Pop | Blinds Closed / Acoustic Guitar / AXS Music / Glued |
+
+Vijf verschillende nummers die allemaal letterlijk *"Chill Pop"* heten, en vier *"Soft
+Pop"* achter elkaar. Dit is productiebibliotheek-muziek, geen echte songs.
+
+De ontdubbeling werkt correct — het zijn verschillende track-id's — en het herhaalvenster
+van 24 wordt dus formeel niet overtreden. Het probleem zit in de **selectie**: de zender
+haalt op een titel die precies zo'n bibliotheek oplevert. De semantische filter in
+`/api/category-filter` laat het door, want "rustig, ontspannen en warm" klopt gewoon.
+
+Er stond overigens ook een *Freek-A-Leek* in de chill-set, op positie 33.
+
+Dit geeft ook een concreet antwoord op de vraag uit §3 over `mair-category-purity.js`: er
+is wel degelijk een kwaliteitsgat, al richt dat filter zich op slaapgeluid en niet op
+vulmuziek.
+
+## 13. Verzoeken en Car Mode
 
 Beide vielen buiten de vijf bevindingen maar staan hoog in de prioriteitenlijst van
 `CLAUDE.md`, dus ze zijn alsnog aangeraakt.
