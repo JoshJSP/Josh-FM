@@ -11,6 +11,29 @@
 
 ---
 
+## In het kort
+
+De Live DJ die je twee commits geleden standaard aanzette, kón niet op de lucht komen. De
+detectie van een natuurlijk trackeinde stelde een eis die de Spotify-SDK structureel niet
+haalt, waardoor elke trackwissel als "extern" gold en de DJ nooit aftelde. Drie echte
+wissels op productie, teller nul. Dat is gerepareerd, en vannacht om 01:36 heeft hij voor
+het eerst volautomatisch gepraat — over de muziek heen, elf seconden, zonder dat de muziek
+stopte.
+
+Onderweg kwamen nog vier dingen boven die geen van de vijf bevindingen noemde. De
+belangrijkste: een vastgelopen speler was voor **geen enkele** bewaking zichtbaar. De
+muziek stond ruim twee minuten stil terwijl Spotify `is_playing: true` meldde en de
+SDK-klok gewoon doorliep. Vijf plekken vertrouwden die vlag; alle vijf zijn dicht.
+
+Verder: het achtergrondontwerp is uitgevoerd (één eigenaar, wake-protocol, keep-alive),
+er staat een gemeten Content-Security-Policy op, de rate limit van de API-routes was met
+één header te omzeilen en is dat niet meer, en zestien dode bestanden zijn weg.
+
+Wat je zelf moet doen staat in §7. Het succescriterium — praat de DJ door met het scherm
+uit — is hier niet te bewijzen en staat daarom nergens als vinkje.
+
+---
+
 ## 1. Hoe er getest is
 
 Niet in simulatie. Tegen jouw echte Spotify Premium-sessie, met muziek die daadwerkelijk
