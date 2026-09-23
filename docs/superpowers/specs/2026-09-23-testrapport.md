@@ -26,8 +26,8 @@ muziek stond ruim twee minuten stil terwijl Spotify `is_playing: true` meldde en
 SDK-klok gewoon doorliep. Vijf plekken vertrouwden die vlag; alle vijf zijn dicht.
 
 En de zender speelde in twintig minuten vier unieke nummers terwijl er 41 in de wachtrij
-stonden: Spotify's eigen shuffle gooide MAIR's programmering weg, en MAIR zette die
-nergens uit. Nu wel (§11).
+stonden. Oorzaak: na elke natuurlijke wissel zette MAIR er een seconde later een eigen
+track overheen, op grond van een Spotify-lezing die nog de vorige track meldde (§11).
 
 Verder: het achtergrondontwerp is uitgevoerd (één eigenaar, wake-protocol, keep-alive),
 er staat een gemeten Content-Security-Policy op, de rate limit van de API-routes was met
@@ -537,16 +537,37 @@ lagen, bewaakt een herhaalvenster van 24 tracks en zet nooit twee nummers van de
 artiest achter elkaar. Die zorgvuldig gebouwde lijst gaat vervolgens naar Spotify.
 
 Gemeten: de zender had **41 tracks** in de wachtrij met een herhaalvenster van 24, en
-speelde in twintig minuten **vier unieke nummers**, steeds in dezelfde ronde. Spotify's
-eigen shuffle stond aan, en MAIR zette die nergens uit. Spotify gooide de programmering
-dus weg en koos zelf.
+speelde in twintig minuten **vier unieke nummers**, steeds in dezelfde ronde.
 
-Alle drie de plekken waar MAIR een lijst aan Spotify geeft zetten shuffle nu eerst uit:
-het starten van een zender, het spelen van een track uit de set, en de terugval bij een
-natuurlijk einde. De test die ik erbij schreef vond meteen dat derde pad, dat ik zelf was
-vergeten.
+Mijn eerste verklaring was Spotify's eigen shuffle, die aan stond terwijl MAIR die nergens
+uitzette. Ik heb dat gerepareerd — alle drie de plekken waar MAIR een lijst aan Spotify
+geeft zetten shuffle nu eerst uit, en de test die ik erbij schreef vond meteen een derde
+pad dat ik zelf vergeten was. Live bevestigd: `shuffle: true` vóór het starten,
+`shuffle: false` erna.
 
-Live bevestigd: `shuffle: true` vóór het starten, `shuffle: false` erna.
+**Maar dat was niet de oorzaak.** Met shuffle uit bleef de herhaling gewoon bestaan: een
+nummer kwam terug na één tussenliggende track. Toen die variabele weg was, werd het
+mechanisme wél zichtbaar:
+
+```
+02:55:37  NATURAL_END      A -> B     Spotify ging zelf door naar B
+02:55:38  EXTERNAL_CHANGE  B -> C     één seconde later zet MAIR er C overheen
+```
+
+Het is **dezelfde verouderde Spotify-lezing als in §2.4**, maar dan in
+`playback-primary.js`. Na een natuurlijk einde vraagt `fastNaturalAdvance` wat er speelt.
+De Web API meldt de eerste seconde nog de track die net afgelopen is. MAIR leidt daaruit
+af dat Spotify niet is doorgegaan, en zet er een eigen track overheen — over een
+natuurlijke wissel die prima was. Daardoor bleef de zender rondcirkelen in een handvol
+nummers, en telde elke wissel als `external_change`, wat de aftelling van de DJ steeds op
+nul zette.
+
+De lezing krijgt nu vier pogingen met de bestaande `verify`-lus voordat MAIR concludeert
+dat Spotify stilstaat. Gedragstest erbij, en gecontroleerd door de reparatie er even uit
+te halen: dan faalt hij.
+
+Dat ik eerst de verkeerde oorzaak aanwees staat hier expliciet, want de shuffle-wijziging
+blijft er wel in — op eigen merites, niet omdat hij dit probleem oploste.
 
 **Dit is de enige wijziging van vannacht die een instelling van je Spotify-account
 aanraakt.** Een radiozender hoort zijn eigen volgorde te bepalen, dus ik vind het
