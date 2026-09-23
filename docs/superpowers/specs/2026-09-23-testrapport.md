@@ -173,13 +173,26 @@ in `index.html`, `sw.js`, `version.js`, `build7.js` of `capacitor.config.json`, 
 ervan verscheen in de modulelijst van de draaiende app. `ios-dj-audio.js` is verwijderd in
 plaats van uitgezet; de regressietest bewaakt nu dat het bestand niet terugkomt.
 
-**Eén van de dertien staat er bewust nog: `mair-category-purity.js`.** Dat is geen dode
-hotfix maar een functie die nooit is aangesloten. Het bevat het filter dat witte ruis,
-regengeluid en ASMR uit de Sleep-zender houdt, en twee testscripts
-(`scripts/dj-v2-regression.mjs`, `scripts/user-reported-hotfix-check.mjs`) eisen dat
-gedrag nog woordelijk. Weggooien betekent dat filter weggooien. Er zijn twee zinnige
-keuzes — aansluiten of samen met de tests schrappen — en allebei zijn het jouw keuze, geen
-opruimactie om vier uur 's nachts.
+**Eén van de dertien staat er bewust nog: `mair-category-purity.js`.** Ik heb dit eerst te
+sterk gesteld en corrigeer mezelf, want het maakt voor jouw beslissing uit.
+
+Het bestand is geen dode hotfix maar een functie die nooit is aangesloten: **niets in de
+app roept `window.MAIRCategoryPurity` aan.** Het bevat een lokaal, deterministisch filter
+tegen witte ruis, regengeluid en ASMR, plus ontdubbeling en een minimum-aantal-terugval.
+
+Wat ik aanvankelijk schreef — dat weggooien "dat filter weggooit" — klopt niet. De
+Sleep-zender wordt namelijk al wél gefilterd: `channel-click-fix.js` stuurt elke zender
+met `semantic:true` door `/api/category-filter`, en sleep staat daar met een
+vertrouwensdrempel van 0,95. De AI-filtering is dus live; wat ontbreekt is de goedkope
+lokale voorwacht die niet van een AI-aanroep afhangt.
+
+De twee testscripts die het bestand noemen lezen alleen de **brontekst** — ze zouden ook
+slagen als de module nooit draait, wat precies is wat er nu gebeurt. Dat is dezelfde
+testzwakte als hieronder in §6.
+
+De keuze is dus kleiner dan ik eerst schreef, maar nog steeds die van jou: aansluiten als
+je een deterministische voorwacht wilt naast de AI, of schrappen samen met die twee
+controles.
 
 ### Bevinding 4 — `[depth-limit]` in het diagnosepaneel
 
