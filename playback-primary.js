@@ -139,7 +139,21 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   const note=(stage,error,extra={})=>{try{window.MAIRRuntime?.record?.('playback.'+stage,{module:'playback-primary',error:String(error?.message||error||'onbekend').slice(0,300),...extra},'warn')}catch{}};
   function stationQueue(){try{return Array.isArray(queue)?queue.filter(t=>t?.uri):[]}catch{return[]}}
   function stationIndex(stateOrUri){const q=stationQueue(),uri=typeof stateOrUri==='string'?stateOrUri:stateOrUri?.item?.uri,id=typeof stateOrUri==='string'?'':stateOrUri?.item?.id;let i=uri?q.findIndex(t=>t?.uri===uri):-1;if(i<0&&id)i=q.findIndex(t=>t?.id===id);return i}
-  function stationContext(uri,max=30){const q=stationQueue(),i=stationIndex(uri);if(i<0)return uri?[uri]:[];return [...new Set(q.slice(i,i+max).map(t=>t?.uri).filter(Boolean))]}
+  // Speelt er iets dat niet in de radioset staat - een verzoek, of playback die is
+  // afgedwaald - dan gaf deze functie een lijst van precies één track terug. Spotify
+  // speelt die ene af en kiest daarna zelf verder, en omdat de volgende track dan ook
+  // niet in de set staat, komt MAIR er nooit meer op terug. Gemeten op 23-09-2026: een
+  // zender met 42 tracks in de wachtrij waarvan er drie op rij speelden die er geen van
+  // alle in stonden; die had Spotify zelf gekozen. De set eraan plakken kost niets en
+  // houdt de eigen programmering in beeld: eerst wat er nu speelt, dan de radio verder.
+  function stationContext(uri,max=30){
+    const q=stationQueue(),i=stationIndex(uri);
+    if(i<0){
+      if(!uri)return[];
+      return [...new Set([uri,...q.slice(0,Math.max(0,max-1)).map(t=>t?.uri).filter(Boolean)])];
+    }
+    return [...new Set(q.slice(i,i+max).map(t=>t?.uri).filter(Boolean))]
+  }
   function stationNeighbor(state,delta){const q=stationQueue(),i=stationIndex(state);if(i<0)return'';return q[i+delta]?.uri||''}
   // MAIR programmeert zijn eigen volgorde: mair-radio-sequencer.js spreidt de lijst,
   // bewaakt een herhaalvenster van 24 tracks en zet nooit twee nummers van dezelfde

@@ -60,6 +60,18 @@ async function testPrimarySingletonAndNaturalEnd(){
   assert.equal(metrics.play,playsBeforeStall+1,'een speler die voorbij de duur doorloopt moet als afgelopen gelden, ook zonder paused');
   assert.equal(remote.item.id,'B');
 
+  // Speelt er iets dat niet in de radioset staat, dan gaf stationContext een lijst van
+  // precies een track terug. Spotify speelt die af en kiest daarna zelf verder, en omdat
+  // de volgende track dan ook niet in de set staat komt MAIR er nooit meer op terug.
+  {
+    const vreemd='spotify:track:ZZZZZZZZZZZZZZZZZZZZZZ';
+    const ctx=context.JFMPlayback.stationContext(vreemd);
+    assert.equal(ctx[0],vreemd,'wat nu speelt hoort vooraan te staan');
+    assert.ok(ctx.length>1,'de radioset hoort erachter te blijven staan, anders kiest Spotify vanaf daar zelf');
+    assert.ok(ctx.includes('spotify:track:AAAAAAAAAAAAAAAAAAAAAA'),'de eigen set hoort erin te zitten');
+    assert.equal(context.JFMPlayback.stationContext('').length,0,'zonder track geen context');
+  }
+
   // Spotify is zelf doorgegaan, maar de Web API meldt de eerste keren nog de track die
   // net afgelopen is. MAIR concludeerde dan "Spotify ging niet door" en zette er een
   // eigen track overheen, precies een seconde na de natuurlijke wissel. Daardoor bleef de
