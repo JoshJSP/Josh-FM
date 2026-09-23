@@ -90,7 +90,7 @@ staat.
 Een positie voorbij de duur kan bij gezond afspelen niet voorkomen — dan is de volgende
 track er al. Dat is nu een ondubbelzinnig einde-signaal, ook zonder `paused`.
 
-Dezelfde blinde vlek zat op vier plekken in totaal, en ze zijn alle vier dicht:
+Dezelfde blinde vlek zat op vijf plekken, en ze zijn alle vijf dicht:
 
 | Plek | Wat er misging |
 |---|---|
