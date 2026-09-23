@@ -483,10 +483,22 @@ in de wachtrij, shuffle stond aan en `context` was `null` omdat MAIR een losse
 opleveren in plaats van een antwoord, en een verkeerde conclusie in dit rapport is erger
 dan een open punt.
 
-**Wat ik zou doen:** dit als eerste bekijken op een schone sessie, zonder openstaand
-verzoek en zonder rate-limit. Het is nadrukkelijk *niet* het gedrag dat in de eerste
-soakronde te zien was — daar liepen veertien wissels correct en kwam de DJ gewoon op de
-lucht.
+**Wat er daarna gebeurde.** Ik heb het schone experiment alsnog gedaan: het openstaande
+verzoek uit de opslag gehaald, de pagina vers geladen, een andere zender gestart en
+daarna niets meer aangeraakt — geen gespoel, geen gepol richting Spotify. Uitkomst:
+
+```
+02:32:52  tel: 2   gemist: 0   geen terugsprong
+```
+
+Twee opeenvolgende natuurlijke wissels correct geteld, nul gemiste, en de track bleef
+staan waar hij hoorde. **Het gedrag is niet reproduceerbaar op een schone pagina.**
+
+Let op wat dat wel en niet zegt. Er veranderden drie dingen tegelijk — het verzoek eruit,
+de rate-limit uitgewerkt, een andere zender — dus ik kan zeggen dat het niet terugkwam,
+niet wat het veroorzaakte. Mijn beste kandidaat is het samenspel van een gewapend verzoek
+met Spotify-antwoorden die 429 gaven, maar dat is een vermoeden en geen bewijs. Als je
+ooit merkt dat een nummer zich herhaalt terwijl er een verzoek openstaat: dat is dit.
 
 ## 11. Verzoeken en Car Mode
 
