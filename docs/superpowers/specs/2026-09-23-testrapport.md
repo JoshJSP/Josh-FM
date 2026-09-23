@@ -90,6 +90,16 @@ staat.
 Een positie voorbij de duur kan bij gezond afspelen niet voorkomen — dan is de volgende
 track er al. Dat is nu een ondubbelzinnig einde-signaal, ook zonder `paused`.
 
+Dezelfde blinde vlek zat op vier plekken in totaal, en ze zijn alle vier dicht:
+
+| Plek | Wat er misging |
+|---|---|
+| `playback-primary.js` watchdog | eiste `sdk.paused`, zag de vastgelopen speler niet |
+| `playback-primary.js` `endedPlayback()` | eiste `!is_playing`, dus herstel sloeg over |
+| `playback-primary.js` `observedPlaying()` | zei "speelt", waardoor de play-knop zou pauzeren wat al stil stond |
+| `mair-background-guard.js` `resumeFailOpen()` | concludeerde dat de muziek hervat was |
+| `radio-core-health-v1.js` | de langesessie-monitor eiste `!isPlaying` en telde de stilstand dus niet als stall |
+
 ### 2.3 De achtergrondwacht geloofde diezelfde leugen
 
 Bij terugkomst naar de voorgrond kwam `mair-background-guard.js` drie keer achter elkaar

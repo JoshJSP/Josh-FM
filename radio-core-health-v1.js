@@ -12,7 +12,12 @@
     if(device)lastDevice=device;
     const id=String(s.trackId||'');
     if(id&&id!==lastTrack){const now=Date.now();if(lastTrack&&now-lastTrackAt<700){rapidTransitions++;push('rapid-track-transition',{from:lastTrack,to:id,ms:now-lastTrackAt})}lastTrack=id;lastTrackAt=now}
-    const stalled=!document.hidden&&navigator.onLine!==false&&!!s.expectedLive&&!s.isPlaying&&!djBusy()&&!window.JFMPlayback?.health?.busy;
+    // Een track die op zijn duur geparkeerd staat telt ook als stilstand: de speler
+    // meldt dan is_playing true terwijl er geen geluid meer is. Zonder die tweede vorm
+    // zag deze monitor de stilstand van 23-09-2026 niet - twee minuten stil met alles
+    // op groen.
+    const geparkeerd=Number(s.durationMs||0)>0&&Number(s.progressMs||0)>=Number(s.durationMs);
+    const stalled=!document.hidden&&navigator.onLine!==false&&!!s.expectedLive&&(!s.isPlaying||geparkeerd)&&!djBusy()&&!window.JFMPlayback?.health?.busy;
     if(stalled){if(!stallSince)stallSince=Date.now();if(Date.now()-stallSince>15000&&!lastSample.stalled){stalls++;push('playback-stall',{trackId:id,device})}}else stallSince=0;
     lastSample={at:Date.now(),trackId:id,deviceId:device,isPlaying:!!s.isPlaying,expectedLive:!!s.expectedLive,djBusy:djBusy(),stalled:stalled&&Date.now()-stallSince>15000,recoveries:Number(window.JFMPlayback?.health?.recoveries||0),failures:Number(window.JFMPlayback?.health?.failures||0)};
   }
