@@ -453,7 +453,42 @@ op: onder een echte 429-storm bleef `failures: 0`, `lastError` leeg en de muziek
 verzoeken naar de zestien verwijderde bestanden, nul 4xx op statics, nul
 CSP-overtredingen, nul consolefouten.
 
-## 10. Verzoeken en Car Mode
+## 10. Eén open waarneming die ik niet heb kunnen dichttimmeren
+
+In de tweede soakronde, ná mijn eigen Spotify-rate-limit, zag ik dit patroon:
+
+```
+02:14:18  NATURAL_END      FEVER DREAM -> andere track
+02:14:19  EXTERNAL_CHANGE  andere track -> FEVER DREAM     (één seconde later, terug)
+```
+
+Daarna speelde FEVER DREAM opnieuw helemaal af, en het herhaalde zich. Elke terugsprong
+telt als `transition-external_change`, en `miss()` zet de aftelling van de DJ op nul —
+dus in die toestand komt de DJ nooit meer aan de beurt. De teller liep naar veertien
+gemiste wissels.
+
+**Wat ik heb uitgesloten:**
+
+- Het is niet mijn watchdog-wijziging: `primary-sdk-watchdog-stalled` heeft in die sessie
+  **nul** keer gevuurd.
+- Het is geen `fastNaturalAdvance`: de bronnen `primary-natural-auto`, `-fast` en `-end`
+  staan alle drie op nul.
+- Het is geen reload-herstel: `reloadRestores: 0`.
+- Het is niet Spotify's repeat: `repeat_state: "off"`.
+
+**Wat ik niet heb kunnen vaststellen:** wie de track dan wél terugzet. De omgeving was op
+dat moment niet schoon — Spotify gaf 429 door mijn eigen testverkeer, er stond een verzoek
+in de wachtrij, shuffle stond aan en `context` was `null` omdat MAIR een losse
+`uris`-lijst afspeelt in plaats van een playlist-context. Verder graven zou een gokje
+opleveren in plaats van een antwoord, en een verkeerde conclusie in dit rapport is erger
+dan een open punt.
+
+**Wat ik zou doen:** dit als eerste bekijken op een schone sessie, zonder openstaand
+verzoek en zonder rate-limit. Het is nadrukkelijk *niet* het gedrag dat in de eerste
+soakronde te zien was — daar liepen veertien wissels correct en kwam de DJ gewoon op de
+lucht.
+
+## 11. Verzoeken en Car Mode
 
 Beide vielen buiten de vijf bevindingen maar staan hoog in de prioriteitenlijst van
 `CLAUDE.md`, dus ze zijn alsnog aangeraakt.
