@@ -25,6 +25,10 @@ belangrijkste: een vastgelopen speler was voor **geen enkele** bewaking zichtbaa
 muziek stond ruim twee minuten stil terwijl Spotify `is_playing: true` meldde en de
 SDK-klok gewoon doorliep. Vijf plekken vertrouwden die vlag; alle vijf zijn dicht.
 
+En de zender speelde in twintig minuten vier unieke nummers terwijl er 41 in de wachtrij
+stonden: Spotify's eigen shuffle gooide MAIR's programmering weg, en MAIR zette die
+nergens uit. Nu wel (§11).
+
 Verder: het achtergrondontwerp is uitgevoerd (één eigenaar, wake-protocol, keep-alive),
 er staat een gemeten Content-Security-Policy op, de rate limit van de API-routes was met
 één header te omzeilen en is dat niet meer, en zestien dode bestanden zijn weg.
@@ -523,7 +527,34 @@ niet wat het veroorzaakte. Mijn beste kandidaat is het samenspel van een gewapen
 met Spotify-antwoorden die 429 gaven, maar dat is een vermoeden en geen bewijs. Als je
 ooit merkt dat een nummer zich herhaalt terwijl er een verzoek openstaat: dat is dit.
 
-## 11. Verzoeken en Car Mode
+## 11. De zender speelde vier nummers in twintig minuten
+
+Dit vond ik pas in de laatste soakronde, en het raakt de luisterervaring directer dan
+alles hierboven.
+
+MAIR programmeert zijn eigen volgorde. `mair-radio-sequencer.js` spreidt de lijst in
+lagen, bewaakt een herhaalvenster van 24 tracks en zet nooit twee nummers van dezelfde
+artiest achter elkaar. Die zorgvuldig gebouwde lijst gaat vervolgens naar Spotify.
+
+Gemeten: de zender had **41 tracks** in de wachtrij met een herhaalvenster van 24, en
+speelde in twintig minuten **vier unieke nummers**, steeds in dezelfde ronde. Spotify's
+eigen shuffle stond aan, en MAIR zette die nergens uit. Spotify gooide de programmering
+dus weg en koos zelf.
+
+Alle drie de plekken waar MAIR een lijst aan Spotify geeft zetten shuffle nu eerst uit:
+het starten van een zender, het spelen van een track uit de set, en de terugval bij een
+natuurlijk einde. De test die ik erbij schreef vond meteen dat derde pad, dat ik zelf was
+vergeten.
+
+Live bevestigd: `shuffle: true` vóór het starten, `shuffle: false` erna.
+
+**Dit is de enige wijziging van vannacht die een instelling van je Spotify-account
+aanraakt.** Een radiozender hoort zijn eigen volgorde te bepalen, dus ik vind het
+verdedigbaar — maar het is jouw account. Wil je het niet, dan gaat het om de aanroepen
+van `disableSpotifyShuffle` in `playback-primary.js`; die weghalen kost één minuut en de
+test vertelt je precies welke drie.
+
+## 12. Verzoeken en Car Mode
 
 Beide vielen buiten de vijf bevindingen maar staan hoog in de prioriteitenlijst van
 `CLAUDE.md`, dus ze zijn alsnog aangeraakt.
