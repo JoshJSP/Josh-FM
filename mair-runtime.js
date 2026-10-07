@@ -9,22 +9,45 @@
     'mair-dj-v2':'djEngine','mair-voice-engine':'voiceEngine','mair-observability':'diagnostics'
   };
   const sessionId=(()=>{try{const key='mair_runtime_session_v1',old=sessionStorage.getItem(key);if(old)return old;const id=`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;sessionStorage.setItem(key,id);return id}catch{return`volatile-${Date.now().toString(36)}`}})();
+  // De dieptegrens bestaat om recursie en payloadgrootte te begrenzen. Een getal,
+  // een boolean of een korte string kan geen van beide veroorzaken, dus die gaan
+  // op elke diepte gewoon mee. Stond de grens er wel voor, dan werd bijvoorbeeld
+  // snapshot().trace[i].detail.status - precies wat het diagnosepaneel toont -
+  // vervangen door de tekst [depth-limit]. Alleen containers worden nog afgekapt,
+  // en dan met een regel die zegt wat er stond in plaats van dat er iets weg is.
   const safe=(value,depth=0)=>{
-    if(depth>3)return'[depth-limit]';
     if(value==null||typeof value==='boolean'||typeof value==='number')return value;
     if(typeof value==='string'){const x=value.slice(0,500);return /bearer\s+[a-z0-9._~+\/-]{10,}|(?:token|secret|api[_-]?key|client[_-]?secret|password)\s*[:=]\s*\S+/i.test(x)?'[redacted]':x}
-    if(Array.isArray(value))return value.slice(0,20).map(x=>safe(x,depth+1));
-    if(typeof value==='object'){const out={};for(const[k,v]of Object.entries(value).slice(0,30)){if(/token|secret|authorization|cookie|code_verifier/i.test(k))out[k]='[redacted]';else out[k]=safe(v,depth+1)}return out}
+    if(Array.isArray(value))return depth>3?`[… ${value.length} items]`:value.slice(0,20).map(x=>safe(x,depth+1));
+    if(typeof value==='object'){if(depth>3)return `{… ${Object.keys(value).length} velden}`;const out={};for(const[k,v]of Object.entries(value).slice(0,30)){if(/token|secret|authorization|cookie|code_verifier/i.test(k))out[k]='[redacted]';else out[k]=safe(v,depth+1)}return out}
     return String(value).slice(0,200)
   };
+  // Foutlog die een herlaadbeurt overleeft: een crash ís een herlaadbeurt, dus
+  // zonder localStorage was precies de fout die je zoekt altijd al weg. Alleen
+  // level 'error' en caught.*-meldingen uit catch-blokken komen erin; dezelfde
+  // melding vlak achter elkaar telt op in plaats van de log vol te schrijven.
+  const ERROR_KEY='mair_error_log_v1',MAX_ERROR_LOG=60;
+  const errorLog=(()=>{try{const x=JSON.parse(localStorage.getItem(ERROR_KEY)||'[]');return Array.isArray(x)?x.slice(-MAX_ERROR_LOG):[]}catch{return[]}})();
+  function keepError(event){
+    const error=String(event.detail?.error||event.detail?.reason||event.detail?.message||event.type).slice(0,300),last=errorLog.at(-1);
+    if(last&&last.type===event.type&&last.error===error){last.count=(last.count||1)+1;last.at=event.at}
+    else{errorLog.push({at:event.at,type:event.type,level:event.level,error,breakId:event.breakId||'',sessionId});if(errorLog.length>MAX_ERROR_LOG)errorLog.splice(0,errorLog.length-MAX_ERROR_LOG)}
+    try{localStorage.setItem(ERROR_KEY,JSON.stringify(errorLog))}catch{/* opslag vol of geblokkeerd: de log blijft dan alleen in het geheugen */}
+  }
+  // Voor catch-blokken: één regel, en de fout belandt in de foutlog in plaats van in het niets.
+  const caught=(where,error)=>{try{return record(`caught.${String(where||'onbekend').slice(0,80)}`,{error:String(error?.message||error||'onbekende fout')},'warn')}catch{return null}};
   function record(type,detail={},level='info'){
     const cleanDetail=safe(detail),eventName=String(type||'event').slice(0,100),correlationId=String(cleanDetail?.breakId||cleanDetail?.correlationId||'').slice(0,140),timestamp=Date.now(),event={id:events.length?events.at(-1).id+1:1,timestamp,at:timestamp,sessionId,transitionId:String(cleanDetail?.transitionId||'').slice(0,140),breakId:String(cleanDetail?.breakId||'').slice(0,140),correlationId,module:String(cleanDetail?.module||eventName.split(/[.]/)[0]||'runtime').slice(0,80),event:eventName,type:eventName,level:['info','warn','error'].includes(level)?level:'info',durationMs:Number.isFinite(cleanDetail?.durationMs)?Math.max(0,Number(cleanDetail.durationMs)):undefined,details:cleanDetail,detail:cleanDetail};
     events.push(event);if(events.length>MAX_EVENTS)events.splice(0,events.length-MAX_EVENTS);
+    if(event.level==='error'||eventName.startsWith('caught.'))keepError(event);
     counters.set(event.type,(counters.get(event.type)||0)+1);
     try{window.dispatchEvent(new CustomEvent('mair:timeline',{detail:event}))}catch{}
     return event
   }
-  function trace(correlationId,stage,detail={},level='info'){return record(`trace.${String(stage||'step').toLowerCase().replace(/[^a-z0-9.-]+/g,'-')}`,{...safe(detail),correlationId:String(correlationId||'').slice(0,140)},level)}
+  // record() saniteert zelf; hier nog een keer safe() draaien was dubbel werk op
+  // elk event, en het maakte bij zoeken naar [depth-limit] onduidelijk welke van de
+  // passes de waarde had afgekapt.
+  function trace(correlationId,stage,detail={},level='info'){return record(`trace.${String(stage||'step').toLowerCase().replace(/[^a-z0-9.-]+/g,'-')}`,{...detail,correlationId:String(correlationId||'').slice(0,140)},level)}
   function correlated(correlationId,limit=100){const id=String(correlationId||'');return events.filter(x=>x.correlationId===id).slice(-Math.max(1,Math.min(MAX_EVENTS,Number(limit)||100))).map(x=>({...x,detail:safe(x.detail)}))}
   function register(id,meta={}){
     id=String(id||'').trim();if(!id)return{installed:false,duplicate:false};
@@ -38,6 +61,6 @@
   function status(){const resolved=resolve();return{owners:Object.fromEntries([...modules].map(([key,value])=>[key,value.owner])),ready:Object.fromEntries(Object.entries(resolved).map(([key,value])=>[key,!!value]))}}
   function refresh(){const detail=status();try{window.dispatchEvent(new CustomEvent('mair:runtime-ready',{detail}))}catch{}return detail}
   function snapshot(){return{version:'runtime-v3-deterministic',sessionId,modules:[...modules.values()].map(x=>({...x})),events:events.map(x=>({...x,details:safe(x.details),detail:safe(x.detail)})),counters:Object.fromEntries(counters),status:status()}}
-  window.MAIRRuntime={version:'runtime-v3-deterministic',sessionId,register,failed,record,trace,correlated,sanitize:safe,snapshot,resolve,status,refresh,events:(limit=100)=>events.slice(-Math.max(1,Math.min(MAX_EVENTS,Number(limit)||100))).map(x=>({...x,details:safe(x.details),detail:safe(x.detail)})),clear:()=>{events.length=0;counters.clear()}};
+  window.MAIRRuntime={version:'runtime-v3-deterministic',sessionId,register,failed,record,trace,correlated,sanitize:safe,snapshot,resolve,status,refresh,events:(limit=100)=>events.slice(-Math.max(1,Math.min(MAX_EVENTS,Number(limit)||100))).map(x=>({...x,details:safe(x.details),detail:safe(x.detail)})),clear:()=>{events.length=0;counters.clear()},caught,errorLog:()=>errorLog.map(x=>({...x})),clearErrorLog:()=>{errorLog.length=0;try{localStorage.removeItem(ERROR_KEY)}catch{/* niets te wissen */}}};
   register('mair-runtime',{version:'runtime-v3-deterministic',owner:'reliability-core'});
 })();
