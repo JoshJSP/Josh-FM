@@ -1,0 +1,66 @@
+/* MAIR motion layer. Alleen overgangen, geen layout/display-wijzigingen.
+   Tokens volgen transitions.dev (duur, easing, afstand). Animatie op transform/opacity;
+   kleurwissels (paint-only) alleen voor actieve/aan-uit-staten. */
+:root{
+  --duration-quick:150ms;--duration-fast:250ms;--duration-medium:350ms;--duration-stagger:40ms;
+  --ease-smooth-out:cubic-bezier(.22,1,.36,1);--ease-out:ease-out;--ease-linear:linear;
+  --distance-base:8px;--scale-press:.97;
+}
+
+/* Tabwissel: display:none -> block, dus een entree-keyframe i.p.v. transition. */
+@keyframes mairMotionRise{from{opacity:0;transform:translateY(var(--distance-base))}}
+@keyframes mairMotionFade{from{opacity:0}}
+.tabpane.active>*:nth-child(-n+6){animation:mairMotionRise var(--duration-fast) var(--ease-smooth-out) backwards}
+.tabpane.active>*:nth-child(2){animation-delay:var(--duration-stagger)}
+.tabpane.active>*:nth-child(3){animation-delay:calc(var(--duration-stagger)*2)}
+.tabpane.active>*:nth-child(4){animation-delay:calc(var(--duration-stagger)*3)}
+.tabpane.active>*:nth-child(5){animation-delay:calc(var(--duration-stagger)*4)}
+.tabpane.active>*:nth-child(6){animation-delay:calc(var(--duration-stagger)*5)}
+/* Instellingen toont alleen #mairProfilePage (mair-profile.js verbergt de rest), en die staat voorbij kind 6. */
+.tabpane.active>#mairProfilePage{animation:mairMotionRise var(--duration-fast) var(--ease-smooth-out) backwards}
+
+/* Diagnostiek-sheet: hidden-attribuut wisselt display, dus entree via keyframe (sluiten blijft direct). */
+.mair-diagnostics-sheet.is-open{animation:mairMotionRise var(--duration-fast) var(--ease-smooth-out)}
+
+/* Albumhoes: zacht in beeld wanneer .hidden eraf gaat. */
+#artImg:not(.hidden){animation:mairMotionFade var(--duration-fast) var(--ease-out)}
+
+/* Knoppen en chips: hover-in snel, hover-uit/ontdoen zachter; press-scale direct op :active. */
+.tab,.chip,.circle,.cta,.secondary,.quick,.taste button,.mair-nav-btn,.mair-station-card,.result button,.searchrow button{
+  transition:transform var(--duration-fast) var(--ease-smooth-out),opacity var(--duration-fast) var(--ease-smooth-out),
+    background-color var(--duration-fast) var(--ease-smooth-out),border-color var(--duration-fast) var(--ease-smooth-out),color var(--duration-fast) var(--ease-smooth-out);
+}
+@media (hover:hover){
+  .tab:hover,.chip:hover,.circle:hover,.cta:hover,.secondary:hover,.quick:hover,.taste button:hover,.mair-nav-btn:hover,.mair-station-card:hover,.result button:hover,.searchrow button:hover{
+    transition-duration:var(--duration-quick);
+  }
+}
+.tab:not(:disabled):active,.chip:not(:disabled):active,.circle:not(:disabled):active,.cta:not(:disabled):active,.secondary:not(:disabled):active,
+.quick:not(:disabled):active,.taste button:not(:disabled):active,.mair-nav-btn:active,.mair-station-card:active,.result button:not(:disabled):active,.searchrow button:not(:disabled):active{
+  transform:scale(var(--scale-press));transition-duration:80ms;
+}
+
+/* Schakelaar: thumb reist via transform (i.p.v. left). */
+.switch span{transition:background-color var(--duration-fast) var(--ease-smooth-out)}
+.switch span:after{transition:transform var(--duration-fast) var(--ease-smooth-out)}
+.switch input:checked+span:after{left:2px;transform:translateX(15px)}
+
+/* Voortgangsbalk en statusindicator. */
+.bar{contain:paint}
+#barFill{transition:width .5s var(--ease-linear)}
+#status{transition:color var(--duration-fast) var(--ease-out),border-color var(--duration-fast) var(--ease-out),background-color var(--duration-fast) var(--ease-out)}
+
+/* Car Mode: geen verplaatsende animaties tijdens het rijden, alleen zachte fades. */
+:is(.mair-car-mode,.mair-car-mode-open,.jfm-car-mode,.car-turn-split) .tabpane.active>*,
+:is(.mair-car-mode,.mair-car-mode-open,.jfm-car-mode,.car-turn-split) .tabpane.active>#mairProfilePage,
+.mair-car-mode-open .mair-diagnostics-sheet.is-open{animation:mairMotionFade var(--duration-quick) var(--ease-out);animation-delay:0s}
+:is(.mair-car-mode,.mair-car-mode-open,.jfm-car-mode,.car-turn-split) :is(.tab,.chip,.circle,.cta,.secondary,.quick,.mair-nav-btn,.mair-station-card):active{transform:none}
+
+/* Reduced motion: alle beweging uit, alleen korte opacity-fades. */
+@media (prefers-reduced-motion:reduce){
+  .tabpane.active>*:nth-child(-n+6),.tabpane.active>#mairProfilePage,.mair-diagnostics-sheet.is-open,#artImg:not(.hidden){animation:mairMotionFade var(--duration-quick) var(--ease-out);animation-delay:0s}
+  .tab:not(:disabled):active,.chip:not(:disabled):active,.circle:not(:disabled):active,.cta:not(:disabled):active,.secondary:not(:disabled):active,
+  .quick:not(:disabled):active,.taste button:not(:disabled):active,.mair-nav-btn:active,.mair-station-card:active,.result button:not(:disabled):active,.searchrow button:not(:disabled):active{transform:none}
+  .switch span:after{transition:none}
+  #barFill{transition:none}
+}

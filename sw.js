@@ -20,7 +20,7 @@ CORE.push('./mair-back-nav.js');
 CORE.push('./mair-car-70-30.js','./mair-car-autofit.js','./mair-car-menu-sticky.js','./mair-car-stop-metrics.js','./mair-car-nav-clean.css','./mair-car-stops.css','./mair-journey-director.js','./mair-traffic-journey-toast.js','./mair-passenger-mode.js','./mair-passenger-search-host.js');
 // Overige actieve modules uit de bootgraaf die nog niet gecached waren: de DJ-cadansgarantie,
 // de persoonlijke muziekbron, dataportabiliteit en de stylesheet die index.html zelf laadt.
-CORE.push('./mair-dj-cadence-fix.js','./mair-personal-source-sync.js','./data-portability-v9.js','./mair-easy-use-v1.css');
+CORE.push('./mair-dj-cadence-fix.js','./mair-personal-source-sync.js','./data-portability-v9.js','./mair-easy-use-v1.css','./mair-motion.css');
 // CRITICAL is bewust minimaal: precies wat nodig is om de app te laten booten en muziek te
 // kunnen starten. Ontbreekt hier iets, dan is een halve installatie erger dan geen installatie.
 // Alle overige CORE-assets zijn optioneel en worden tolerant gecached, zodat één ontbrekend
