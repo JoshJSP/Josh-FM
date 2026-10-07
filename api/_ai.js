@@ -8,7 +8,7 @@
 // Audio, Spotify en MusicBrainz. Een extra dependency per Vercel-functie kost
 // meer dan de regels hieronder.
 
-export const CLAUDE_DEFAULT_MODEL='claude-opus-5';
+export const CLAUDE_DEFAULT_MODEL='claude-opus-5-5';
 const CLAUDE_URL='https://api.anthropic.com/v1/messages';
 const GROQ_URL='https://api.groq.com/openai/v1/chat/completions';
 const clip=(v,n)=>String(v??'').slice(0,n);
@@ -21,14 +21,20 @@ export function hasGroq(){return !!String(process.env.GROQ_API_KEY||'').trim()}
 
 // effort stuurt hoe diep Claude nadenkt voor hij schrijft: 'low' waar de
 // deadline hard is (DJ-break, nieuws), 'medium' waar precisie telt (classificatie).
+// Zet hem altijd expliciet: op Opus 5.5 staat denken altijd aan (een 'thinking'-
+// veld uitzetten geeft een 400) en is de standaard 'medium', niet 'low'.
 // maxTokens moet ruim boven de gewenste tekstlengte liggen, want het nadenken
 // telt mee in datzelfde budget.
+//
+// fallbacks:'default' laat Anthropic een geweigerd verzoek zelf op een ander
+// model overdoen, gekozen per weigeringscategorie. Pas als die hele keten weigert
+// komt stop_reason 'refusal' hier terug en neemt Groq het over.
 export async function claudeText({system,user,maxTokens=2000,effort='low',timeoutMs=12000,requestId=''}={}){
   const key=String(process.env.ANTHROPIC_API_KEY||'').trim(),model=claudeModel();
   if(!key)return{ok:false,provider:'claude',model,status:503,error:'ANTHROPIC_API_KEY ontbreekt'};
-  const headers={'x-api-key':key,'anthropic-version':'2023-06-01','content-type':'application/json'};
+  const headers={'x-api-key':key,'anthropic-version':'2023-06-01','anthropic-beta':'server-side-fallback-2026-07-01','content-type':'application/json'};
   if(requestId)headers['X-MAIR-Request-ID']=requestId;
-  const body={model,max_tokens:maxTokens,system,messages:[{role:'user',content:user}],output_config:{effort}};
+  const body={model,max_tokens:maxTokens,system,messages:[{role:'user',content:user}],output_config:{effort},fallbacks:'default'};
   try{
     const r=await timedFetch(CLAUDE_URL,{method:'POST',headers,body:JSON.stringify(body)},timeoutMs);
     const d=await r.json().catch(()=>({}));
@@ -42,7 +48,8 @@ export async function claudeText({system,user,maxTokens=2000,effort='low',timeou
     // een halve zin komt hier echt voorbij - en die zou letterlijk worden
     // uitgesproken. Liever doorvallen naar Groq dan halverwege afbreken.
     if(d?.stop_reason==='max_tokens')return{ok:false,provider:'claude',model,status:502,error:'Claude raakte max_tokens; tekst is afgekapt'};
-    return{ok:true,provider:'claude',model,text,usage:d?.usage||null};
+    // Na een fallback staat in d.model het model dat echt schreef.
+    return{ok:true,provider:'claude',model:String(d?.model||model),text,usage:d?.usage||null};
   }catch(e){const aborted=e?.name==='AbortError';return{ok:false,provider:'claude',model,status:aborted?504:500,error:aborted?'Claude timeout':clip(e?.message||e,500)}}
 }
 

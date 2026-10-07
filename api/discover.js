@@ -1,3 +1,4 @@
+import {guardAI} from './_guard.js';
 import {claudeText,groqText,hasClaude,hasGroq} from './_ai.js';
 // Deze route doet zelf geen fetch meer: _ai.js bewaakt de deadlines.
 const GROQ_MODELS=['openai/gpt-oss-120b','openai/gpt-oss-20b'];
@@ -11,7 +12,7 @@ const clientIp=req=>{const real=String(req.headers?.['x-real-ip']||'').trim();if
 function rateLimit(req,res){const windowMs=60000,limit=20,ip=clientIp(req),now=Date.now(),fresh=(RATE.get(ip)||[]).filter(at=>now-at<windowMs);if(fresh.length>=limit){const retry=Math.max(1,Math.ceil((windowMs-(now-fresh[0]))/1000));res.setHeader('Retry-After',String(retry));res.status(429).json({error:'rate_limited',detail:`Probeer het over ${retry} seconden opnieuw.`});return false}fresh.push(now);RATE.set(ip,fresh);if(RATE.size>512)for(const[k,hits]of RATE)if(!hits.some(at=>now-at<windowMs))RATE.delete(k);return true}
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
-  if(!rateLimit(req,res))return;
+  if(!rateLimit(req,res))return;if(!await guardAI(req,res))return;
   if(!hasClaude()&&!hasGroq())return res.status(503).json({error:'missing_ai_key'});
   const {seeds=[],count=10,mode='normal'}=req.body||{};
   const wanted=Math.max(1,Math.min(12,Number(count)||10));

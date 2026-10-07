@@ -1,3 +1,4 @@
+import {guardAI} from './_guard.js';
 import {claudeText,hasClaude} from './_ai.js';
 const DEFAULT_MODELS=['openai/gpt-oss-120b','openai/gpt-oss-20b'];
 const RATE=new Map();
@@ -18,7 +19,7 @@ function cleanOutput(text=''){let x=String(text).replace(/```[\s\S]*?```/g,' ').
 function acceptable(text=''){const x=String(text||'');if(x.length<180||x.length>2400)return false;if(/\b(?:AI|API|Groq|Anthropic|Fish Audio|Spotify|prompt|metadata)\b/i.test(x))return false;return/^Dit is MAIR Nieuws\./i.test(x)&&/Dit was MAIR Nieuws\. Je luistert naar MAIR\.?$/i.test(x)}
 export default async function handler(req,res){
  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
- if(!rateLimit(req,res))return;
+ if(!rateLimit(req,res))return;if(!await guardAI(req,res))return;
  const raw=Array.isArray(req.body?.items)?req.body.items:[],items=raw.map(item).filter(Boolean).slice(0,6),source=safe(req.body?.sourceLabel||'NOS Nieuws',80),time=safe(req.body?.time||'',40);
  if(items.length<3)return res.status(422).json({error:'Te weinig actuele nieuwsitems voor een betrouwbaar bulletin'});
  const deterministic=fallback(items,source),key=process.env.GROQ_API_KEY;

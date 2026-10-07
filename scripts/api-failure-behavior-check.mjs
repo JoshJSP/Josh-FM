@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
+import {withAI,primeAIGuard} from './_ai-guard-test.mjs';
 import tts from '../api/tts.js';
 import writer from '../api/dj-writer.js';
 
 const originalFetch=globalThis.fetch;
 const originalEnv={...process.env};
 function response(){return{statusCode:0,headers:{},body:null,status(code){this.statusCode=code;return this},setHeader(name,value){this.headers[name]=value},json(value){this.body=value;return this},send(value){this.body=value;return this}}}
-async function call(handler,req){const res=response();await handler(req,res);return res}
+async function call(handler,req){const res=response();await handler(withAI(req),res);return res}
+await primeAIGuard();
 function fishResponse(body,{status=200,type='audio/mpeg'}={}){const data=Buffer.isBuffer(body)?body:Buffer.from(String(body));return{ok:status>=200&&status<300,status,headers:{get:name=>name.toLowerCase()==='content-type'?type:null},text:async()=>data.toString(),arrayBuffer:async()=>data}}
 function writerBody(id='api-test'){return{breakId:id,breakType:'FORWARD_ANNOUNCE',targetWords:16,energy:'NORMAL',context:{schemaVersion:'1.0.0',break:{breakType:'FORWARD_ANNOUNCE',targetWords:16,maxDurationSeconds:10,energy:'NORMAL',mustMention:[],permittedTopics:['music'],prohibitedTopics:[]},onAir:{previous:{id:'a',name:'Eerste',artists:['Artiest A']},next:{id:'b',name:'Tweede',artists:['Artiest B']},future:[],relationship:null},session:{station:'MAIR',localTime:'10:15',day:'woensdag',daypart:'ochtend',durationMinutes:20,narrative:{}},memory:{revision:0,recentBreaks:[],usedFactIds:[]},allowedFacts:[],doNot:[]}}}
 function restoreEnv(){for(const key of Object.keys(process.env))if(!(key in originalEnv))delete process.env[key];Object.assign(process.env,originalEnv)}
@@ -82,12 +84,12 @@ try{
   calls=[];const claudeCalls=[];
   globalThis.fetch=async(url,opt)=>{const u=String(url);calls.push(u);if(u.includes('api.anthropic.com')){claudeCalls.push({headers:opt.headers,body:JSON.parse(opt.body)});return{ok:true,status:200,json:async()=>({stop_reason:'end_turn',content:[{type:'thinking',thinking:''},{type:'text',text:'Claude schrijft deze radiolink.'}],usage:{input_tokens:10,output_tokens:5}})}}return{ok:true,status:200,json:async()=>({choices:[{message:{content:'Groq had niet gebeld mogen worden.'}}]})}};
   res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.40'},body:writerBody('claude-primary')});
-  assert.equal(res.statusCode,200);assert.equal(res.body.provider,'claude');assert.equal(res.body.model,'claude-opus-5');
+  assert.equal(res.statusCode,200);assert.equal(res.body.provider,'claude');assert.equal(res.body.model,'claude-opus-5-5');
   assert.equal(res.body.text,'Claude schrijft deze radiolink.');assert.equal(res.body.persona,'josh');
   assert.equal(calls.length,1);assert.ok(calls[0].includes('api.anthropic.com'));
   assert.equal(claudeCalls[0].headers['x-api-key'],'claude-test-key');assert.equal(claudeCalls[0].headers['anthropic-version'],'2023-06-01');
-  assert.equal(claudeCalls[0].body.model,'claude-opus-5');assert.ok(claudeCalls[0].body.max_tokens>=2000);
-  assert.equal(claudeCalls[0].body.output_config.effort,'low');assert.ok(claudeCalls[0].body.system.includes('on-air DJ van MAIRFM'));
+  assert.equal(claudeCalls[0].body.model,'claude-opus-5-5');assert.ok(claudeCalls[0].body.max_tokens>=2000);
+  assert.equal(claudeCalls[0].body.output_config.effort,'low');assert.equal(claudeCalls[0].body.fallbacks,'default');assert.equal(claudeCalls[0].headers['anthropic-beta'],'server-side-fallback-2026-07-01');assert.equal(claudeCalls[0].body.thinking,undefined,'Opus 5.5 weigert thinking uit; het veld hoort weg te blijven');assert.ok(claudeCalls[0].body.system.includes('on-air DJ van MAIRFM'));
 
   // Een weigering komt als HTTP 200 binnen. Groq moet het dan overnemen.
   calls=[];
