@@ -40,19 +40,19 @@
     window.MAIRDiagnosticsHub?.sync?.();
   }
   async function refresh(){
-    try{window.dispatchEvent(new Event('jfm:diagnostics-refresh'));navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'});await navigator.serviceWorker?.getRegistration?.().then(r=>r?.update?.()).catch(()=>{});await wait(220)}catch{}
+    try{window.dispatchEvent(new Event('jfm:diagnostics-refresh'));navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'});await navigator.serviceWorker?.getRegistration?.().then(r=>r?.update?.()).catch(()=>{});await wait(220)}catch(e){window.MAIRRuntime?.caught?.('release-diagnostics.dispatchEvent',e)}
     render();
   }
   async function repair(){
     if(repairing)return;repairing=true;const b=$('diagRepair'),info=$('diagRepairInfo');
     if(b){b.disabled=true;b.textContent='Herstellen…'}if(info)info.textContent='MAIR synchroniseert de app veilig…';const results=[];
     try{
-      try{await navigator.serviceWorker?.getRegistration?.().then(r=>r?.update?.());results.push('cache')}catch{}
-      try{window.dispatchEvent(new Event('jfm:diagnostics-refresh'));navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'})}catch{}
+      try{await navigator.serviceWorker?.getRegistration?.().then(r=>r?.update?.());results.push('cache')}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}
+      try{window.dispatchEvent(new Event('jfm:diagnostics-refresh'));navigator.serviceWorker?.controller?.postMessage?.({type:'CACHE_VERSION'})}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}
       try{if(window.JFMPlayback?.ensureDevice){await window.JFMPlayback.ensureDevice();results.push('device')}}catch{results.push('device-fout')}
       try{if(window.JFMPlayback?.recover){await window.JFMPlayback.recover('manual-diagnostics');results.push('playback')}}catch{results.push('playback-fout')}
-      try{await window.JFMStationQueue?.maintain?.('manual-diagnostics');results.push('wachtrij')}catch{}
-      try{window.JFMIntegrationGuards?.sanity?.();window.JFMStationHealth?.applySafeMode?.()}catch{}
+      try{await window.JFMStationQueue?.maintain?.('manual-diagnostics');results.push('wachtrij')}catch(e){window.MAIRRuntime?.caught?.('release-diagnostics.maintain',e)}
+      try{window.JFMIntegrationGuards?.sanity?.();window.JFMStationHealth?.applySafeMode?.()}catch(e){window.MAIRRuntime?.caught?.('release-diagnostics.sanity',e)}
       lastRepair=new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});await wait(250);render();
       if(info)info.textContent=results.includes('playback-fout')||results.includes('device-fout')?'Herstel deels uitgevoerd. Controleer de regels hierboven of koppel Spotify opnieuw.':'Herstel voltooid zonder je persoonlijke voorkeuren te wissen.';
     }finally{repairing=false;if(b){b.disabled=false;b.textContent='Herstel MAIR'}}

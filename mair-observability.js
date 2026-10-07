@@ -7,12 +7,16 @@ let dj=null,lastTransition=null,lastPlayback=null,lastEvent=null,lastTTS=null;
 const errors=[],timings={},retries={total:0,byStage:{}};
 const runtime=()=>window.MAIRRuntime;
 const clean=value=>runtime()?.sanitize?.(value)??sanitize(value);
+// Noodvariant voor als mair-runtime.js niet geladen is; clean() gebruikt normaal
+// MAIRRuntime.sanitize. Dezelfde regel als daar: primitieven gaan op elke diepte
+// mee, alleen containers worden afgekapt. Twee sanitizers met verschillende
+// dieptegrenzen naast elkaar was precies waarom [depth-limit] zo lastig te
+// herleiden was.
 function sanitize(value,depth=0){
-  if(depth>4)return'[depth-limit]';
   if(value==null||typeof value==='boolean'||typeof value==='number')return value;
   if(typeof value==='string')return /bearer\s+[a-z0-9._-]{12,}|(?:token|secret|api[_-]?key)\s*[:=]\s*\S+/i.test(value)?'[redacted]':value.slice(0,1000);
-  if(Array.isArray(value))return value.slice(0,30).map(x=>sanitize(x,depth+1));
-  if(typeof value==='object'){const out={};for(const[k,v]of Object.entries(value).slice(0,50))out[k]=/token|secret|authorization|cookie|code_verifier|client_secret/i.test(k)?'[redacted]':sanitize(v,depth+1);return out}
+  if(Array.isArray(value))return depth>4?`[… ${value.length} items]`:value.slice(0,30).map(x=>sanitize(x,depth+1));
+  if(typeof value==='object'){if(depth>4)return `{… ${Object.keys(value).length} velden}`;const out={};for(const[k,v]of Object.entries(value).slice(0,50))out[k]=/token|secret|authorization|cookie|code_verifier|client_secret/i.test(k)?'[redacted]':sanitize(v,depth+1);return out}
   return String(value).slice(0,300)
 }
 const track=x=>x?{id:String(x.id||x.trackId||'').slice(0,120),name:String(x.name||'').slice(0,180),artists:(x.artists||[]).map(a=>String(a?.name||a)).slice(0,4),uri:String(x.uri||'').slice(0,180)}:null;

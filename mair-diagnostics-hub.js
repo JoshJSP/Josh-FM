@@ -41,10 +41,24 @@ function toggleDj(){
   try{window.MAIRFlags?.setDJEnabled?.(next)}catch{}
   const message=next?'Live DJ staat aan vanaf de volgende keer laden. MAIRFM wordt nu herladen.':'Live DJ staat uit vanaf de volgende keer laden. MAIRFM wordt nu herladen.';
   document.querySelectorAll('[data-mair-dj-hint]').forEach(el=>{el.textContent=message});
-  setTimeout(()=>{try{location.reload()}catch{}},700);
+  setTimeout(()=>{try{location.reload()}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}},700);
 }
-function sync(){purgeRetired();if(!ensureHub())return;ensureDjSwitch();moveVoiceTest();moveControl('mairImagingPreview','diag-imaging-test','SONIC LOGO TEST');moveCard('mairTraceCard','CENTRALE RUNTIME STATUS');moveCard('mairTestLabCard','MAIR TEST LAB');moveCard('mairVoiceCheckCard','COMPLETE VOICE CHECK');moveCard('mairVoiceEngineCard','VOICE ENGINE');moveCard('mairVoiceLabCard','VOICE LAB');moveCard('mairSoakCard','RELIABILITY MONITOR');moveCard('mairStationDirectorCard','STATION DIRECTOR');for(const id of ['jfmDiagnostics','jfmHealthCard'])$(id)?.classList.add('mairfm-legacy-diagnostics');moveSelfTest();applyOpenState(expanded)}
-function handleClick(e){if(e.target?.closest?.('[data-mair-dj-toggle]')){e.preventDefault();e.stopPropagation();toggleDj();return}if(e.target?.closest?.('#mairDiagnosticsToggle')){e.preventDefault();e.stopPropagation();applyOpenState(!expanded);return}if(e.target?.closest?.('#mairDiagnosticsClose')||e.target===$('mairDiagnosticsSheet')){e.preventDefault();showSheet(false)}}
+// Foutlog uit MAIRRuntime: overleeft een herlaadbeurt, dus hier staat ook wat er
+// misging vlak voor een crash. textContent, geen innerHTML: foutteksten zijn invoer.
+function ensureErrorLog(){
+  const sec=addSection('diag-error-log','FOUTLOG');if(!sec)return;
+  let card=$('mairErrorLogCard');
+  if(!card){
+    card=document.createElement('article');card.id='mairErrorLogCard';card.className='card';
+    card.innerHTML='<div class="row between"><h3 style="margin:0">Laatste fouten</h3><span data-mair-errorlog-count class="muted">0</span></div><ol data-mair-errorlog-list style="margin:10px 0 0;padding-left:18px;font-size:12px;line-height:1.45;word-break:break-word"></ol><button data-mair-errorlog-clear type="button" class="secondary" style="margin-top:10px">Foutlog wissen</button>';
+    sec.appendChild(card);
+  }
+  const log=window.MAIRRuntime?.errorLog?.()||[],list=card.querySelector('[data-mair-errorlog-list]');
+  card.querySelector('[data-mair-errorlog-count]').textContent=String(log.length);
+  list.replaceChildren(...(log.length?log.slice(-20).reverse().map(x=>{const li=document.createElement('li');const when=new Date(x.at||0).toLocaleString('nl-NL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});li.textContent=`${when} · ${x.type}${x.count>1?` (×${x.count})`:''} — ${x.error}`;return li}):[Object.assign(document.createElement('li'),{textContent:'Geen fouten vastgelegd.'})]));
+}
+function sync(){purgeRetired();if(!ensureHub())return;ensureDjSwitch();ensureErrorLog();moveVoiceTest();moveControl('mairImagingPreview','diag-imaging-test','SONIC LOGO TEST');moveCard('mairTraceCard','CENTRALE RUNTIME STATUS');moveCard('mairTestLabCard','MAIR TEST LAB');moveCard('mairVoiceCheckCard','COMPLETE VOICE CHECK');moveCard('mairVoiceEngineCard','VOICE ENGINE');moveCard('mairVoiceLabCard','VOICE LAB');moveCard('mairSoakCard','RELIABILITY MONITOR');moveCard('mairStationDirectorCard','STATION DIRECTOR');for(const id of ['jfmDiagnostics','jfmHealthCard'])$(id)?.classList.add('mairfm-legacy-diagnostics');moveSelfTest();applyOpenState(expanded)}
+function handleClick(e){if(e.target?.closest?.('[data-mair-errorlog-clear]')){e.preventDefault();e.stopPropagation();window.MAIRRuntime?.clearErrorLog?.();ensureErrorLog();return}if(e.target?.closest?.('[data-mair-dj-toggle]')){e.preventDefault();e.stopPropagation();toggleDj();return}if(e.target?.closest?.('#mairDiagnosticsToggle')){e.preventDefault();e.stopPropagation();applyOpenState(!expanded);return}if(e.target?.closest?.('#mairDiagnosticsClose')||e.target===$('mairDiagnosticsSheet')){e.preventDefault();showSheet(false)}}
 document.addEventListener('click',handleClick,false);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&visible)showSheet(false)});
 function boot(){paintDjSwitch();sync();let ticks=0;const timer=setInterval(()=>{sync();if(++ticks>=80)clearInterval(timer)},250)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();window.addEventListener('pageshow',()=>setTimeout(sync,120));window.addEventListener('mair:diagnostics-open',()=>showSheet(true));

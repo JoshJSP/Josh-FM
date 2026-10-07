@@ -2,7 +2,7 @@
 (()=>{
   if(window.JFMMusicIntelligence)return;
   const HISTORY='jfm_music_recent_v3',norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
-  const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(d))}catch{return d}},save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+  const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||JSON.stringify(d))}catch{return d}},save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{/* opslag geblokkeerd: dan zonder opslag */}};
   const year=t=>Number(String(t?.release||'').slice(0,4))||0,artist=t=>norm(t?.artists?.[0]||''),sig=t=>norm(t?.name)+'|'+artist(t),channel=()=>localStorage.getItem('jfm_music_channel_v1')||'mix';
   function pure(t,id=channel()){
     if(!t?.id||!t?.uri)return false;

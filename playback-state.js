@@ -15,11 +15,11 @@
   let operationSeq=0;
 
   function load(){try{return JSON.parse(sessionStorage.getItem(KEY)||'{}')}catch{return{}}}
-  function persist(){try{sessionStorage.setItem(KEY,JSON.stringify(state))}catch{}}
+  function persist(){try{sessionStorage.setItem(KEY,JSON.stringify(state))}catch{/* opslag geblokkeerd: dan maar zonder opslag */}}
   function emit(reason='update',previous=null){
     const snapshot=get();
-    for(const fn of listeners){try{fn(snapshot,reason)}catch{}}
-    try{window.dispatchEvent(new CustomEvent('jfm:playback-state',{detail:{state:snapshot,previous:previous?{...previous}:null,reason,sequence:snapshot.sequence}}))}catch{}
+    for(const fn of listeners){try{fn(snapshot,reason)}catch(e){window.MAIRRuntime?.caught?.('playback-state.emit',e)}}
+    try{window.dispatchEvent(new CustomEvent('jfm:playback-state',{detail:{state:snapshot,previous:previous?{...previous}:null,reason,sequence:snapshot.sequence}}))}catch{/* event-listener gooide: onschuldig */}
   }
   function get(){return{...state,operation:state.operation?{...state.operation}:null}}
   function normalize(remote={}){
@@ -53,9 +53,9 @@
       const expected=state.operation.expectedTrackId||'';
       if((expected&&next.trackId===expected)||(!expected&&changedTrack))state.operation=null;
     }
-    try{playback=remote}catch{}
+    try{playback=remote}catch{/* globale playback-variabele niet overal beschikbaar */}
     persist();emit(changedTrack?'track-change':'state',previous);
-    if(changedTrack)try{window.dispatchEvent(new CustomEvent('jfm:trackchange',{detail:{trackId:next.trackId,previousTrackId:previousTrack,source,sequence:state.sequence}}))}catch{}
+    if(changedTrack)try{window.dispatchEvent(new CustomEvent('jfm:trackchange',{detail:{trackId:next.trackId,previousTrackId:previousTrack,source,sequence:state.sequence}}))}catch{/* event-listener gooide: onschuldig */}
     return get()
   }
   function patch(values={},reason='patch'){
