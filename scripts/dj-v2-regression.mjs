@@ -30,6 +30,10 @@ ok(primary.includes('player()?.activateElement')&&primary.includes('djPauseDirec
 ok(primary.includes('primary-v17-end-detection-guard'),'Primary background auto-next transport version missing');
 ok(!dj.includes('new Audio(')&&!dj.includes('AudioContext'),'DJ scheduler must not own an audio engine');
 ok(resume.includes('duplicateIOSBridge:false')&&!resume.includes('new Audio(')&&!resume.includes("s.src='./ios-dj-audio.js"),'Duplicate iOS voice bridge must remain disabled');
+// ios-dj-audio.js is op 23-09-2026 verwijderd in plaats van uitgezet. Deze test
+// bewaakte dat het bestand niet geladen werd; nu bewaakt hij dat het niet
+// terugkomt, want een tweede stembrug naast debug-tts.js levert dubbele audio.
+ok(!fs.existsSync('ios-dj-audio.js'),'Duplicate iOS voice bridge file must stay deleted');
 ok(voice.includes('const mediaAudio=new Audio()')&&voice.includes('const AC=window.AudioContext||window.webkitAudioContext'),'Central Fish Audio engine missing');
 ok(engine.includes("register('fish'")&&engine.includes('window.prepareSpeech=prepare')&&engine.includes('window.speakText=speak'),'Voice provider adapter missing');
 ok(engine.includes('if(speaking)')&&engine.includes('overlapDrops')&&engine.includes('CACHE_TTL'),'Voice engine must reject overlap and bound prepared-state lifetime');
