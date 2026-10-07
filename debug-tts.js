@@ -25,6 +25,10 @@ window.JFMJingleText=(type='station')=>{const dict={station:['Dit is MAIR FM.','
 const AC=window.AudioContext||window.webkitAudioContext;
 let djContext=AC?new AC():null,djGain=null,webAudioUnlocked=false,mediaUnlocked=false;
 if(djContext){djGain=djContext.createGain();djGain.gain.value=1;djGain.connect(djContext.destination)}
+// De stem volgt de MAIR-volumeschuif, net als Spotify. Op 7-10-2026 gemeten op 12%:
+// de stem op vol volume stond ~10 dB boven de muziek, dus de DJ schreeuwde juist
+// als je zacht luisterde. Zelfde factor op beide houdt de balans van 100% vast.
+const voiceLevel=()=>{const v=Number(window.JFMPlayback?.volume);return Number.isFinite(v)?Math.max(0,Math.min(1,v)):1};
 const mediaAudio=new Audio();mediaAudio.preload='auto';mediaAudio.playsInline=true;mediaAudio.setAttribute('playsinline','');mediaAudio.volume=1;
 const SILENT='data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAACA';
 async function primeMedia(){if(mediaUnlocked)return true;try{mediaAudio.src=SILENT;mediaAudio.currentTime=0;const p=mediaAudio.play();if(p?.then)await p;mediaAudio.pause();mediaAudio.removeAttribute('src');mediaAudio.load();mediaUnlocked=true;return true}catch{return false}}
@@ -114,7 +118,7 @@ async function playWithMediaElement(blob,label,meta={}){
   const url=URL.createObjectURL(blob);let playbackStartedAt=0,success=false,failure=null;
   try{
     await primeMedia().catch(()=>false);if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
-    mediaAudio.pause();mediaAudio.src=url;mediaAudio.currentTime=0;mediaAudio.volume=1;
+    mediaAudio.pause();mediaAudio.src=url;mediaAudio.currentTime=0;mediaAudio.volume=voiceLevel();
     await mediaAudio.play();playbackStartedAt=Date.now();lastPlaybackMode='html-audio';lastPlaybackAt=playbackStartedAt;
     setInfo(`${label} is on air ✓`,'onair');notifyPlayback(meta,'onPlaybackStart',{playbackStartedAt,route:'html-audio',success:true});
     await new Promise((resolve,reject)=>{let done=false;const finish=e=>{if(done)return;done=true;mediaAudio.onended=null;mediaAudio.onerror=null;meta.signal?.removeEventListener?.('abort',cancel);clearTimeout(timer);if(activePlayback?.finish===finish)activePlayback=null;e?reject(e):resolve()},cancel=()=>{mediaAudio.pause();finish(cancelledError(meta.signal?.reason))},timer=setTimeout(()=>finish(new Error('Afspelen van Fish Audio duurde te lang')),45000);activePlayback={breakId:String(meta.breakId||''),finish,cancel};mediaAudio.onended=()=>finish();mediaAudio.onerror=()=>finish(new Error('De browser kon Fish Audio niet afspelen'));meta.signal?.addEventListener?.('abort',cancel,{once:true})});
@@ -127,7 +131,7 @@ async function playWithMediaElement(blob,label,meta={}){
 }
 async function playWithWebAudio(blob,label,meta={}){
   if(!djContext)throw new Error('Web Audio is niet beschikbaar');if(djContext.state==='suspended')await djContext.resume();if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
-  const arr=await blob.arrayBuffer(),buffer=await djContext.decodeAudioData(arr.slice(0)),source=djContext.createBufferSource();source.buffer=buffer;source.connect(djGain);
+  const arr=await blob.arrayBuffer(),buffer=await djContext.decodeAudioData(arr.slice(0)),source=djContext.createBufferSource();source.buffer=buffer;djGain.gain.value=voiceLevel();source.connect(djGain);
   let playbackStartedAt=0,success=false,failure=null;
   try{
     await new Promise((resolve,reject)=>{let done=false;const finish=e=>{if(done)return;done=true;source.onended=null;meta.signal?.removeEventListener?.('abort',cancel);clearTimeout(timer);if(activePlayback?.finish===finish)activePlayback=null;e?reject(e):resolve()},cancel=()=>{try{source.stop()}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}finish(cancelledError(meta.signal?.reason))},timer=setTimeout(()=>{try{source.stop()}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}finish(new Error('Web Audio bleef hangen tijdens de DJ-break'))},Math.min(45000,Math.max(3000,Math.ceil((Number(buffer.duration)||0)*1000)+3000)));activePlayback={breakId:String(meta.breakId||''),finish,cancel};source.onended=()=>finish();meta.signal?.addEventListener?.('abort',cancel,{once:true});try{source.start(0);playbackStartedAt=Date.now();lastPlaybackMode='web-audio';lastPlaybackAt=playbackStartedAt;setInfo(`${label} is on air ✓`,'onair');notifyPlayback(meta,'onPlaybackStart',{playbackStartedAt,route:'web-audio',success:true})}catch(e){finish(e)}});
