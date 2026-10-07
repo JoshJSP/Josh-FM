@@ -24,7 +24,7 @@ function sessionAlive(){
     if(hardened&&hardened.reauthRequired===true)return false;
     const auth=window.JFMAuth?.state;
     if(auth&&(typeof auth.hasAccessToken==='boolean'||typeof auth.hasRefreshToken==='boolean'))return !!(auth.hasAccessToken||auth.hasRefreshToken);
-  }catch{}
+  }catch(e){window.MAIRRuntime?.caught?.('mair-ux-state.x',e)}
   return null
 }
 function connection(){
@@ -66,7 +66,7 @@ function get(){
   const pending=operation&&['next','previous','pause','resume','start'].includes(operation.type)?operation.type:null;
   return{version:'radio-view-state-v1',at:Date.now(),appState,station:station(),track,playbackState:{isPlaying:!!p.isPlaying,expectedLive:!!p.expectedLive,progressMs:Number(p.progressMs||0),durationMs:Number(p.durationMs||track?.durationMs||0)},playbackPendingAction:pending,djPublicState,nextTrack:nextTrack(),spotifyConnection,recoverableError:userError(p,online,health),recoveryJustSucceeded:Date.now()-lastRecoverySuccess<5000}
 }
-function emit(reason='refresh'){const state=get();for(const fn of listeners)try{fn(state,reason)}catch{};try{window.dispatchEvent(new CustomEvent('mair:ux-state',{detail:{state,reason}}))}catch{}return state}
+function emit(reason='refresh'){const state=get();for(const fn of listeners)try{fn(state,reason)}catch(e){window.MAIRRuntime?.caught?.('mair-ux-state.fn',e)};try{window.dispatchEvent(new CustomEvent('mair:ux-state',{detail:{state,reason}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}return state}
 function subscribe(fn){if(typeof fn!=='function')return()=>{};listeners.add(fn);fn(get(),'subscribe');return()=>listeners.delete(fn)}
 ['jfm:playback-state','jfm:trackchange','mair:dj-v2-state','mair:dj-speaking','mair:channelchange','mair:station-selected','online','offline','pageshow'].forEach(name=>window.addEventListener(name,e=>{if(name==='mair:channelchange'&&e.detail?.loading){stationFeedback='Station wisselen…';stationFeedbackAt=Date.now()}if(name==='mair:station-selected'){stationFeedback=`${clean(e.detail?.label||'Station')} speelt`;stationFeedbackAt=Date.now()}emit(name)}));
 window.addEventListener('mair:station-error',e=>{lastStationError=clean(e.detail?.error||'Station error',300);lastStationErrorAt=Date.now();emit('station-error')});

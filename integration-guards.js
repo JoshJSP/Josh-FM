@@ -32,10 +32,10 @@
   ];
   const SESSION_KEYS=['jfm_station_queue_v4','jfm_playback_truth_v1'];
   function clearPersonalMemory(){
-    for(const k of MEMORY_KEYS)try{localStorage.removeItem(k)}catch{}
-    for(const k of SESSION_KEYS)try{sessionStorage.removeItem(k)}catch{}
-    try{session=[];renderHistory()}catch{}
-    try{window.JFMPlaybackState?.reset?.()}catch{}
+    for(const k of MEMORY_KEYS)try{localStorage.removeItem(k)}catch{/* opslag geblokkeerd: dan zonder opslag */}
+    for(const k of SESSION_KEYS)try{sessionStorage.removeItem(k)}catch{/* opslag geblokkeerd: dan zonder opslag */}
+    try{session=[];renderHistory()}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
+    try{window.JFMPlaybackState?.reset?.()}catch(e){window.MAIRRuntime?.caught?.('integration-guards.reset',e)}
     trace('personal-memory-cleared',{keys:MEMORY_KEYS.length});
   }
   function installClearMemoryOwner(){
@@ -47,12 +47,12 @@
     })
   }
   async function disconnectSpotify(){
-    try{window.jfmSpotifyPlayer?.disconnect?.()}catch{}
-    for(const k of ['jfm_token','jfm_refresh','jfm_exp','jfm_spotify_device_id','jfm_streaming_ready_v2','jfm_auth_requested_streaming','jfm_pkce_verifier_v2','jfm_pkce_state_v2'])try{localStorage.removeItem(k)}catch{}
-    for(const k of ['jfm_verifier','jfm_state'])try{sessionStorage.removeItem(k)}catch{}
-    try{token=null;refreshToken=null;expiresAt=0;clearInterval(poll)}catch{}
-    try{window.JFMPlaybackState?.reset?.()}catch{}
-    try{setConnected(false)}catch{}
+    try{window.jfmSpotifyPlayer?.disconnect?.()}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
+    for(const k of ['jfm_token','jfm_refresh','jfm_exp','jfm_spotify_device_id','jfm_streaming_ready_v2','jfm_auth_requested_streaming','jfm_pkce_verifier_v2','jfm_pkce_state_v2'])try{localStorage.removeItem(k)}catch{/* opslag geblokkeerd: dan zonder opslag */}
+    for(const k of ['jfm_verifier','jfm_state'])try{sessionStorage.removeItem(k)}catch{/* opslag geblokkeerd: dan zonder opslag */}
+    try{token=null;refreshToken=null;expiresAt=0;clearInterval(poll)}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
+    try{window.JFMPlaybackState?.reset?.()}catch(e){window.MAIRRuntime?.caught?.('integration-guards.reset',e)}
+    try{setConnected(false)}catch(e){window.MAIRRuntime?.caught?.('integration-guards.setConnected',e)}
     trace('spotify-disconnected')
   }
   function installLogoutOwner(){

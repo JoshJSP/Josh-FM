@@ -13,7 +13,7 @@
     lastReason=reason;
     return s;
   }
-  function emit(reason,extra={}){try{window.dispatchEvent(new CustomEvent('mair:background-state',{detail:{reason,hiddenAt,wasPlaying,trackId,recovering,backgroundSkipArmed,...extra}}))}catch{}}
+  function emit(reason,extra={}){try{window.dispatchEvent(new CustomEvent('mair:background-state',{detail:{reason,hiddenAt,wasPlaying,trackId,recovering,backgroundSkipArmed,...extra}}))}catch{/* event-listener gooide: onschuldig */}}
   function armBackgroundDjSkip(reason='background'){
     if(!isHidden())return false;
     try{
@@ -35,7 +35,7 @@
         if(ok){emit('background-dj-resumed',{reason,route:'djResume'});return true}
       }
       const live=await remote();
-      if(live?.is_playing){try{window.JFMPlaybackState?.ingest?.(live,'background-fail-open-playing')}catch{};return true}
+      if(live?.is_playing){try{window.JFMPlaybackState?.ingest?.(live,'background-fail-open-playing')}catch(e){window.MAIRRuntime?.caught?.('mair-background-guard.resumeFailOpen',e)};return true}
       if(typeof window.JFMPlayback?.resume==='function'){
         const ok=await window.JFMPlayback.resume().catch(()=>false);
         if(ok){emit('background-dj-resumed',{reason,route:'resume'});return true}
@@ -51,8 +51,8 @@
     cancelling=true;
     emit('background-dj-cancel',{reason,phase});
     Promise.resolve().then(async()=>{
-      try{await dj?.cancelActive?.('background-hidden')}catch{}
-      try{await resumeFailOpen(reason)}catch{}
+      try{await dj?.cancelActive?.('background-hidden')}catch(e){window.MAIRRuntime?.caught?.('mair-background-guard.cancelUnsafeHandoff',e)}
+      try{await resumeFailOpen(reason)}catch(e){window.MAIRRuntime?.caught?.('mair-background-guard.cancelUnsafeHandoff2',e)}
     }).finally(()=>{cancelling=false});
     return true;
   }
@@ -61,9 +61,9 @@
     const s=snapshot('hidden');
     document.body?.setAttribute('data-mair-background','1');
     if(s.isPlaying||s.expectedLive){
-      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-preserve')}catch{}
-      try{navigator.mediaSession.playbackState='playing'}catch{}
-      try{window.JFMPWA?.reassertMediaSession?.(false)}catch{}
+      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-preserve')}catch(e){window.MAIRRuntime?.caught?.('mair-background-guard.onHidden',e)}
+      try{navigator.mediaSession.playbackState='playing'}catch{/* mediaSession niet beschikbaar op dit apparaat */}
+      try{window.JFMPWA?.reassertMediaSession?.(false)}catch{/* mediaSession niet beschikbaar op dit apparaat */}
       // Never let a browser-owned DJ handoff pause Spotify while iOS can suspend JS.
       // If a handoff is already in progress, cancel it and fail open to music.
       if(!cancelUnsafeHandoff('visibility-hidden'))armBackgroundDjSkip('visibility-hidden');
@@ -74,15 +74,15 @@
     document.body?.removeAttribute('data-mair-background');
     const awayMs=hiddenAt?Date.now()-hiddenAt:0;
     hiddenAt=0;backgroundSkipArmed=false;
-    try{window.JFMPWA?.reassertMediaSession?.(false)}catch{}
+    try{window.JFMPWA?.reassertMediaSession?.(false)}catch{/* mediaSession niet beschikbaar op dit apparaat */}
     if(recovering||!wasPlaying){emit('visible-no-recovery',{awayMs});return}
     recovering=true;
     try{
       await new Promise(r=>setTimeout(r,180));
       const live=await remote();
       if(live?.is_playing){
-        try{window.JFMPlaybackState?.ingest?.(live,'background-return-playing')}catch{}
-        try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-return-playing')}catch{}
+        try{window.JFMPlaybackState?.ingest?.(live,'background-return-playing')}catch(e){window.MAIRRuntime?.caught?.('mair-background-guard.onVisible',e)}
+        try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-return-playing')}catch(e){window.MAIRRuntime?.caught?.('mair-background-guard.onVisible2',e)}
         emit('visible-still-playing',{awayMs});
         return;
       }
@@ -101,8 +101,8 @@
     if(!isHidden())return;
     const detail=event?.detail||{},s=snapshot('hidden-natural-end');
     if(s.isPlaying||s.expectedLive||wasPlaying){
-      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-natural-passive')}catch{}
-      try{navigator.mediaSession.playbackState='playing'}catch{}
+      try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-natural-passive')}catch(e){window.MAIRRuntime?.caught?.('mair-background-guard.onVisible3',e)}
+      try{navigator.mediaSession.playbackState='playing'}catch{/* mediaSession niet beschikbaar op dit apparaat */}
     }
     emit('hidden-natural-observed',{endedTrackId:String(detail.trackId||detail.endedTrackId||'')});
   });

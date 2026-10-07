@@ -3,7 +3,7 @@
   const RECENT='jfm_dj_quality_recent_v1',FORMATS='jfm_dj_quality_formats_v1';
   const $=id=>document.getElementById(id),pick=a=>a[Math.floor(Math.random()*a.length)],clean=s=>String(s||'').replace(/\s+/g,' ').replace(/\s+([,.!?])/g,'$1').trim();
   const load=(k,d=[])=>{try{const x=JSON.parse(localStorage.getItem(k)||'null');return Array.isArray(x)?x:d}catch{return d}};
-  const save=(k,x)=>{try{localStorage.setItem(k,JSON.stringify(x))}catch{}};
+  const save=(k,x)=>{try{localStorage.setItem(k,JSON.stringify(x))}catch{/* opslag geblokkeerd: dan zonder opslag */}};
   const artist=t=>Array.isArray(t?.artists)?t.artists.join(' and '):'',title=t=>String(t?.name||''),year=t=>Number(String(t?.release||'').slice(0,4))||0;
   const current=()=>{try{return playback?.item?trackObj(playback.item):null}catch{return null}};
   const next=()=>{try{return window.jfmUpcoming?.()?.[0]||null}catch{return null}};

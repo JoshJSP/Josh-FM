@@ -7,7 +7,7 @@ let token='',lastFetch=0,inFlight=false,lastKey='',stopMetrics=null,journeyLegs=
 const dist=m=>!Number.isFinite(m)?'—':m<1000?`${Math.max(10,Math.round(m/10)*10)} M`:`${m/1000<10?(m/1000).toFixed(1):Math.round(m/1000)} KM`;
 const eta=x=>Number.isFinite(x)?new Intl.DateTimeFormat('nl-NL',{hour:'2-digit',minute:'2-digit'}).format(new Date(Date.now()+x*1000)):'--:--';
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-async function getToken(){if(token)return token;try{const r=await fetch(CFG,{cache:'no-store'});if(r.ok)token=String((await r.json()).mapboxPublicToken||'').trim()}catch{}return token}
+async function getToken(){if(token)return token;try{const r=await fetch(CFG,{cache:'no-store'});if(r.ok)token=String((await r.json()).mapboxPublicToken||'').trim()}catch(e){window.MAIRRuntime?.caught?.('mair-car-stop-metrics.fetch',e)}return token}
 const geo=()=>new Promise((ok,no)=>navigator.geolocation?.getCurrentPosition(ok,no,{enableHighAccuracy:true,timeout:9000,maximumAge:10000})||no(Error('Locatie niet beschikbaar')));
 function state(){try{return window.MAIRCarModePrototype?.status?.()||null}catch{return null}}
 function nextStop(){const st=state(),x=st?.stops?.[0];return st?.routeActive&&x&&Number.isFinite(Number(x.longitude))&&Number.isFinite(Number(x.latitude))?x:null}

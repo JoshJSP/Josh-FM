@@ -28,7 +28,7 @@
     return out;
   }
   function readStarts(){try{return JSON.parse(localStorage.getItem(START_KEY)||'{}')}catch{return{}}}
-  function rememberStart(station,trackId){if(!station||!trackId)return;try{const all=readStarts(),arr=Array.isArray(all[station])?all[station]:[];all[station]=[trackId,...arr.filter(x=>x!==trackId)].slice(0,HISTORY);localStorage.setItem(START_KEY,JSON.stringify(all))}catch{}}
+  function rememberStart(station,trackId){if(!station||!trackId)return;try{const all=readStarts(),arr=Array.isArray(all[station])?all[station]:[];all[station]=[trackId,...arr.filter(x=>x!==trackId)].slice(0,HISTORY);localStorage.setItem(START_KEY,JSON.stringify(all))}catch{/* opslag geblokkeerd: dan zonder opslag */}}
   function avoidRecentStart(station,list){
     const out=[...list];if(!TARGETS.has(station)||out.length<2)return out;
     const recent=new Set(Array.isArray(readStarts()?.[station])?readStarts()[station]:[]);

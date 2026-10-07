@@ -8,13 +8,13 @@
   const retryIn=()=>Math.max(0,nextRetryAt-Date.now());
   function success(stage='speech'){
     failures=0;nextRetryAt=0;lastError='';lastSuccessAt=Date.now();trace('success',{stage});
-    try{window.dispatchEvent(new CustomEvent('jfm:dj-audio-health',{detail:{ok:true,stage}}))}catch{}
+    try{window.dispatchEvent(new CustomEvent('jfm:dj-audio-health',{detail:{ok:true,stage}}))}catch{/* event-listener gooide: onschuldig */}
   }
   function failure(error,stage='speech'){
     failures++;lastError=String(error?.message||error||'Fish Audio failed').slice(0,300);
     const delay=Math.min(MAX_BACKOFF,BASE_BACKOFF*Math.pow(2,Math.max(0,failures-1)));
     nextRetryAt=Date.now()+delay;trace('failure',{stage,failures,retryInMs:delay,error:lastError});
-    try{window.dispatchEvent(new CustomEvent('jfm:dj-audio-health',{detail:{ok:false,stage,error:lastError,retryInMs:delay}}))}catch{}
+    try{window.dispatchEvent(new CustomEvent('jfm:dj-audio-health',{detail:{ok:false,stage,error:lastError,retryInMs:delay}}))}catch{/* event-listener gooide: onschuldig */}
   }
   async function guarded(fn,stage,{respectBackoff=true}={}){
     if(respectBackoff&&!available()){trace('backoff-skip',{stage,retryInMs:retryIn()});return false}

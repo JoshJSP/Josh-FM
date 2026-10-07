@@ -5,7 +5,7 @@ if(window.MAIRLiveNews)return;
 const $=id=>document.getElementById(id),ENABLED='mair_news_enabled_v1',CACHE='mair_news_cache_v1',LAST='mair_news_last_used_v1',LAST_SLOT='mair_news_last_slot_v1',LAST_TITLE='mair_news_last_title_v1',COOLDOWN=27*60*1000,FEED_MAX_AGE=20*60*1000;let data=null,lastError='',loading=false;
 const isEnabled=()=>localStorage.getItem(ENABLED)==='1';
 function cached(){try{return JSON.parse(localStorage.getItem(CACHE)||'null')}catch{return null}}
-function save(d){try{localStorage.setItem(CACHE,JSON.stringify(d))}catch{}}
+function save(d){try{localStorage.setItem(CACHE,JSON.stringify(d))}catch{/* opslag geblokkeerd: dan zonder opslag */}}
 function fresh(h){if(!h?.title)return false;if(!h.publishedAt)return true;const at=new Date(h.publishedAt).getTime();return Number.isFinite(at)&&Date.now()-at<12*60*60*1000}
 function feedFresh(d=data||cached()){if(!d||d.stale)return false;const at=new Date(d.fetchedAt||0).getTime();return Number.isFinite(at)&&Date.now()-at>=0&&Date.now()-at<FEED_MAX_AGE}
 function halfSlot(date=new Date()){const d=new Date(date);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:30`}
@@ -14,10 +14,10 @@ function candidates(){const d=data||cached(),lastTitle=String(localStorage.getIt
 function candidate(){return candidates()[0]||null}
 function bulletinItems(max=6){const d=data||cached();if(!isEnabled()||!feedFresh(d))return[];const seen=new Set(),out=[];for(const h of(d?.headlines||[])){const title=String(h?.title||'').replace(/\s+/g,' ').trim();if(!title||!fresh(h)||seen.has(title.toLowerCase()))continue;seen.add(title.toLowerCase());out.push({title,summary:String(h?.summary||'').replace(/\s+/g,' ').trim().slice(0,900),source:h?.source||'NOS',sourceLabel:d?.sourceLabel||'NOS Nieuws',publishedAt:h?.publishedAt||null,link:h?.link||''});if(out.length>=Math.max(3,Math.min(6,Number(max)||6)))break}return out}
 function headlineEligible(){if(!isEnabled()||!feedFresh())return false;const now=Date.now(),last=Number(localStorage.getItem(LAST)||0);if(now-last<COOLDOWN)return false;const p=window.JFMStationClock?.current?.()?.phase||document.body?.dataset?.clockPhase||'open';if(p!=='half')return false;return localStorage.getItem(LAST_SLOT)!==halfSlot()}
-function take(){if(!headlineEligible())return null;const h=candidate();if(!h)return null;try{localStorage.setItem(LAST,String(Date.now()));localStorage.setItem(LAST_SLOT,halfSlot());localStorage.setItem(LAST_TITLE,String(h.title||''))}catch{};render();return{title:h.title,source:h.source||'NOS',sourceLabel:(data||cached())?.sourceLabel||'NOS Nieuws',link:h.link||'',publishedAt:h.publishedAt||null}}
+function take(){if(!headlineEligible())return null;const h=candidate();if(!h)return null;try{localStorage.setItem(LAST,String(Date.now()));localStorage.setItem(LAST_SLOT,halfSlot());localStorage.setItem(LAST_TITLE,String(h.title||''))}catch{/* opslag geblokkeerd: dan zonder opslag */};render();return{title:h.title,source:h.source||'NOS',sourceLabel:(data||cached())?.sourceLabel||'NOS Nieuws',link:h.link||'',publishedAt:h.publishedAt||null}}
 function peek(){const h=candidate(),d=data||cached();return{enabled:isEnabled(),eligible:headlineEligible(),headline:h,source:d?.sourceLabel||'NOS Nieuws',lastUsed:Number(localStorage.getItem(LAST)||0),lastSlot:localStorage.getItem(LAST_SLOT)||'',feedFresh:feedFresh(d),fetchedAt:d?.fetchedAt||null,stale:!!d?.stale,error:lastError,loading,bulletinItems:bulletinItems(6).length}}
-function setEnabled(v){localStorage.setItem(ENABLED,v?'1':'0');const box=$('newsMention');if(box)box.checked=!!v;if(v)refresh(true);render();emit();try{window.dispatchEvent(new CustomEvent('mair:news-setting',{detail:{enabled:!!v}}))}catch{}}
-function emit(){try{window.dispatchEvent(new CustomEvent('mair:live-news',{detail:peek()}))}catch{}}
+function setEnabled(v){localStorage.setItem(ENABLED,v?'1':'0');const box=$('newsMention');if(box)box.checked=!!v;if(v)refresh(true);render();emit();try{window.dispatchEvent(new CustomEvent('mair:news-setting',{detail:{enabled:!!v}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}}
+function emit(){try{window.dispatchEvent(new CustomEvent('mair:live-news',{detail:peek()}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}}
 function installUI(){
   // MAIR draait zonder nieuws (net als zonder DJ en zonder jingles). De schakelaar zat
   // in de DJ-kaart die mair-public-dj-off.js verbergt: onbereikbaar maar wel aanwezig.

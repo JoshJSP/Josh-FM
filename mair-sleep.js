@@ -4,27 +4,27 @@
 if(window.MAIRSleep)return;
 const KEY='jfm_sleep_timer_v1',$=id=>document.getElementById(id);
 let state=read(),tickTimer=0,stopBusy=false,lastError='',lastStoppedAt=0,open=false;
-function read(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(!x||typeof x!=='object')return null;if(x.mode==='time'&&Number(x.at||0)>Date.now())return x;if(x.mode==='after-track'&&x.trackId)return x}catch{}return null}
-function save(v){state=v;try{localStorage.setItem(KEY,JSON.stringify(v))}catch{}emit();render()}
-function clear(){state=null;try{localStorage.setItem(KEY,'null')}catch{}emit();render()}
+function read(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(!x||typeof x!=='object')return null;if(x.mode==='time'&&Number(x.at||0)>Date.now())return x;if(x.mode==='after-track'&&x.trackId)return x}catch{/* opslag geblokkeerd: dan zonder opslag */}return null}
+function save(v){state=v;try{localStorage.setItem(KEY,JSON.stringify(v))}catch{/* opslag geblokkeerd: dan zonder opslag */}emit();render()}
+function clear(){state=null;try{localStorage.setItem(KEY,'null')}catch{/* opslag geblokkeerd: dan zonder opslag */}emit();render()}
 function playback(){return window.JFMPlaybackState?.get?.()||null}
 function track(){const p=playback()||{};return{trackId:String(p.trackId||''),uri:String(p.uri||''),title:String($('title')?.textContent||'MAIR'),artist:String($('artist')?.textContent||'')}}
 function remainingMs(){return state?.mode==='time'?Math.max(0,Number(state.at||0)-Date.now()):0}
 function fmt(ms){const total=Math.max(0,Math.ceil(ms/1000)),m=Math.floor(total/60),s=total%60;return`${m}:${String(s).padStart(2,'0')}`}
 function status(){return{version:'mair-sleep-v1.2',active:!!state,mode:state?.mode||'',endsAt:state?.mode==='time'?Number(state.at||0):0,remainingMs:remainingMs(),trackId:state?.trackId||'',open,lastError,lastStoppedAt}}
-function emit(){try{window.dispatchEvent(new CustomEvent('mair:sleep',{detail:status()}))}catch{}}
+function emit(){try{window.dispatchEvent(new CustomEvent('mair:sleep',{detail:status()}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}}
 async function stopRadio(reason='sleep-timer'){
   if(stopBusy)return false;stopBusy=true;lastError='';const truth=window.JFMPlaybackState,before=truth?.get?.();let op=0;
   try{
-    try{op=truth?.begin?.('pause',{expectedUri:String(before?.uri||''),timeoutMs:10000})||0;truth?.setExpectedLive?.(false,reason)}catch{}
+    try{op=truth?.begin?.('pause',{expectedUri:String(before?.uri||''),timeoutMs:10000})||0;truth?.setExpectedLive?.(false,reason)}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.begin',e)}
     const pause=window.JFMPlayback?.pause;
     if(typeof pause!=='function')throw Error('MAIR playback-controller is nog niet beschikbaar');
     const ok=await pause();if(!ok)throw Error(window.JFMPlayback?.health?.lastError||'Spotify kon niet worden gepauzeerd');
     lastStoppedAt=Date.now();clear();
-    try{window.dispatchEvent(new CustomEvent('mair:sleep-complete',{detail:{reason,at:lastStoppedAt}}))}catch{}
+    try{window.dispatchEvent(new CustomEvent('mair:sleep-complete',{detail:{reason,at:lastStoppedAt}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}
     return true
-  }catch(e){if(before?.expectedLive)try{truth?.setExpectedLive?.(true,'sleep-pause-failed')}catch{};lastError=String(e?.message||e||'Sleep timer kon MAIR niet pauzeren');emit();render();return false}
-  finally{try{if(op)truth?.end?.(op,{error:lastError})}catch{};stopBusy=false}
+  }catch(e){if(before?.expectedLive)try{truth?.setExpectedLive?.(true,'sleep-pause-failed')}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.setExpectedLive',e)};lastError=String(e?.message||e||'Sleep timer kon MAIR niet pauzeren');emit();render();return false}
+  finally{try{if(op)truth?.end?.(op,{error:lastError})}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.end',e)};stopBusy=false}
 }
 function scheduleMinutes(minutes){const n=Math.max(1,Math.min(240,Number(minutes)||0));lastError='';save({mode:'time',at:Date.now()+n*60000,minutes:n,createdAt:Date.now()});ensureTick();return status()}
 function scheduleAfterTrack(){const t=track();if(!t.trackId){lastError='Start eerst een nummer voordat je “na dit nummer” gebruikt.';emit();render();return false}lastError='';save({mode:'after-track',trackId:t.trackId,createdAt:Date.now(),title:t.title,artist:t.artist});ensureTick();return true}

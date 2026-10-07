@@ -25,7 +25,7 @@
   function normalize(raw={}){const base=blank(),x={...base,...raw};x.schema=SCHEMA;x.users={...base.users,...(raw.users||{})};x.stations={...base.stations,...(raw.stations||{})};x.musicProfiles={...base.musicProfiles,...(raw.musicProfiles||{})};x.djProfiles={...base.djProfiles,...(raw.djProfiles||{})};x.histories={...base.histories,...(raw.histories||{})};x.migrations={...base.migrations,...(raw.migrations||{})};if(!x.stations[x.activeStationId])x.activeStationId=base.activeStationId;if(!x.users[x.activeUserId])x.activeUserId=base.activeUserId;return x}
   let model=normalize(read(KEY,{}));
   function snapshot(){return typeof structuredClone==='function'?structuredClone(model):JSON.parse(JSON.stringify(model))}
-  function persist(reason='update'){model.updatedAt=Date.now();model.revision=num(model.revision,0)+1;write(KEY,model);const s=snapshot();for(const fn of listeners)try{fn(s,reason)}catch{};try{window.dispatchEvent(new CustomEvent('jfm:product-model',{detail:{model:s,reason}}))}catch{};return s}
+  function persist(reason='update'){model.updatedAt=Date.now();model.revision=num(model.revision,0)+1;write(KEY,model);const s=snapshot();for(const fn of listeners)try{fn(s,reason)}catch(e){window.MAIRRuntime?.caught?.('product-model-v6.fn',e)};try{window.dispatchEvent(new CustomEvent('jfm:product-model',{detail:{model:s,reason}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */};return s}
   function activeStation(){return model.stations?.[model.activeStationId]||null}
   function music(){const s=activeStation();return s?model.musicProfiles?.[s.musicProfileId]||null:null}
   function dj(){const s=activeStation();return s?model.djProfiles?.[s.djProfileId]||null:null}

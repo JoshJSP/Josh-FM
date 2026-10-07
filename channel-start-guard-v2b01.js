@@ -3,7 +3,7 @@
   if(window.JFMChannelStartGuard)return;
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   let wrapped=false;
-  function activate(){try{window.jfmSpotifyPlayer?.activateElement?.()}catch{}}
+  function activate(){try{window.jfmSpotifyPlayer?.activateElement?.()}catch(e){window.MAIRRuntime?.caught?.('channel-start-guard-v2b01.activateElement',e)}}
   function install(){
     const p=window.JFMPlayback;
     if(!p||wrapped||typeof p.playUri!=='function')return false;

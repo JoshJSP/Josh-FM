@@ -4,7 +4,7 @@
   let trackId='',baseMs=0,anchor=performance.now(),playing=false,durationMs=0,lastRemoteMs=-1,lastRemotePlaying=null;
   const fmt=ms=>{const s=Math.max(0,Math.floor(Number(ms||0)/1000)),m=Math.floor(s/60);return `${m}:${String(s%60).padStart(2,'0')}`};
   function syncFromPlayback(){
-    let p=null;try{p=playback}catch{}
+    let p=null;try{p=playback}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}
     const id=String(p?.item?.id||''),remoteMs=Math.max(0,Number(p?.progress_ms||0)),remotePlaying=!!p?.is_playing,dur=Math.max(0,Number(p?.item?.duration_ms||0));
     if(!id)return;
     const changedTrack=id!==trackId,changedRemote=remoteMs!==lastRemoteMs,changedPlaying=remotePlaying!==lastRemotePlaying;

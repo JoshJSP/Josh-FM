@@ -8,7 +8,7 @@
     if(window.__jfmApiBudgetInstalled||typeof window.startPolling!=='function'||typeof window.refresh!=='function')return false;
     window.__jfmApiBudgetInstalled=true;
     window.startPolling=startPolling=function(){
-      try{clearInterval(poll)}catch{}
+      try{clearInterval(poll)}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
       poll=setInterval(()=>{safeRefresh()},POLL_MS)
     };
     const eventRefresh=()=>{
@@ -18,7 +18,7 @@
     window.addEventListener('jfm:trackchange',eventRefresh);
     window.addEventListener('online',()=>setTimeout(()=>safeRefresh(),900));
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(()=>safeRefresh(),900)});
-    try{if(token)startPolling()}catch{}
+    try{if(token)startPolling()}catch(e){window.MAIRRuntime?.caught?.('spotify-api-budget.startPolling',e)}
     window.JFMSpotifyApiBudget={version:'api-budget-v2-rate-limit-aware',pollMs:POLL_MS,eventDriven:true,get cooldownMs(){return Math.max(0,cooldownUntil-Date.now())},get lastError(){return lastError}};
     return true
   }

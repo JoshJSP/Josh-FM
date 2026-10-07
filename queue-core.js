@@ -18,12 +18,12 @@
   }
   function current(){try{return normalize(Array.isArray(queue)?queue:[])}catch{return[]}}
   function loadActive(){try{const x=JSON.parse(sessionStorage.getItem(ACTIVE_KEY)||'{}');if(Date.now()-Number(x.at||0)>6*60*60*1000||x.station!==(localStorage.getItem('jfm_music_channel_v1')||'mix'))return[];return normalize(x.tracks)}catch{return[]}}
-  function persistActive(list,stationId=station){try{sessionStorage.setItem(ACTIVE_KEY,JSON.stringify({at:Date.now(),station:stationId||localStorage.getItem('jfm_music_channel_v1')||'mix',tracks:normalize(list).slice(0,60)}))}catch{}}
-  function emit(reason){try{window.dispatchEvent(new CustomEvent('jfm:queue-change',{detail:{revision,reason,station,tracks:current().length}}))}catch{}}
+  function persistActive(list,stationId=station){try{sessionStorage.setItem(ACTIVE_KEY,JSON.stringify({at:Date.now(),station:stationId||localStorage.getItem('jfm_music_channel_v1')||'mix',tracks:normalize(list).slice(0,60)}))}catch{/* opslag geblokkeerd: dan maar zonder opslag */}}
+  function emit(reason){try{window.dispatchEvent(new CustomEvent('jfm:queue-change',{detail:{revision,reason,station,tracks:current().length}}))}catch{/* event-listener gooide: onschuldig */}}
   function commit(list,meta={}){
     const next=normalize(list);if(!next.length)throw Error('De radioset bevat geen geldige Spotify-tracks.');
     queue=next;revision++;source=String(meta.source||source||'unknown');station=String(meta.station||localStorage.getItem('jfm_music_channel_v1')||'mix');lastReason=String(meta.reason||'commit');lastError='';
-    persistActive(next,station);try{window.__jfmStationQueueSig=''}catch{};trace('commit',{revision,source,station,reason:lastReason,tracks:next.length});emit(lastReason);return next
+    persistActive(next,station);try{window.__jfmStationQueueSig=''}catch{/* optionele cache-sleutel */};trace('commit',{revision,source,station,reason:lastReason,tracks:next.length});emit(lastReason);return next
   }
   function serialize(kind,work){
     const isTransport=kind==='transport',previous=isTransport?transportTail:buildTail;
@@ -60,7 +60,7 @@
       if(next?.uri!==track.uri)throw Error('Spotify bevestigde het request niet als eerstvolgende track.');
       if(String(reason).toLowerCase().includes('request'))window.MAIRTransitionController?.mark?.('REQUEST',{fromTrackId:String(state.item.id||''),expectedTrackId:String(track.id||track.uri.split(':').pop()||''),source:reason,ttlMs:10*60*1000});
       trace('program-next',{reason,uri:track.uri,currentUri,position,context:uris.length});
-      try{window.JFMSpotifyUpcomingTruth?.sync?.(true)}catch{};return true
+      try{window.JFMSpotifyUpcomingTruth?.sync?.(true)}catch(e){window.MAIRRuntime?.caught?.('queue-core.programNext',e)};return true
     })
   }
   function state(){return{version:'queue-core-v2',revision,source,station,lastReason,lastError,tracks:current().length,building:building>0,transporting:transporting>0,events:events.length}}

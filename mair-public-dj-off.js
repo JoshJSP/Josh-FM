@@ -8,7 +8,7 @@ function preserveSettings(){
   try{
     const current=JSON.parse(localStorage.getItem('jfm_settings')||'{}');
     localStorage.setItem('jfm_settings',JSON.stringify({...current,talk:0,facts:false,time:false,weather:false,jingles:false}));
-  }catch{}
+  }catch{/* opslag geblokkeerd: dan zonder opslag */}
 }
 function installStyle(){
   if($('mairPublicDjOffStyle'))return;
@@ -48,17 +48,17 @@ function cleanPublicCopy(){
 const DJ_ENTRY_POINTS=['prepare','air','armManual','runVoiceCheck'];
 function stopPublicDj(){
   const dj=window.MAIRDJ;
-  try{dj?.cancelActive?.('public-dj-disabled')}catch{}
-  try{dj?.skipNext?.()}catch{}
-  try{window.JFMDJAudio?.stop?.()}catch{}
-  try{window.JFMDJAudio?.cancel?.()}catch{}
+  try{dj?.cancelActive?.('public-dj-disabled')}catch(e){window.MAIRRuntime?.caught?.('mair-public-dj-off.cancelActive',e)}
+  try{dj?.skipNext?.()}catch(e){window.MAIRRuntime?.caught?.('mair-public-dj-off.skipNext',e)}
+  try{window.JFMDJAudio?.stop?.()}catch(e){window.MAIRRuntime?.caught?.('mair-public-dj-off.stop',e)}
+  try{window.JFMDJAudio?.cancel?.()}catch(e){window.MAIRRuntime?.caught?.('mair-public-dj-off.cancel',e)}
   // speakText blijft bewust intact: de startjingle en het (opt-in) nieuwsbulletin
   // gebruiken dezelfde centrale stem. De DJ kan niet meer praten omdat zijn
   // ingangen hieronder dicht staan, niet omdat de stem is gesloopt.
   if(dj){
     const off=async()=>false;
     for(const name of DJ_ENTRY_POINTS){
-      try{if(typeof dj[name]==='function')dj[name]=off}catch{}
+      try{if(typeof dj[name]==='function')dj[name]=off}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}
     }
   }
 }
