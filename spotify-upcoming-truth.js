@@ -26,7 +26,7 @@
       const seen=new Set(current?[current]:[]),items=[];
       for(const raw of d?.queue||[]){const t=map(raw);if(!t?.id||seen.has(t.id))continue;seen.add(t.id);items.push(t);if(items.length>=6)break}
       lastCurrent=current;lastItems=items;lastOk=Date.now();lastError='';paint(items,false);
-      try{window.__jfmSpotifyUpcomingTruth={current,items:[...items],at:lastOk}}catch{}
+      try{window.__jfmSpotifyUpcomingTruth={current,items:[...items],at:lastOk}}catch{/* optionele vlag zetten mislukt: onschuldig */}
       return true;
     }catch(e){
       noteCooldown(e);

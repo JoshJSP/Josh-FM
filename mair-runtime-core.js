@@ -23,7 +23,7 @@ const resolve=()=>({
  director:window.MAIRStationDirector||null
 });
 function status(){const r=resolve();return{owners,ready:{playback:!!r.playback,reloadGuard:!!r.reload,station:!!r.station,dj:!!r.dj,voice:!!r.voice,foundation:!!r.foundation,profiles:!!r.profiles,clock:!!r.clock,musicDirector:!!r.musicDirector,memory:!!r.memory,imaging:!!r.imaging,liveNews:!!r.liveNews,voiceLab:!!r.voiceLab,soak:!!r.soak,director:!!r.director},speaking:!!r.voice?.speaking,stationId:localStorage.getItem('jfm_music_channel_v1')||'mix',show:r.clock?.current?.()?.show||null,djSchedule:r.dj?.state?.()||r.dj?.diagnostics?.()||null,reload:r.reload?.status||null,djProfile:r.profiles?.current||null,imaging:r.imaging?.status?.()||null,news:r.liveNews?.peek?.()||null,soak:r.soak?.summary?.()||null}}
-function emit(){if(emitting)return;emitting=true;try{window.dispatchEvent(new CustomEvent('mair:runtime-ready',{detail:status()}))}catch{}finally{emitting=false}}
+function emit(){if(emitting)return;emitting=true;try{window.dispatchEvent(new CustomEvent('mair:runtime-ready',{detail:status()}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}finally{emitting=false}}
 function bindAliases(){const r=resolve();if(r.playback&&!window.MAIRPlayback)window.MAIRPlayback=r.playback;if(r.dj&&!window.MAIRDJ)window.MAIRDJ=r.dj;if(r.voice&&!window.MAIRVoice)window.MAIRVoice=r.voice;if(r.station&&!window.MAIRStationsRuntime)window.MAIRStationsRuntime=r.station}
 function refresh(){bindAliases();emit();return status()}
 window.MAIRRuntime={version:'mair-runtime-core-v1.2-radio-experience',owners,resolve,status,refresh};

@@ -3,10 +3,10 @@
 if(window.__mairPersonalSourceSync)return;window.__mairPersonalSourceSync=true;
 const $=id=>document.getElementById(id),CHANNEL_KEY='jfm_music_channel_v1',PLAYBACK_SOURCE_KEY='mair_playback_source_v1';
 function activatePersonal(reason='personal-source'){
-  try{localStorage.setItem(CHANNEL_KEY,'mix');localStorage.setItem(PLAYBACK_SOURCE_KEY,JSON.stringify({kind:'station',id:'mix',at:Date.now(),reason}));localStorage.removeItem('mair_active_category_v2')}catch{}
-  try{document.body.dataset.musicChannel='mix'}catch{}
-  try{window.dispatchEvent(new CustomEvent('mair:channelchange',{detail:{id:'mix',label:'MY MAIR',loading:false,reason}}))}catch{}
-  try{window.MAIRStations?.sync?.();window.MAIRRadioHome?.refresh?.();window.MAIREasyUse?.sync?.()}catch{}
+  try{localStorage.setItem(CHANNEL_KEY,'mix');localStorage.setItem(PLAYBACK_SOURCE_KEY,JSON.stringify({kind:'station',id:'mix',at:Date.now(),reason}));localStorage.removeItem('mair_active_category_v2')}catch{/* opslag geblokkeerd: dan zonder opslag */}
+  try{document.body.dataset.musicChannel='mix'}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}
+  try{window.dispatchEvent(new CustomEvent('mair:channelchange',{detail:{id:'mix',label:'MY MAIR',loading:false,reason}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}
+  try{window.MAIRStations?.sync?.();window.MAIRRadioHome?.refresh?.();window.MAIREasyUse?.sync?.()}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
   return true;
 }
 async function buildPersonal(options={}){
@@ -29,14 +29,14 @@ async function buildPersonal(options={}){
   const skips=skipMap();tracks.sort((a,b)=>(skips[a.id]||0)-(skips[b.id]||0)+(Math.random()-.5)*2);let result=tracks.slice(0,50).map(trackObj);
   if(!result.length)throw Error('Ik kon geen tracks voor deze persoonlijke radioset vinden.');
   if(shouldCommit)result=window.JFMQueue?.commit?.(result,{source:'personal',station:'mix',reason:'personal-source-rebuild'})||(queue=result);
-  try{window.__jfmStationQueueSig='';window.jfmRenderNext?.();window.JFMProgramDirector?.render?.()}catch{}
+  try{window.__jfmStationQueueSig='';window.jfmRenderNext?.();window.JFMProgramDirector?.render?.()}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
   if(info&&announce)info.textContent=`${result.length} tracks klaar · MY MAIR.`;
-  if(announce)try{window.dispatchEvent(new CustomEvent('mair:station-selected',{detail:{id:'mix',label:'MY MAIR',count:result.length,verified:true,started:false,reason:'personal-source'}}))}catch{}
+  if(announce)try{window.dispatchEvent(new CustomEvent('mair:station-selected',{detail:{id:'mix',label:'MY MAIR',count:result.length,verified:true,started:false,reason:'personal-source'}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}
   return result;
 }
 function install(){
   const source=$('source'),rebuild=$('rebuild');
-  if(source&&!source.dataset.mairPersonalSourceSync){source.dataset.mairPersonalSourceSync='1';source.addEventListener('change',()=>{activatePersonal('source-change');try{queue=[]}catch{}},true)}
+  if(source&&!source.dataset.mairPersonalSourceSync){source.dataset.mairPersonalSourceSync='1';source.addEventListener('change',()=>{activatePersonal('source-change');try{queue=[]}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}},true)}
   if(rebuild&&!rebuild.dataset.mairPersonalSourceSync){rebuild.dataset.mairPersonalSourceSync='1';rebuild.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();buildPersonal().catch(err=>{const info=$('queueInfo');if(info){info.textContent='Radioset maken mislukt: '+String(err?.message||err);info.style.color='#ffb4b4'}})},true)}
   if(!window.__mairPersonalBuildWrapped&&typeof window.buildSet==='function'){
     const inherited=window.buildSet;window.buildSet=async(...args)=>{const active=localStorage.getItem(CHANNEL_KEY)||'mix';return active==='mix'?buildPersonal():inherited(...args)};window.__mairPersonalBuildWrapped=true;

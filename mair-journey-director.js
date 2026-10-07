@@ -29,7 +29,7 @@ function familiarity(t){try{return Number(window.JFMRotation?.familiarity?.(t))|
 function momentum(t){try{return Number(window.JFMRotation?.momentum?.(t))||.6}catch{return.6}}
 function personalAffinity(t){
   const id=t?.id||'';let m={};
-  try{m=window.jfmDirectorMemory?.()||{}}catch{}
+  try{m=window.jfmDirectorMemory?.()||{}}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}
   return Number(m.likes?.[id]||0)*1.8+Math.min(6,Number(m.plays?.[id]||0))*.35+Math.min(5,Number(m.completions?.[id]||0))*.25;
 }
 function journeyBonus(t,out=[],slotIndex=0,j=journey()){
@@ -88,7 +88,7 @@ function scheduleReplan(j){
   const wait=Math.max(250,8000-(now-lastReplanAt));
   replanTimer=setTimeout(async()=>{
     lastReplanAt=Date.now();
-    try{await window.JFMProgramDirector?.replan?.('journey',true)}catch{}
+    try{await window.JFMProgramDirector?.replan?.('journey',true)}catch(e){window.MAIRRuntime?.caught?.('mair-journey-director.replan',e)}
   },wait);
 }
 function retireRoadtrip(){
@@ -100,7 +100,7 @@ function retireRoadtrip(){
     const originalStart=manager.start?.bind(manager);
     if(originalStart)manager.start=async(mode,options,force)=>mode==='roadtrip'?{ok:false,retired:true,reason:'journey-director'}:originalStart(mode,options,force);
     manager.__roadtripRetired=true;
-    try{if(manager.state?.().mode==='roadtrip')manager.stop?.('roadtrip-retired')}catch{}
+    try{if(manager.state?.().mode==='roadtrip')manager.stop?.('roadtrip-retired')}catch(e){window.MAIRRuntime?.caught?.('mair-journey-director.state',e)}
   }
 }
 function boot(){
@@ -113,7 +113,7 @@ function boot(){
   window.addEventListener('mair:foundation-ready',()=>setTimeout(retireRoadtrip,100));
   const current=journey();if(current)scheduleReplan(current);
   window.MAIRJourneyDirector={version:'journey-director-v1',state:()=>{const j=journey();return j?{active:true,phase:phase(j),targetMomentum:targetMomentum(j),context:{...j}}:{active:false,phase:'off'}},replan:()=>window.JFMProgramDirector?.replan?.('journey-manual',true)};
-  try{window.dispatchEvent(new CustomEvent('mair:journey-director-ready'))}catch{}
+  try{window.dispatchEvent(new CustomEvent('mair:journey-director-ready'))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

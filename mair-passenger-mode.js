@@ -5,7 +5,7 @@ if(window.MAIRPassengerMode)return;
 const $=id=>document.getElementById(id),KEY='mair_passenger_host_v1',QR_LIB='./vendor/qrcode.min.js';
 let state=load(),pollTimer=null,processing=false,domSyncQueued=false,qrLoading=null;
 function load(){try{return JSON.parse(sessionStorage.getItem(KEY)||'null')||{active:false,code:'',hostSecret:'',guestUrl:'',requests:[]}}catch{return{active:false,code:'',hostSecret:'',guestUrl:'',requests:[]}}}
-function save(){try{sessionStorage.setItem(KEY,JSON.stringify(state))}catch{}renderBadge()}
+function save(){try{sessionStorage.setItem(KEY,JSON.stringify(state))}catch{/* opslag geblokkeerd: dan zonder opslag */}renderBadge()}
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function post(body){const r=await fetch('/api/passenger',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),cache:'no-store'}),d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||`Passenger Mode fout ${r.status}`);return d}
 async function create(){const d=await post({action:'create',origin:location.origin});state={active:true,code:d.code,hostSecret:d.hostSecret,guestUrl:d.guestUrl||`${location.origin}/passenger.html?code=${encodeURIComponent(d.code)}`,requests:[]};save();startPoll();openPanel();return state}

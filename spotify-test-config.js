@@ -5,7 +5,7 @@
 
   // Web Playback device IDs belong to one browser/SDK runtime. A persisted ID from
   // an older PWA session is only stale state and must never become playback authority.
-  try{localStorage.removeItem(DEVICE_KEY)}catch{}
+  try{localStorage.removeItem(DEVICE_KEY)}catch{/* opslag geblokkeerd: dan zonder opslag */}
 
   // Harden the existing app.js refresh flow without touching UI or click handling.
   // Only Spotify's definitive invalid_grant may destroy the refresh credential.
@@ -25,7 +25,7 @@
           try{r=await timedFetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body})}
           catch(e){authRefreshFailures++;authRefreshError=String(e?.message||e||'Netwerkfout').slice(0,240);const err=new Error('Spotify-token vernieuwen is tijdelijk niet gelukt. MAIR probeert het later opnieuw.');err.code='AUTH_REFRESH_RECOVERABLE';throw err}
           if(!r.ok){
-            let detail={};try{detail=await r.json()}catch{}
+            let detail={};try{detail=await r.json()}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}
             const code=String(detail?.error||''),description=String(detail?.error_description||'');authRefreshStatus=r.status;authRefreshError=(description||code||`HTTP ${r.status}`).slice(0,240);authRefreshFailures++;
             if(code==='invalid_grant'){
               authReauthRequired=true;clearSpotifySession();
@@ -60,12 +60,12 @@
     lastDeviceRepairAt=Date.now();lastDeviceRepairError='';
     deviceRepairPromise=(async()=>{
       const sdk=window.JFMSpotifySDK;if(!sdk)return false;
-      const live=String(sdk.deviceId||'').trim();if(live){try{localStorage.setItem(DEVICE_KEY,live)}catch{};return true}
-      try{localStorage.removeItem(DEVICE_KEY)}catch{}
+      const live=String(sdk.deviceId||'').trim();if(live){try{localStorage.setItem(DEVICE_KEY,live)}catch{/* opslag geblokkeerd: dan zonder opslag */};return true}
+      try{localStorage.removeItem(DEVICE_KEY)}catch{/* opslag geblokkeerd: dan zonder opslag */}
       let id='';
       try{id=String(await sdk.ensureDevice?.()||'').trim()}catch(e){lastDeviceRepairError=String(e?.message||e||'device unavailable').slice(0,240)}
       if(!id){try{id=String(await sdk.reconnect?.()||'').trim()}catch(e){lastDeviceRepairError=String(e?.message||e||'device reconnect failed').slice(0,240)}}
-      if(id){try{localStorage.setItem(DEVICE_KEY,id)}catch{};lastDeviceRepairError='';try{window.dispatchEvent(new CustomEvent('mair:spotify-device-recovered',{detail:{reason,deviceId:id,at:Date.now()}}))}catch{};return true}
+      if(id){try{localStorage.setItem(DEVICE_KEY,id)}catch{/* opslag geblokkeerd: dan zonder opslag */};lastDeviceRepairError='';try{window.dispatchEvent(new CustomEvent('mair:spotify-device-recovered',{detail:{reason,deviceId:id,at:Date.now()}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */};return true}
       return false
     })().finally(()=>{deviceRepairPromise=null});
     return deviceRepairPromise
@@ -74,7 +74,7 @@
 
   const input=document.getElementById('clientId');if(!input)return;const label=input.closest('label');
   function selected(){return String(input.value||localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID).trim()}
-  function persist(value){const id=String(value||'').trim();if(!id)return'';if(localStorage.getItem(TEST_KEY)!==id)localStorage.setItem(TEST_KEY,id);if(localStorage.getItem(CLIENT_KEY)!==id)localStorage.setItem(CLIENT_KEY,id);try{if(spotifyClientId!==id)spotifyClientId=id}catch{}return id}
+  function persist(value){const id=String(value||'').trim();if(!id)return'';if(localStorage.getItem(TEST_KEY)!==id)localStorage.setItem(TEST_KEY,id);if(localStorage.getItem(CLIENT_KEY)!==id)localStorage.setItem(CLIENT_KEY,id);try{if(spotifyClientId!==id)spotifyClientId=id}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}return id}
   function expose(){if(label?.classList.contains('hidden'))label.classList.remove('hidden');const saved=localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID;if(input.value!==saved)input.value=saved;if(input.placeholder!=='Eigen Spotify Client ID voor deze test')input.placeholder='Eigen Spotify Client ID voor deze test';if(input.autocomplete!=='off')input.autocomplete='off';if(input.readOnly)input.readOnly=false}
   function sync(){expose();persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID)}
   function restorePkceRoundTrip(){
@@ -83,13 +83,13 @@
       const state=localStorage.getItem('jfm_pkce_state_v2')||localStorage.getItem('jfm_pkce_state')||'';
       if(verifier&&!sessionStorage.getItem('jfm_verifier'))sessionStorage.setItem('jfm_verifier',verifier);
       if(state&&!sessionStorage.getItem('jfm_state'))sessionStorage.setItem('jfm_state',state);
-    }catch{}
+    }catch{/* opslag geblokkeerd: dan zonder opslag */}
   }
-  function clearPkceRoundTrip(){try{['jfm_pkce_verifier_v2','jfm_pkce_state_v2','jfm_pkce_verifier','jfm_pkce_state'].forEach(k=>localStorage.removeItem(k))}catch{}}
+  function clearPkceRoundTrip(){try{['jfm_pkce_verifier_v2','jfm_pkce_state_v2','jfm_pkce_verifier','jfm_pkce_state'].forEach(k=>localStorage.removeItem(k))}catch{/* opslag geblokkeerd: dan zonder opslag */}}
   restorePkceRoundTrip();
   input.addEventListener('input',()=>{const id=String(input.value||'').trim();if(id)persist(id)});input.addEventListener('change',()=>{const id=String(input.value||'').trim();if(id)persist(id)});
-  try{if(typeof callback==='function'){const originalCallback=callback;callback=async function(...args){persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);restorePkceRoundTrip();const out=await originalCallback.apply(this,args);if(new URLSearchParams(location.search).get('code'))clearPkceRoundTrip();return out}}}catch{}
-  try{connect=async function(){const id=persist(selected());if(!id)return alert('Vul eerst je Spotify Client ID in.');const verifier=rand(),state=rand(20);sessionStorage.setItem('jfm_verifier',verifier);sessionStorage.setItem('jfm_state',state);try{localStorage.setItem('jfm_pkce_verifier_v2',verifier);localStorage.setItem('jfm_pkce_state_v2',state)}catch{}const challenge=b64url(await sha256(verifier));const p=new URLSearchParams({response_type:'code',client_id:id,scope:SCOPES,redirect_uri:redirectUri(),state,code_challenge_method:'S256',code_challenge:challenge});location.href='https://accounts.spotify.com/authorize?'+p}}catch{}
+  try{if(typeof callback==='function'){const originalCallback=callback;callback=async function(...args){persist(localStorage.getItem(TEST_KEY)||DEFAULT_CLIENT_ID);restorePkceRoundTrip();const out=await originalCallback.apply(this,args);if(new URLSearchParams(location.search).get('code'))clearPkceRoundTrip();return out}}}catch(e){window.MAIRRuntime?.caught?.('spotify-test-config.persist',e)}
+  try{connect=async function(){const id=persist(selected());if(!id)return alert('Vul eerst je Spotify Client ID in.');const verifier=rand(),state=rand(20);sessionStorage.setItem('jfm_verifier',verifier);sessionStorage.setItem('jfm_state',state);try{localStorage.setItem('jfm_pkce_verifier_v2',verifier);localStorage.setItem('jfm_pkce_state_v2',state)}catch{/* opslag geblokkeerd: dan zonder opslag */}const challenge=b64url(await sha256(verifier));const p=new URLSearchParams({response_type:'code',client_id:id,scope:SCOPES,redirect_uri:redirectUri(),state,code_challenge_method:'S256',code_challenge:challenge});location.href='https://accounts.spotify.com/authorize?'+p}}catch(e){window.MAIRRuntime?.caught?.('spotify-test-config.persist',e)}
   try{
     if(typeof api==='function'){
       const rawApi=api,searchCache=new Map();let searchChain=Promise.resolve(),lastSearchAt=0,cooldownUntil=0,lastRateLimitAt=0;

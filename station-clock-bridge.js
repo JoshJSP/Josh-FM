@@ -18,11 +18,11 @@
         if(localStorage.getItem('jfm_auto_program')==='0')return;
         const mode=clock.preferredMode();
         if(typeof setMode==='function'&&settings?.mode!==mode)setMode(mode)
-      }catch{}
+      }catch{/* opslag geblokkeerd: dan zonder opslag */}
     };
-    window.addEventListener('jfm:show-change',()=>{applyMode();try{window.jfmHourMarker=true}catch{}});
+    window.addEventListener('jfm:show-change',()=>{applyMode();try{window.jfmHourMarker=true}catch{/* optionele vlag zetten mislukt: onschuldig */}});
     window.addEventListener('jfm:clock-moment',e=>{
-      try{if(e.detail?.phase==='top')window.jfmHourMarker=true}catch{}
+      try{if(e.detail?.phase==='top')window.jfmHourMarker=true}catch{/* optionele vlag zetten mislukt: onschuldig */}
     });
     applyMode();clock.render();
     window.JFMStationClockBridge={version:'clock-bridge-v1',applyMode};

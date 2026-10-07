@@ -19,7 +19,7 @@
     const fingerprint=`${from}>${to}:${Number(next?.sequence||next?.revision||0)}`;prune();if(seen.has(fingerprint))return null;seen.set(fingerprint,now());
     const source=String(meta.source||next?.source||''),result=classify(from,to,{source}),transitionId=`t${++transitionSeq}`,transition={transitionId,id:transitionId,sessionId:window.MAIRRuntime?.sessionId||'',observedAt:now(),at:now(),fromTrack:previous?{...previous}:null,toTrack:next?{...next}:null,fromTrackId:from,toTrackId:to,sequence:Number(next?.sequence||next?.revision||0),source,...result};
     record('transition.classified',transition,result.cause==='UNKNOWN'?'warn':'info');
-    try{window.dispatchEvent(new CustomEvent('mair:track-transition',{detail:transition}))}catch{}
+    try{window.dispatchEvent(new CustomEvent('mair:track-transition',{detail:transition}))}catch{/* event-listener gooide: onschuldig */}
     return transition
   }
   function onState(event){const detail=event.detail||{},next=detail.state||detail.snapshot;if(next)accept(next,{source:next.source||detail.source||detail.reason})}

@@ -9,7 +9,7 @@
   // Het gedrag blijft hetzelfde - null betekent nog steeds onbekend - maar het
   // verschil tussen 'niets aan het spelen' en 'ik kon het niet vragen' staat nu
   // in de tijdlijn.
-  const note=(stage,error,extra={})=>{try{window.MAIRRuntime?.record?.('background.'+stage,{module:'mair-background-guard',error:String(error?.message||error||'onbekend').slice(0,300),...extra},'warn')}catch{}};
+  const note=(stage,error,extra={})=>{try{window.MAIRRuntime?.record?.('background.'+stage,{module:'mair-background-guard',error:String(error?.message||error||'onbekend').slice(0,300),...extra},'warn')}catch{/* de logger zelf faalde: nooit afspelen blokkeren */}};
   const remote=async()=>{try{return await api('/me/player')}catch(e){note('remote-read-failed',e);return null}};
   const isHidden=()=>document.visibilityState==='hidden'||document.body?.getAttribute('data-mair-background')==='1';
   // Dezelfde voorwaarde als ensureVoiceReady() in mair-dj-v2.js: alleen in de
@@ -29,7 +29,7 @@
   // overschreef de naam van het event. emit('dj-skip-armed',{reason}) kwam in de
   // tijdlijn terecht als 'visibility-hidden' - de diagnostiek loog dus over wat er
   // gebeurd was. De naam van het event wint nu altijd; de aanleiding heet cause.
-  function emit(reason,extra={}){try{window.dispatchEvent(new CustomEvent('mair:background-state',{detail:{...extra,reason,hiddenAt,wasPlaying,trackId,recovering,backgroundSkipArmed}}))}catch{}}
+  function emit(reason,extra={}){try{window.dispatchEvent(new CustomEvent('mair:background-state',{detail:{...extra,reason,hiddenAt,wasPlaying,trackId,recovering,backgroundSkipArmed}}))}catch{/* event-listener gooide: onschuldig */}}
   function armBackgroundDjSkip(reason='background'){
     if(!isHidden())return false;
     try{
@@ -81,8 +81,8 @@
     document.body?.setAttribute('data-mair-background','1');
     if(s.isPlaying||s.expectedLive){
       try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-preserve')}catch(e){note('expected-live-write-failed',e,{at:'hidden'})}
-      try{navigator.mediaSession.playbackState='playing'}catch{}
-      try{window.JFMPWA?.reassertMediaSession?.(false)}catch{}
+      try{navigator.mediaSession.playbackState='playing'}catch{/* mediaSession niet beschikbaar op dit apparaat */}
+      try{window.JFMPWA?.reassertMediaSession?.(false)}catch{/* mediaSession niet beschikbaar op dit apparaat */}
       // Never let a browser-owned DJ handoff pause Spotify while iOS can suspend JS.
       // If a handoff is already in progress, cancel it and fail open to music.
       if(backgroundVoiceAllowed())emit('hidden-dj-allowed',{cause:'native-keep-alive'});
@@ -123,7 +123,7 @@
     document.body?.removeAttribute('data-mair-background');
     const awayMs=hiddenAt?Date.now()-hiddenAt:0;
     hiddenAt=0;backgroundSkipArmed=false;
-    try{window.JFMPWA?.reassertMediaSession?.(false)}catch{}
+    try{window.JFMPWA?.reassertMediaSession?.(false)}catch{/* mediaSession niet beschikbaar op dit apparaat */}
     if(recovering||!wasPlaying){
       emit('visible-no-recovery',{awayMs});
       // Niets te herstellen, maar het scherm moet wel kloppen.
@@ -143,7 +143,7 @@
       // alleen toe zolang de track nog niet aan zijn eind geparkeerd staat.
       const parkedAtEnd=Number(live?.item?.duration_ms||0)>0&&Number(live?.progress_ms||0)>=Number(live.item.duration_ms);
       if(live?.is_playing&&!parkedAtEnd){
-        try{window.JFMPlaybackState?.ingest?.(live,'background-return-playing')}catch{}
+        try{window.JFMPlaybackState?.ingest?.(live,'background-return-playing')}catch(e){window.MAIRRuntime?.caught?.('mair-background-guard.onVisible2',e)}
         try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-return-playing')}catch(e){note('expected-live-write-failed',e,{at:'visible'})}
         emit('visible-still-playing',{awayMs});
         reconciled=true;
@@ -175,7 +175,7 @@
     const detail=event?.detail||{},s=snapshot('hidden-natural-end');
     if(s.isPlaying||s.expectedLive||wasPlaying){
       try{window.JFMPlaybackState?.setExpectedLive?.(true,'background-natural-passive')}catch(e){note('expected-live-write-failed',e,{at:'hidden-natural-end'})}
-      try{navigator.mediaSession.playbackState='playing'}catch{}
+      try{navigator.mediaSession.playbackState='playing'}catch{/* mediaSession niet beschikbaar op dit apparaat */}
     }
     emit('hidden-natural-observed',{endedTrackId:String(detail.trackId||detail.endedTrackId||'')});
   });

@@ -17,9 +17,9 @@
   const KEY='jfm_car_mode',OLD='mair_car_mode_v1';
   // Oude toestand opruimen: anders blijft een toestel met jfm_car_mode='1' uit een
   // vorige versie de body-klassen dragen zonder dat er nog iets bij hoort.
-  try{localStorage.removeItem(KEY);localStorage.removeItem(OLD)}catch{}
-  try{document.body?.classList.remove('jfm-car-mode','mair-car-mode')}catch{}
-  try{document.getElementById('jfmCarView')?.remove()}catch{}
+  try{localStorage.removeItem(KEY);localStorage.removeItem(OLD)}catch{/* opslag geblokkeerd: dan zonder opslag */}
+  try{document.body?.classList.remove('jfm-car-mode','mair-car-mode')}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
+  try{document.getElementById('jfmCarView')?.remove()}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
 
   const state=()=>({car:false,data:false,battery:false,night:false,nightAuto:false,nightEffective:false});
   const api={

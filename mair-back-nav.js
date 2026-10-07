@@ -51,7 +51,7 @@ const somethingOpen=()=>!!topView()||!!activeTab();
 let depth=0,lastPop=0;
 
 function pushEntry(){
-  try{depth++;history.pushState({mairBack:depth},'',location.href)}catch{}
+  try{depth++;history.pushState({mairBack:depth},'',location.href)}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
 }
 // Sluit precies een niveau. Geeft terug of er iets gesloten is.
 function back(){

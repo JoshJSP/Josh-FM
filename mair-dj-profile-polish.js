@@ -9,7 +9,7 @@ const PATCHES={
   noah:{tone:'rustig, inhoudelijk, volwassen en muziekgericht',energy:'Low-medium',talk:'Rustig en compact',humor:'Droog en spaarzaam',genres:'Indie, alternative, classics',presentation:'Curator voor avond en late night. Zegt alleen iets als het echt iets toevoegt en vertrouwt op de muziek.',avoid:'Geen drukke station-promotie en geen lange uitleg.'}
 };
 let appliedAt=0;
-function apply(){const api=window.MAIRDJProfiles;if(!api?.profiles)return false;for(const[id,patch]of Object.entries(PATCHES)){if(api.profiles[id])Object.assign(api.profiles[id],patch)}appliedAt=Date.now();try{window.dispatchEvent(new CustomEvent('mair:dj-profiles-polished',{detail:{at:appliedAt,profiles:Object.keys(PATCHES)}}))}catch{}return true}
+function apply(){const api=window.MAIRDJProfiles;if(!api?.profiles)return false;for(const[id,patch]of Object.entries(PATCHES)){if(api.profiles[id])Object.assign(api.profiles[id],patch)}appliedAt=Date.now();try{window.dispatchEvent(new CustomEvent('mair:dj-profiles-polished',{detail:{at:appliedAt,profiles:Object.keys(PATCHES)}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}return true}
 function boot(){if(apply())return;let tries=0;const timer=setInterval(()=>{if(apply()||++tries>40)clearInterval(timer)},100)}
 window.addEventListener('mair:foundation-ready',apply);window.addEventListener('pageshow',apply);
 window.MAIRDJProfilePolish={version:'mair-dj-profile-polish-v1',apply,get appliedAt(){return appliedAt},profiles:PATCHES};

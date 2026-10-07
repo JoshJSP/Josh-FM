@@ -5,9 +5,9 @@
   let refreshing=false,lastError='',weatherMemo={at:0,data:null};
 
   function loadLocation(){try{const x=JSON.parse(localStorage.getItem(LOC_KEY)||'null');if(!x||!x.name)return null;return x}catch{return null}}
-  function saveLocation(x){if(!x?.name)return;try{localStorage.setItem(LOC_KEY,JSON.stringify({name:x.name,region:x.region||'',country:x.country||'',at:now()}))}catch{}}
+  function saveLocation(x){if(!x?.name)return;try{localStorage.setItem(LOC_KEY,JSON.stringify({name:x.name,region:x.region||'',country:x.country||'',at:now()}))}catch{/* opslag geblokkeerd: dan zonder opslag */}}
   function enabled(){return localStorage.getItem(PREF_KEY)==='1'}
-  function setEnabled(on){try{localStorage.setItem(PREF_KEY,on?'1':'0')}catch{};render();if(on)refresh().catch(()=>{})}
+  function setEnabled(on){try{localStorage.setItem(PREF_KEY,on?'1':'0')}catch{/* opslag geblokkeerd: dan zonder opslag */};render();if(on)refresh().catch(()=>{})}
 
   async function reversePlace(lat,lon){
     const r=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&localityLanguage=en`,{cache:'no-store'});
@@ -30,18 +30,18 @@
   function locationLine(){
     if(!enabled())return'';const x=loadLocation();if(!x?.name)return'';
     const last=Number(localStorage.getItem(MENTION_KEY)||0);if(now()-last<75*60*1000||Math.random()>.22)return'';
-    try{localStorage.setItem(MENTION_KEY,String(now()))}catch{}
+    try{localStorage.setItem(MENTION_KEY,String(now()))}catch{/* opslag geblokkeerd: dan zonder opslag */}
     const h=new Date().getHours();if(h<11)return`Good morning from ${x.name}.`;if(h>=23||h<5)return`Late night in ${x.name}, and Josh FM is still on.`;return`Right here in ${x.name}, this is Josh FM.`
   }
 
   function feedbackProfile(){
-    let f={up:0,down:0,liked:[],disliked:[]};try{f={...f,...JSON.parse(localStorage.getItem('jfm_dj_feedback')||'{}')}}catch{}
+    let f={up:0,down:0,liked:[],disliked:[]};try{f={...f,...JSON.parse(localStorage.getItem('jfm_dj_feedback')||'{}')}}catch{/* opslag geblokkeerd: dan zonder opslag */}
     const up=Number(f.up||0),down=Number(f.down||0),total=up+down,confidence=Math.min(1,total/12);
     return{up,down,total,confidence,positive:total?up/total:.5,avoid:(f.avoid||f.disliked||[]).slice(0,10)}
   }
   function normalized(s=''){return String(s).toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim()}
   function repetitionRisk(text=''){
-    const n=normalized(text);if(!n)return 0;let recent=[];try{recent=window.JFMRadioClock?.recent?.()||[]}catch{}
+    const n=normalized(text);if(!n)return 0;let recent=[];try{recent=window.JFMRadioClock?.recent?.()||[]}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}
     const head=n.split(' ').slice(0,7).join(' ');return recent.slice(0,12).some(x=>normalized(x).includes(head))?1:0
   }
   function dislikedRisk(text=''){

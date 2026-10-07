@@ -11,7 +11,7 @@
   function cancel(){if(pending?.timer)clearTimeout(pending.timer);pending=null}
   function mark(detail={}){const s=sig(String(detail.endedTrackId||''),String(detail.newTrackId||''));if(!s)return;seen.set(s,now());if(pending?.sig===s)cancel();cleanup()}
   function shouldFastFallback(){try{const d=window.MAIRDJ?.diagnostics?.()||{};return !!(d.pendingAir||d.phase==='ARMED'||Number(d.remaining||99)<=1)}catch{return false}}
-  function synthesize(record){if(pending!==record)return;pending=null;if(document.visibilityState==='hidden')return;if(currentId()!==record.current)return;cleanup();if(seen.has(record.sig))return;seen.set(record.sig,now());try{window.dispatchEvent(new CustomEvent('jfm:natural-next-ready',{detail:{endedTrackId:record.previous,newTrackId:record.current,source:'trackchange-fallback',synthetic:true,at:now()}}))}catch{}}
+  function synthesize(record){if(pending!==record)return;pending=null;if(document.visibilityState==='hidden')return;if(currentId()!==record.current)return;cleanup();if(seen.has(record.sig))return;seen.set(record.sig,now());try{window.dispatchEvent(new CustomEvent('jfm:natural-next-ready',{detail:{endedTrackId:record.previous,newTrackId:record.current,source:'trackchange-fallback',synthetic:true,at:now()}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}}
   function onTrackChange(detail={}){
     const current=String(detail.trackId||currentId()||''),previous=String(detail.previousTrackId||lastTrackId||'');
     if(current)lastTrackId=current;

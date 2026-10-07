@@ -4,8 +4,8 @@ if(window.__mairSingleStationRuntime)return;window.__mairSingleStationRuntime=tr
 const ACTIVE_KEY='mair_active_category_v2',SEARCH_KEY='mair_category_search_v1',SOURCE_KEY='mair_playback_source_v1';
 const ALIASES={pop:'hits',dance:'party',rnb:'mix',hiphop:'mix',rock:'throwback',nl:'nl',indie:'new',feelgood:'hits',chill:'chill',energy:'party',focus:'chill',party:'party',morning:'hits',drive:'mix',evening:'chill',latenight:'chill','90s':'throwback','00s':'00s','10s':'10s','20s':'hits'};
 function clearActive(){
-  try{localStorage.removeItem(ACTIVE_KEY);localStorage.removeItem(SEARCH_KEY);const src=JSON.parse(localStorage.getItem(SOURCE_KEY)||'null');if(src?.kind==='category')localStorage.removeItem(SOURCE_KEY)}catch{}
-  try{delete window.MAIRPlaybackContext;delete document.body.dataset.mairCategory;window.dispatchEvent(new CustomEvent('mair:playback-context',{detail:null}))}catch{}
+  try{localStorage.removeItem(ACTIVE_KEY);localStorage.removeItem(SEARCH_KEY);const src=JSON.parse(localStorage.getItem(SOURCE_KEY)||'null');if(src?.kind==='category')localStorage.removeItem(SOURCE_KEY)}catch{/* opslag geblokkeerd: dan zonder opslag */}
+  try{delete window.MAIRPlaybackContext;delete document.body.dataset.mairCategory;window.dispatchEvent(new CustomEvent('mair:playback-context',{detail:null}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}
   return true;
 }
 function removeDuplicateUi(){document.getElementById('mairCategorySearch')?.remove();document.querySelectorAll('[data-category]').forEach(x=>x.closest('.mair-category-result')?.remove())}

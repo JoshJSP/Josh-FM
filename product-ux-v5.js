@@ -5,7 +5,7 @@
     try{return !!(localStorage.getItem('jfm_client_id')||localStorage.getItem('jfm_streaming_ready_v2')||localStorage.getItem('jfm_taste_model_v4')||localStorage.getItem('jfm_settings'))}catch{return false}
   };
   const getState=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch{return{}}};
-  const save=x=>{try{localStorage.setItem(KEY,JSON.stringify({...getState(),...x,updatedAt:Date.now()}))}catch{}};
+  const save=x=>{try{localStorage.setItem(KEY,JSON.stringify({...getState(),...x,updatedAt:Date.now()}))}catch{/* opslag geblokkeerd: dan zonder opslag */}};
   function style(){if($('jfmOnboardingStyle'))return;const s=document.createElement('style');s.id='jfmOnboardingStyle';s.textContent=`
 #jfmOnboarding{position:fixed;inset:0;z-index:9999;background:rgba(5,7,10,.88);backdrop-filter:blur(16px);display:grid;place-items:center;padding:20px}
 #jfmOnboarding[hidden]{display:none}.jfmObCard{width:min(520px,100%);background:#11151b;border:1px solid #2a313b;border-radius:24px;padding:24px;box-shadow:0 24px 80px rgba(0,0,0,.45)}
@@ -29,7 +29,7 @@
   function ensure(){if($('jfmOnboarding'))return;style();const root=document.createElement('div');root.id='jfmOnboarding';root.hidden=true;root.innerHTML='<div class="jfmObCard" id="jfmOnboardingBody" role="dialog" aria-modal="true" aria-label="MAIR instellen"></div>';document.body.appendChild(root);root.addEventListener('click',e=>{if(e.target===root)close(false)});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!root.hidden)close(false)});installSettingsLauncher()}
   function open({reset=false}={}){ensure();const saved=getState();answers={...answers,...(saved.answers||{})};if(reset)current=0;$('jfmOnboarding').hidden=false;paint();save({opened:true})}
   function close(completed=false){const root=$('jfmOnboarding');if(root)root.hidden=true;save({completed:!!completed||!!getState().completed})}
-  function finish(){applyAnswers();save({completed:true,completedAt:Date.now()});close(true);const connect=$('connect');if(connect&&!connect.disabled){try{connect.scrollIntoView({behavior:'smooth',block:'center'});connect.click()}catch{}}}
+  function finish(){applyAnswers();save({completed:true,completedAt:Date.now()});close(true);const connect=$('connect');if(connect&&!connect.disabled){try{connect.scrollIntoView({behavior:'smooth',block:'center'});connect.click()}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}}}
   function installSettingsLauncher(){
     // Deze kaart werd aangemaakt en meteen weer verwijderd door mair-easy-use-v1.js
     // (die #jfmProductSetupCard opruimt). Twee lagen die elkaar tegenwerken; hier stoppen.

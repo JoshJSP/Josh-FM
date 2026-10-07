@@ -4,7 +4,7 @@
   const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
   const DEVICE_KEY='jfm_spotify_device_id';
   const TRUTH_KEY='jfm_playback_truth_v1',TRACK_URI=/^spotify:track:[A-Za-z0-9]{22}$/;
-  function readReloadIntent(){try{const x=JSON.parse(sessionStorage.getItem(TRUTH_KEY)||'{}'),age=Date.now()-Number(x.updatedAt||0);if(x.expectedLive&&TRACK_URI.test(String(x.uri||''))&&age>=0&&age<5*60*1000)return{uri:String(x.uri),trackId:String(x.trackId||''),progressMs:Math.max(0,Number(x.progressMs||0)),durationMs:Math.max(0,Number(x.durationMs||0)),deviceId:String(x.deviceId||''),updatedAt:Number(x.updatedAt||0)}}catch{}return null}
+  function readReloadIntent(){try{const x=JSON.parse(sessionStorage.getItem(TRUTH_KEY)||'{}'),age=Date.now()-Number(x.updatedAt||0);if(x.expectedLive&&TRACK_URI.test(String(x.uri||''))&&age>=0&&age<5*60*1000)return{uri:String(x.uri),trackId:String(x.trackId||''),progressMs:Math.max(0,Number(x.progressMs||0)),durationMs:Math.max(0,Number(x.durationMs||0)),deviceId:String(x.deviceId||''),updatedAt:Number(x.updatedAt||0)}}catch{/* sessionStorage-cache onleesbaar: dan geen herstelintentie */}return null}
   let reloadIntent=readReloadIntent(),reloadNeedsGesture=false,bound=false,busy=false,lastError='',recoveries=0,failures=0,deviceHandovers=0,reloadRestores=0,endGuardBusy=false,lastNaturalEnd='',recoveryFailures=0,recoveryCooldownUntil=0,startPending=false,resumeGuardTrackId='',resumeGuardAttempts=0,resumeGuardAdvancedId='',resumeGuardAdvances=0;
   // Een track die Spotify blijft melden als 'paused' kan eindeloos worden hervat zonder ooit
   // hoorbaar te worden. Tel opeenvolgende herstel-resumes per track, zodat de radio precies
@@ -17,14 +17,14 @@
   const sdkDeviceId=()=>String(window.JFMSpotifySDK?.deviceId||'').trim();
   const deviceId=()=>sdkDeviceId()||String(localStorage.getItem(DEVICE_KEY)||'').trim();
   const truth=()=>window.JFMPlaybackState||null;
-  function markTransitionAction(type,detail={}){const payload={type,fromTrackId:String(detail.fromTrackId||truth()?.get?.()?.trackId||''),expectedTrackId:String(detail.expectedTrackId||''),source:String(detail.source||'playback-primary'),at:Date.now()};if(window.MAIRTransitionController?.mark)return window.MAIRTransitionController.mark(type,payload);try{window.dispatchEvent(new CustomEvent('jfm:transport-action',{detail:payload}))}catch{}return''}
+  function markTransitionAction(type,detail={}){const payload={type,fromTrackId:String(detail.fromTrackId||truth()?.get?.()?.trackId||''),expectedTrackId:String(detail.expectedTrackId||''),source:String(detail.source||'playback-primary'),at:Date.now()};if(window.MAIRTransitionController?.mark)return window.MAIRTransitionController.mark(type,payload);try{window.dispatchEvent(new CustomEvent('jfm:transport-action',{detail:payload}))}catch{/* event-listener gooide: onschuldig */}return''}
   const transportIds=new Set(['start','play','next','prev']);
   const djOwnsTransport=()=>!!(window.JFMDJAuthoritative?.busy||window.JFMDJTransition?.busy||window.djBusy||truth()?.blocksRecovery?.());
   const backgrounded=()=>document.visibilityState==='hidden'||document.body?.getAttribute('data-mair-background')==='1';
   function showReloadPrompt(){reloadNeedsGesture=true;const artist=$('artist'),play=$('play');if(artist)artist.textContent='Tik op Play om na het vernieuwen verder te luisteren.';if(play)play.setAttribute('aria-label','Hervat MAIR na vernieuwen');info('Tik op Play om MAIR hoorbaar te hervatten.',true)}
-  function clearReloadPrompt(){reloadNeedsGesture=false;try{$('play')?.removeAttribute?.('aria-label')}catch{}}
+  function clearReloadPrompt(){reloadNeedsGesture=false;try{$('play')?.removeAttribute?.('aria-label')}catch{/* element/listener al weg */}}
 
-  function activateNow(){try{player()?.activateElement?.()}catch{}}
+  function activateNow(){try{player()?.activateElement?.()}catch(e){window.MAIRRuntime?.caught?.('playback-primary.activateNow',e)}}
   async function ensurePlayer(){for(let i=0;i<70;i++){const p=player();if(p)return p;await wait(120)}throw Error('MAIRFM-player is nog niet klaar. Koppel Spotify opnieuw of vernieuw de app.')}
   async function remote(){try{return await api('/me/player')}catch{return null}}
   async function freshDevice(){
@@ -44,9 +44,9 @@
   // getItem geeft null als er niets staat, en Number(null) is 0 - niet NaN. Zonder
 // de null-controle startte een vers toestel dus op stil.
 let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||raw==='')return 1;const parsed=Number(raw);return Number.isFinite(parsed)?clampVolume(parsed):1}catch{return 1}})(),volumeDevice='',appliedVolume=1,ducked=false;
-  function paintVolume(){const slider=$('volume'),label=$('volumeValue'),pct=Math.round(volume*100);if(slider&&document.activeElement!==slider)slider.value=String(pct);if(label)label.textContent=pct+'%';try{window.dispatchEvent(new CustomEvent('mair:volume',{detail:{volume}}))}catch{}}
+  function paintVolume(){const slider=$('volume'),label=$('volumeValue'),pct=Math.round(volume*100);if(slider&&document.activeElement!==slider)slider.value=String(pct);if(label)label.textContent=pct+'%';try{window.dispatchEvent(new CustomEvent('mair:volume',{detail:{volume}}))}catch{/* event-listener gooide: onschuldig */}}
   async function pushVolume(v){
-    try{const p=player();if(p?.setVolume){await p.setVolume(v);appliedVolume=v;return true}}catch{}
+    try{const p=player();if(p?.setVolume){await p.setVolume(v);appliedVolume=v;return true}}catch(e){window.MAIRRuntime?.caught?.('playback-primary.pushVolume',e)}
     const id=deviceId();
     await api('/me/player/volume?volume_percent='+Math.round(v*100)+(id?'&device_id='+encodeURIComponent(id):''),{method:'PUT'});
     appliedVolume=v;return true;
@@ -87,7 +87,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   }
   async function setVolume(next){
     const v=clampVolume(next);if(!Number.isFinite(v))return false;
-    volume=v;try{localStorage.setItem(VOLUME_KEY,String(v))}catch{}
+    volume=v;try{localStorage.setItem(VOLUME_KEY,String(v))}catch{/* opslag geblokkeerd: dan maar zonder opslag */}
     paintVolume();
     // Tijdens een DJ-break alleen het basisniveau onthouden; de speler staat
     // dan bewust zacht en mag daar niet uit worden geduwd.
@@ -105,10 +105,10 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     if(s?.is_playing&&s.item?.uri!==intent.uri&&naturalAdvanceDue){if(s.device?.id!==id){s=await transfer(id,true);deviceHandovers++}reloadIntent=null;return{p,id,state:s}}
     if(s?.device?.id!==id){await transfer(id,false);deviceHandovers++}
     const position=Math.min(Math.max(0,intent.progressMs+elapsed),Math.max(0,(intent.durationMs||Infinity)-1500));await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris:[intent.uri],position_ms:position}});
-    s=await verify(x=>x.device?.id===id&&x.is_playing&&x.item?.uri===intent.uri,10);if(!s)throw Error('Spotify bevestigde de track na vernieuwen niet.');let local=false;for(let i=0;i<3&&!local;i++){try{await p.seek(position);await p.resume();local=!!(await verifySdk(x=>!x.paused&&sdkUri(x)===intent.uri&&Math.abs(Number(x.position||0)-position)<6000,8))}catch{}if(!local)await wait(180)}await wait(700);try{const stable=await p.getCurrentState();local=!!(stable&&!stable.paused&&sdkUri(stable)===intent.uri&&Math.abs(Number(stable.position||0)-position)<8000)}catch{local=false}if(!local){showReloadPrompt();const error=Error('De browser wacht op een tik om audio na vernieuwen te hervatten.');error.code='RELOAD_GESTURE';throw error}clearReloadPrompt();window.__jfmReloadContextUri=intent.uri;try{window.dispatchEvent(new CustomEvent('jfm:reload-context-restored',{detail:{uri:intent.uri}}))}catch{}reloadRestores++;reloadIntent=null;return{p,id,state:s}
+    s=await verify(x=>x.device?.id===id&&x.is_playing&&x.item?.uri===intent.uri,10);if(!s)throw Error('Spotify bevestigde de track na vernieuwen niet.');let local=false;for(let i=0;i<3&&!local;i++){try{await p.seek(position);await p.resume();local=!!(await verifySdk(x=>!x.paused&&sdkUri(x)===intent.uri&&Math.abs(Number(x.position||0)-position)<6000,8))}catch(e){window.MAIRRuntime?.caught?.('playback-primary.restoreReloadPlayback',e)}if(!local)await wait(180)}await wait(700);try{const stable=await p.getCurrentState();local=!!(stable&&!stable.paused&&sdkUri(stable)===intent.uri&&Math.abs(Number(stable.position||0)-position)<8000)}catch{local=false}if(!local){showReloadPrompt();const error=Error('De browser wacht op een tik om audio na vernieuwen te hervatten.');error.code='RELOAD_GESTURE';throw error}clearReloadPrompt();window.__jfmReloadContextUri=intent.uri;try{window.dispatchEvent(new CustomEvent('jfm:reload-context-restored',{detail:{uri:intent.uri}}))}catch{/* event-listener gooide: onschuldig */}reloadRestores++;reloadIntent=null;return{p,id,state:s}
   }
   async function verify(predicate,tries=10){for(let i=0;i<tries;i++){await wait(140+i*45);const s=await remote();if(s&&predicate(s))return s}return null}
-  async function verifySdk(predicate,tries=8){const p=player();if(!p)return null;for(let i=0;i<tries;i++){try{const s=await p.getCurrentState();if(s&&predicate(s))return s}catch{}await wait(45+i*25)}return null}
+  async function verifySdk(predicate,tries=8){const p=player();if(!p)return null;for(let i=0;i<tries;i++){try{const s=await p.getCurrentState();if(s&&predicate(s))return s}catch(e){window.MAIRRuntime?.caught?.('playback-primary.verifySdk',e)}await wait(45+i*25)}return null}
   async function nudgeSdkPlayback(){if(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,4))return true;try{await player()?.resume?.()}catch(e){note('sdk-nudge-failed',e)}return!!(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,6))}
   const sdkUri=s=>String(s?.track_window?.current_track?.uri||'');
   // Een speler die voorbij de duur doorloopt maakt geen geluid meer, hoe hard hij
@@ -136,7 +136,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   // onschuldige storing af. Maar een fout die gedrag verbergt hoort geregistreerd
   // te worden, anders blijft de ringbuffer leeg terwijl er wel iets misging. Dit
   // is bewust geen herstelpad: de aanroeper doet precies wat hij al deed.
-  const note=(stage,error,extra={})=>{try{window.MAIRRuntime?.record?.('playback.'+stage,{module:'playback-primary',error:String(error?.message||error||'onbekend').slice(0,300),...extra},'warn')}catch{}};
+  const note=(stage,error,extra={})=>{try{window.MAIRRuntime?.record?.('playback.'+stage,{module:'playback-primary',error:String(error?.message||error||'onbekend').slice(0,300),...extra},'warn')}catch{/* de logger zelf faalde: nooit afspelen blokkeren */}};
   function stationQueue(){try{return Array.isArray(queue)?queue.filter(t=>t?.uri):[]}catch{return[]}}
   function stationIndex(stateOrUri){const q=stationQueue(),uri=typeof stateOrUri==='string'?stateOrUri:stateOrUri?.item?.uri,id=typeof stateOrUri==='string'?'':stateOrUri?.item?.id;let i=uri?q.findIndex(t=>t?.uri===uri):-1;if(i<0&&id)i=q.findIndex(t=>t?.id===id);return i}
   // Speelt er iets dat niet in de radioset staat - een verzoek, of playback die is
@@ -185,7 +185,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     if($('jingles')?.checked&&typeof speakText==='function'){Promise.resolve(speakText('MAIRFM. Jouw muziek, jouw radio.',true)).catch(()=>false)}
     info('Muziek wordt gestart…');await disableSpotifyShuffle(id);await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&!!x.item?.id);if(!s)throw Error('Spotify bevestigde het starten niet.');await nudgeSdkPlayback();
-    try{session=[];lastTrackId=null;renderHistory();scheduleTalk();startPolling()}catch{};ingest(s,'primary-start');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;info(`MAIRFM is live · ${queue.length} tracks klaar.`);return true
+    try{session=[];lastTrackId=null;renderHistory();scheduleTalk();startPolling()}catch(e){window.MAIRRuntime?.caught?.('playback-primary.uris',e)};ingest(s,'primary-start');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;info(`MAIRFM is live · ${queue.length} tracks klaar.`);return true
   }
   async function start(){
     activateNow();
@@ -200,7 +200,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
 
   async function pauseDirect(){
     const{p,id,state}=await ensureActive(),wasExpected=!!truth()?.get?.()?.expectedLive;
-    let sdk=null;try{sdk=await p.getCurrentState()}catch{}
+    let sdk=null;try{sdk=await p.getCurrentState()}catch(e){window.MAIRRuntime?.caught?.('playback-primary.pauseDirect',e)}
     const playing=sdk?.track_window?.current_track?!sdk.paused:(state?.item?!!state.is_playing:!!truth()?.get?.()?.isPlaying);
     if(!playing){truth()?.setExpectedLive?.(false,'pause');return true}
     truth()?.setExpectedLive?.(false,'pause');
@@ -212,7 +212,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     }catch(e){truth()?.setExpectedLive?.(wasExpected,'pause-failed');throw e}
   }
   async function resumeDirect(){
-    const{p,id,state}=await ensureActive();let sdk=null;try{sdk=await p.getCurrentState()}catch{}
+    const{p,id,state}=await ensureActive();let sdk=null;try{sdk=await p.getCurrentState()}catch(e){window.MAIRRuntime?.caught?.('playback-primary.resumeDirect',e)}
     const hasTrack=!!(state?.item||sdk?.track_window?.current_track||truth()?.get?.()?.trackId),playing=sdk?.track_window?.current_track?!sdk.paused:(state?.item?!!state.is_playing:!!truth()?.get?.()?.isPlaying);
     if(playing){if(state)ingest(state,'primary-resume-already');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM speelt.');return true}
     if(!hasTrack){truth()?.setExpectedLive?.(true,'restart-empty');return startDirect()}
@@ -244,7 +244,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   }
   async function djRewindDirect(expectedUri=''){
     const id=await freshDevice(),p=await ensurePlayer();
-    let local=false;try{await p.seek(0);local=!!(await verifySdk(s=>(!expectedUri||sdkUri(s)===expectedUri)&&Number(s.position||0)<1400,8))}catch{}
+    let local=false;try{await p.seek(0);local=!!(await verifySdk(s=>(!expectedUri||sdkUri(s)===expectedUri)&&Number(s.position||0)<1400,8))}catch(e){window.MAIRRuntime?.caught?.('playback-primary.djRewindDirect',e)}
     if(!local){await api('/me/player/seek?position_ms=0&device_id='+encodeURIComponent(id),{method:'PUT'});const s=await verify(x=>(!expectedUri||x.item?.uri===expectedUri)&&Number(x.progress_ms||0)<1800,5);if(!s)throw Error('Spotify bevestigde DJ-rewind niet.')}return true
   }
   async function djPause(uri=''){return withBusy(async()=>{try{return await djPauseDirect(uri)}catch(e){lastError=String(e?.message||e);return false}})}
@@ -252,9 +252,9 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   async function djRewind(uri=''){return withBusy(async()=>{try{return await djRewindDirect(uri)}catch(e){lastError=String(e?.message||e);return false}})}
 
   async function advance({record=false,source='primary-next'}={}){
-    const{id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');if(record)try{recordSkip(before)}catch{};
+    const{id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');if(record)try{recordSkip(before)}catch{/* skip-statistiek is optioneel */};
     const fallbackUri=stationNeighbor(state,1);
-    try{await api('/me/player/next?device_id='+encodeURIComponent(id),{method:'POST'})}catch{}
+    try{await api('/me/player/next?device_id='+encodeURIComponent(id),{method:'POST'})}catch(e){window.MAIRRuntime?.caught?.('playback-primary.advance2',e)}
     let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,6);
     if(!s){try{await player()?.nextTrack?.()}catch(e){note('sdk-next-failed',e)};s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,4)}
     if(!s&&fallbackUri)s=await playContextDirect(fallbackUri,id,source+'-fallback');
@@ -290,7 +290,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
       try{
         const cause=delta>0?'USER_NEXT':'USER_PREVIOUS';if(window.MAIRDJ?.busy&&typeof window.MAIRDJ?.cancelActive==='function')await window.MAIRDJ.cancelActive(cause);
         if(delta>0){markTransitionAction('NEXT');await advance({record:true,source:'primary-next'});info('MAIRFM speelt.');return true}
-        const{p,id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');markTransitionAction('PREVIOUS',{fromTrackId:before});const fallbackUri=stationNeighbor(state,-1);let position=Number(state?.progress_ms||0);if(!position)try{position=Number((await p.getCurrentState())?.position||0)}catch{}
+        const{p,id,state}=await ensureActive();const before=state?.item?.id||'';if(!before)throw Error('Er speelt nog geen nummer.');markTransitionAction('PREVIOUS',{fromTrackId:before});const fallbackUri=stationNeighbor(state,-1);let position=Number(state?.progress_ms||0);if(!position)try{position=Number((await p.getCurrentState())?.position||0)}catch(e){window.MAIRRuntime?.caught?.('playback-primary.skip',e)}
         await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'});
         /* Spotify herstart bij 'previous' de lopende track zodra die langer dan een paar
            seconden speelt; daarvoor stond hier een tweede aanroep. Die vuurde alleen ook
@@ -308,7 +308,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     endGuardBusy=true;lastNaturalEnd=endedId;
     try{
       await wait(120);if(djOwnsTransport())return false;const s=await fastNaturalAdvance(endedId);if(!s)throw Error('Volgende track kon niet snel worden gestart.');recoveries++;recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM gaat automatisch door.');
-      try{window.dispatchEvent(new CustomEvent('jfm:natural-next-ready',{detail:{endedTrackId:endedId,newTrackId:s?.item?.id||'',auto:true,fast:true}}))}catch{};return true
+      try{window.dispatchEvent(new CustomEvent('jfm:natural-next-ready',{detail:{endedTrackId:endedId,newTrackId:s?.item?.id||'',auto:true,fast:true}}))}catch{/* event-listener gooide: onschuldig */};return true
     }catch(e){return rememberError(e,'Automatisch doorgaan mislukt: ')}finally{endGuardBusy=false;setTimeout(()=>{if(lastNaturalEnd===endedId)lastNaturalEnd=''},1800)}
   }
 
@@ -342,7 +342,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
       // dit is een veilig en ondubbelzinnig signaal.
       const ended=duration>0&&(sdk?.paused?position>=Math.max(0,duration-3500):position>=duration);
       if(track?.id&&ended)return handleNaturalEnd({trackId:String(track.id),uri:String(track.uri||''),durationMs:duration,positionMs:Math.min(position,duration),source:sdk?.paused?'primary-sdk-watchdog':'primary-sdk-watchdog-stalled'});
-    }catch{}
+    }catch(e){window.MAIRRuntime?.caught?.('playback-primary.watchdog',e)}
     return recover('watchdog')
   }
 
