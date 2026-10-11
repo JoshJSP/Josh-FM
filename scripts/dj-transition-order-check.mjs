@@ -25,6 +25,11 @@ assert.ok(imaging<0||(validate<imaging&&imaging<speak),'Radio-imaging mag alleen
 assert.ok(validate<speak,'DJ mag pas spreken nadat de vastgehouden track is gevalideerd');
 assert.ok(speak<rewindResume,'Nieuwe track moet pas na de DJ vanaf het begin worden hervat');
 assert.ok(source.includes("stableCurrent(expectedId='',timeoutMs=2400)"),'stableCurrent heeft een begrensde stabiliteitscontrole');
-assert.ok(source.includes("if(document.visibilityState==='hidden')"),'Voice-ready pad blokkeert achtergrondaudio');
+// De DJ zweeg met het scherm uit omdat dit pad onvoorwaardelijk blokkeerde. Sinds
+// 23-09-2026 is er precies een uitzondering: de native shell met een aantoonbaar
+// lopende keep-alive. Safari, de PWA en desktop blijven blokkeren, want daar mag
+// het besturingssysteem de pagina bevriezen.
+assert.ok(source.includes("document.visibilityState==='hidden'&&!backgroundVoiceAllowed()"),'Voice-ready pad blokkeert achtergrondaudio, behalve bij een bewezen keep-alive');
+assert.ok(source.includes('a?.nativeShell')&&source.includes('a?.keepAlive?.running'),'De achtergronduitzondering geldt alleen in de native shell met lopende keep-alive');
 
 console.log('MAIR DJ transition order: PASS — voice ready, hold vóór validatie, imaging veilig, DJ vóór muziek');

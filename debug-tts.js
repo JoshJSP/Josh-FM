@@ -4,7 +4,7 @@ const FISH_VERSION='fish-audio-v7-mair-nl-safe';
 const JFM_BUILD='audit-fish-v7-mair-nl';
 const IS_IOS=/iPhone|iPad|iPod/i.test(navigator.userAgent)||(/Macintosh/i.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
 let selectedLanguage='nl';
-const speechCache=new Map(),SPEECH_CACHE_TTL=5*60*1000,SPEECH_CACHE_MAX=8;
+const speechCache=new Map(),SPEECH_CACHE_TTL=12*60*1000,SPEECH_CACHE_MAX=8;
 let lastError='',lastProvider='',lastModel='',lastVoiceId='',lastVoiceTitle='',lastLatency=0,lastAudibleTestAt=0,lastPlaybackMode='',lastPlaybackAt=0,activePlayback=null;
 
 function currentProfile(){return window.MAIRDJProfiles?.current?.id||window.MAIRCurrentDJ?.id||localStorage.getItem('mair_dj_profile_v1')||'josh'}
@@ -25,11 +25,96 @@ window.JFMJingleText=(type='station')=>{const dict={station:['Dit is MAIR FM.','
 const AC=window.AudioContext||window.webkitAudioContext;
 let djContext=AC?new AC():null,djGain=null,webAudioUnlocked=false,mediaUnlocked=false;
 if(djContext){djGain=djContext.createGain();djGain.gain.value=1;djGain.connect(djContext.destination)}
+// De stem volgt de MAIR-volumeschuif, net als Spotify. Op 7-10-2026 gemeten op 12%:
+// de stem op vol volume stond ~10 dB boven de muziek, dus de DJ schreeuwde juist
+// als je zacht luisterde. Zelfde factor op beide houdt de balans van 100% vast.
+const voiceLevel=()=>{const v=Number(window.JFMPlayback?.volume);return Number.isFinite(v)?Math.max(0,Math.min(1,v)):1};
 const mediaAudio=new Audio();mediaAudio.preload='auto';mediaAudio.playsInline=true;mediaAudio.setAttribute('playsinline','');mediaAudio.volume=1;
 const SILENT='data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAACA';
 async function primeMedia(){if(mediaUnlocked)return true;try{mediaAudio.src=SILENT;mediaAudio.currentTime=0;const p=mediaAudio.play();if(p?.then)await p;mediaAudio.pause();mediaAudio.removeAttribute('src');mediaAudio.load();mediaUnlocked=true;return true}catch{return false}}
 async function unlockAudio(){try{if(djContext?.state==='suspended')await djContext.resume();if(djContext){const b=djContext.createBuffer(1,1,24000),s=djContext.createBufferSource();s.buffer=b;s.connect(djGain);s.start(0)}webAudioUnlocked=!!djContext&&djContext.state==='running'}catch{webAudioUnlocked=false}await primeMedia().catch(()=>false);renderHealth();return webAudioUnlocked||mediaUnlocked}
 for(const ev of ['pointerdown','touchstart'])document.addEventListener(ev,()=>{unlockAudio().catch(()=>{})},{capture:true,passive:true});
+
+// ---------------------------------------------------------------------------
+// Keep-alive voor de Capacitor-app.
+//
+// iOS houdt een webpagina op de achtergrond alleen levend zolang er geluid uit
+// die pagina zelf komt. De muziek komt uit de Spotify-app, dus vanuit iOS maakt
+// MAIRFM geen geluid en mag de pagina slapen. Daarom zwijgt de DJ met het scherm
+// uit. Een lus van echte stilte houdt de audiosessie open.
+//
+// Bewust smal gehouden:
+// - alleen in de native shell. Safari en de PWA krijgen dit niet: Apple mag die
+//   sessie opruimen, en een PWA die stil accu verbruikt zonder te werken is
+//   erger dan niets.
+// - gekoppeld aan expectedLive. Staat de radio uit, dan stopt de lus, ook als er
+//   onderweg iets misgaat.
+// - luistert bewust NIET naar mair:sleep. Juist dan moet hij doorlopen.
+//
+// Het fragment wordt hier gebouwd in plaats van als data-URI opgenomen: tien
+// seconden 8-bits mono is 80 KB, en dat als base64 in de broncode zetten kost
+// meer dan honderd kilobyte aan iedere bezoeker, ook aan de browsers die dit
+// nooit gebruiken.
+function silentWavUrl(seconds=10,rate=8000){
+  const bytes=rate*seconds,buffer=new ArrayBuffer(44+bytes),view=new DataView(buffer);
+  const ascii=(offset,text)=>{for(let i=0;i<text.length;i++)view.setUint8(offset+i,text.charCodeAt(i))};
+  ascii(0,'RIFF');view.setUint32(4,36+bytes,true);ascii(8,'WAVEfmt ');view.setUint32(16,16,true);
+  view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,rate,true);
+  view.setUint32(28,rate,true);view.setUint16(32,1,true);view.setUint16(34,8,true);
+  ascii(36,'data');view.setUint32(40,bytes,true);
+  new Uint8Array(buffer,44).fill(128); // 128 is stilte bij 8-bits PCM zonder teken
+  return URL.createObjectURL(new Blob([buffer],{type:'audio/wav'}));
+}
+const nativeShell=()=>{try{return !!window.Capacitor?.isNativePlatform?.()}catch{return false}};
+let keepAliveAudio=null,keepAliveUrl='',keepAliveSince=0,keepAliveError='';
+function keepAliveStop(reason='expected-live-off'){
+  if(!keepAliveAudio)return false;
+  try{keepAliveAudio.pause();keepAliveAudio.removeAttribute('src');keepAliveAudio.load()}catch(e){keepAliveError=String(e?.message||e)}
+  finally{keepAliveAudio=null;keepAliveSince=0;window.MAIRRuntime?.record?.('audio.keep-alive-stopped',{reason},'info')}
+  return true;
+}
+// Eén start tegelijk: een tweede aanroep voordat play() klaar is maakte een tweede lus-Audio die keepAliveStop nooit stopte.
+let keepAliveStarting=null;
+function keepAliveStart(reason='expected-live'){
+  if(keepAliveAudio)return Promise.resolve(true);
+  if(!keepAliveStarting)keepAliveStarting=keepAliveStartOnce(reason).finally(()=>{keepAliveStarting=null});
+  return keepAliveStarting;
+}
+async function keepAliveStartOnce(reason){
+  if(keepAliveAudio)return true;
+  if(!nativeShell())return false;
+  try{
+    keepAliveUrl=keepAliveUrl||silentWavUrl(10);
+    const audio=new Audio(keepAliveUrl);
+    audio.loop=true;audio.playsInline=true;audio.setAttribute('playsinline','');audio.preload='auto';audio.volume=1;
+    await audio.play();
+    keepAliveAudio=audio;keepAliveSince=Date.now();keepAliveError='';
+    window.MAIRRuntime?.record?.('audio.keep-alive-started',{reason,seconds:10},'info');
+    return true;
+  }catch(e){
+    keepAliveError=String(e?.message||e);
+    // Mislukken mag nooit de muziek raken; het betekent alleen dat de DJ straks
+    // zwijgt met het scherm uit, en dat hoort zichtbaar te zijn in de diagnostiek.
+    window.MAIRRuntime?.record?.('audio.keep-alive-failed',{reason,error:keepAliveError},'warn');
+    return false;
+  }
+}
+window.addEventListener('jfm:playback-state',e=>{
+  const live=!!e?.detail?.state?.expectedLive;
+  if(live)keepAliveStart('expected-live').catch(()=>{});
+  else keepAliveStop('expected-live-off');
+});
+// Aanname uit het ontwerp, eerst gemeten voordat er gedrag aan hangt: Capacitor
+// laadt de app via server.url van een externe host, en dan is het niet
+// vanzelfsprekend dat de brug is geinjecteerd. Faalt die aanname, dan is de
+// keep-alive niet stuk maar nooit actief - precies het soort stille mislukking
+// dat je pas na een rit ontdekt. Daarom staat de uitkomst in de tijdlijn.
+window.MAIRRuntime?.record?.('audio.native-shell-probe',{
+  hasCapacitor:(()=>{try{return !!window.Capacitor}catch{return false}})(),
+  isNativePlatform:nativeShell(),
+  platform:(()=>{try{return String(window.Capacitor?.getPlatform?.()||'web')}catch{return'web'}})(),
+  keepAliveEligible:nativeShell()
+},nativeShell()?'info':'warn');
 
 function cacheKey(text,jingle,profile=currentProfile()){return`${profile}|${jingle?'j':'s'}|${String(text||'').trim()}`}
 async function checkFishHealth(){try{const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);let r;try{r=await fetch(`/api/tts?djProfile=${encodeURIComponent(currentProfile())}`,{method:'GET',cache:'no-store',signal:c.signal})}finally{clearTimeout(timer)}const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.voice?.detail||d?.detail||d?.error||`HTTP ${r.status}`);lastVoiceId=d?.voiceId||d?.voice?.id||lastVoiceId;lastVoiceTitle=d?.voice?.title||lastVoiceTitle;lastModel=Array.isArray(d?.models)?d.models[0]||lastModel:lastModel;lastError='';lastProvider='fish';renderHealth();return d}catch(e){lastError=e?.name==='AbortError'?'Fish Audio-controle duurde te lang':String(e?.message||e);renderHealth();throw new Error(lastError)}}
@@ -40,8 +125,8 @@ async function playWithMediaElement(blob,label,meta={}){
   const url=URL.createObjectURL(blob);let playbackStartedAt=0,success=false,failure=null;
   try{
     await primeMedia().catch(()=>false);if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
-    mediaAudio.pause();mediaAudio.src=url;mediaAudio.currentTime=0;mediaAudio.volume=1;
-    await mediaAudio.play();playbackStartedAt=Date.now();lastPlaybackMode='html-audio';lastPlaybackAt=playbackStartedAt;
+    mediaAudio.pause();mediaAudio.src=url;mediaAudio.currentTime=0;mediaAudio.volume=voiceLevel();
+    await mediaAudio.play();if(meta.signal?.aborted){mediaAudio.pause();throw cancelledError(meta.signal.reason)}playbackStartedAt=Date.now();lastPlaybackMode='html-audio';lastPlaybackAt=playbackStartedAt;
     setInfo(`${label} is on air ✓`,'onair');notifyPlayback(meta,'onPlaybackStart',{playbackStartedAt,route:'html-audio',success:true});
     await new Promise((resolve,reject)=>{let done=false;const finish=e=>{if(done)return;done=true;mediaAudio.onended=null;mediaAudio.onerror=null;meta.signal?.removeEventListener?.('abort',cancel);clearTimeout(timer);if(activePlayback?.finish===finish)activePlayback=null;e?reject(e):resolve()},cancel=()=>{mediaAudio.pause();finish(cancelledError(meta.signal?.reason))},timer=setTimeout(()=>finish(new Error('Afspelen van Fish Audio duurde te lang')),45000);activePlayback={breakId:String(meta.breakId||''),finish,cancel};mediaAudio.onended=()=>finish();mediaAudio.onerror=()=>finish(new Error('De browser kon Fish Audio niet afspelen'));meta.signal?.addEventListener?.('abort',cancel,{once:true})});
     success=true;return true
@@ -53,7 +138,9 @@ async function playWithMediaElement(blob,label,meta={}){
 }
 async function playWithWebAudio(blob,label,meta={}){
   if(!djContext)throw new Error('Web Audio is niet beschikbaar');if(djContext.state==='suspended')await djContext.resume();if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
-  const arr=await blob.arrayBuffer(),buffer=await djContext.decodeAudioData(arr.slice(0)),source=djContext.createBufferSource();source.buffer=buffer;source.connect(djGain);
+  const arr=await blob.arrayBuffer(),buffer=await djContext.decodeAudioData(arr.slice(0)),source=djContext.createBufferSource();source.buffer=buffer;djGain.gain.value=voiceLevel();source.connect(djGain);
+  // Een skip tijdens het decoderen kwam nog niet bij een luisteraar aan: nu alsnog afbreken.
+  if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
   let playbackStartedAt=0,success=false,failure=null;
   try{
     await new Promise((resolve,reject)=>{let done=false;const finish=e=>{if(done)return;done=true;source.onended=null;meta.signal?.removeEventListener?.('abort',cancel);clearTimeout(timer);if(activePlayback?.finish===finish)activePlayback=null;e?reject(e):resolve()},cancel=()=>{try{source.stop()}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}finish(cancelledError(meta.signal?.reason))},timer=setTimeout(()=>{try{source.stop()}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}finish(new Error('Web Audio bleef hangen tijdens de DJ-break'))},Math.min(45000,Math.max(3000,Math.ceil((Number(buffer.duration)||0)*1000)+3000)));activePlayback={breakId:String(meta.breakId||''),finish,cancel};source.onended=()=>finish();meta.signal?.addEventListener?.('abort',cancel,{once:true});try{source.start(0);playbackStartedAt=Date.now();lastPlaybackMode='web-audio';lastPlaybackAt=playbackStartedAt;setInfo(`${label} is on air ✓`,'onair');notifyPlayback(meta,'onPlaybackStart',{playbackStartedAt,route:'web-audio',success:true})}catch(e){finish(e)}});
@@ -68,7 +155,7 @@ async function fishAudio(text,jingle=false,meta={}){try{text=jingle?localizeKnow
 window.prepareSpeech=async(text='',jingle=false,meta={})=>{await unlockAudio();if(!String(text||'').trim()||meta?.signal?.aborted)return false;try{await prepareFish(text,jingle,meta);if(meta?.signal?.aborted)return false;setInfo('Nederlandse MAIR DJ-break staat klaar ✓','prepared');return true}catch(e){lastError=String(e?.message||e);if(!meta?.signal?.aborted)setInfo(`Voorbereiden van Fish Audio mislukt: ${lastError}`,'error');return false}};
 window.speakText=async function(text,jingle=false,meta={}){await unlockAudio();if(!String(text||'').trim()||meta.signal?.aborted)return false;return fishAudio(text,jingle,meta)};
 function cancelPlayback(reason='user-cancel',breakId=''){let stopped=false;for(const[k,v]of speechCache)if(!breakId||String(v?.breakId||'')===String(breakId)){speechCache.delete(k);stopped=true}if(activePlayback&&(!breakId||activePlayback.breakId===String(breakId))){activePlayback.cancel?.(reason);stopped=true}return stopped}
-window.JFMDJAudio={context:djContext,unlock:unlockAudio,health:checkFishHealth,prepare:prepareFish,cancel:cancelPlayback,getErrors:()=>lastError?[lastError]:[],get status(){return{provider:lastProvider,model:lastModel,voiceId:lastVoiceId,voiceTitle:lastVoiceTitle,latencyMs:lastLatency,error:lastError,cacheSize:speechCache.size,audioUnlocked:webAudioUnlocked||mediaUnlocked,webAudioUnlocked,mediaUnlocked,playbackMode:lastPlaybackMode,lastPlaybackAt,activeBreakId:activePlayback?.breakId||'',build:JFM_BUILD,lastAudibleTestAt,djProfile:currentProfile()}},version:FISH_VERSION,get language(){return selectedLanguage},get host(){return currentHost()}};window.JFMBuild=JFM_BUILD;
+window.JFMDJAudio={context:djContext,unlock:unlockAudio,health:checkFishHealth,prepare:prepareFish,cancel:cancelPlayback,keepAliveStart,keepAliveStop,getErrors:()=>lastError?[lastError]:[],get status(){return{provider:lastProvider,model:lastModel,voiceId:lastVoiceId,voiceTitle:lastVoiceTitle,latencyMs:lastLatency,error:lastError,cacheSize:speechCache.size,audioUnlocked:webAudioUnlocked||mediaUnlocked,webAudioUnlocked,mediaUnlocked,playbackMode:lastPlaybackMode,lastPlaybackAt,activeBreakId:activePlayback?.breakId||'',build:JFM_BUILD,lastAudibleTestAt,djProfile:currentProfile(),nativeShell:nativeShell(),keepAlive:{running:!!keepAliveAudio,sinceMs:keepAliveSince?Date.now()-keepAliveSince:0,error:keepAliveError}}},version:FISH_VERSION,get language(){return selectedLanguage},get host(){return currentHost()}};window.JFMBuild=JFM_BUILD;
 
 function installHealthCard(){if(document.getElementById('jfmHealthCard'))return;const settingsPane=document.getElementById('tab-settings');if(!settingsPane)return;const voiceCard=voiceSelect?.closest('.card'),card=document.createElement('article');card.className='card';card.id='jfmHealthCard';card.innerHTML='<div class="kicker">STATION HEALTH</div><div class="row between"><h3 style="margin:0">MAIR status</h3><span id="jfmHealthBadge" class="accent">CONTROLEREN</span></div><div id="jfmHealthRows" class="muted" style="margin-top:10px;line-height:1.7"></div><button id="jfmHealthRefresh" class="secondary" type="button">Controleer Fish Audio</button>';if(voiceCard?.nextSibling)settingsPane.insertBefore(card,voiceCard.nextSibling);else settingsPane.appendChild(card);document.getElementById('jfmHealthRefresh')?.addEventListener('click',async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Controleren…';try{await checkFishHealth()}catch(e){window.MAIRRuntime?.caught?.('debug-tts.checkFishHealth',e)}finally{b.disabled=false;b.textContent='Controleer Fish Audio';renderHealth()}});renderHealth()}
 function renderHealth(){const rows=document.getElementById('jfmHealthRows'),badge=document.getElementById('jfmHealthBadge');if(!rows||!badge)return;const healthy=lastProvider==='fish'&&!lastError;badge.textContent=lastError?'FOUT':healthy?'KLAAR':'ONBEKEND';const safe=s=>String(s||'—').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));rows.innerHTML=`<div><b>Primaire stem:</b> Fish Audio</div><div><b>Stem:</b> ${safe(lastVoiceTitle||lastVoiceId||'MAIR DJ-stem')}</div><div><b>Model:</b> ${safe(lastModel||'adaptive')}</div><div><b>TTS-latency:</b> ${lastLatency?`${lastLatency} ms`:'—'}</div><div><b>Audio ontgrendeld:</b> ${webAudioUnlocked||mediaUnlocked?'ja':'nog niet'}</div><div><b>Afspeelroute:</b> ${safe(lastPlaybackMode||'nog niet gebruikt')}</div><div><b>Voorbereide breaks:</b> ${speechCache.size}</div><div><b>Hoorbare test:</b> ${lastAudibleTestAt?`geslaagd ${new Date(lastAudibleTestAt).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}`:'nog niet uitgevoerd'}</div><div><b>Build:</b> ${JFM_BUILD}</div>${lastError?`<div><b>Laatste fout:</b> ${safe(lastError)}</div>`:''}`}

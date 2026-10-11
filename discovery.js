@@ -4,7 +4,7 @@
 const slider=document.getElementById('discovery'),label=document.getElementById('discoveryValue');if(!slider||!label)return;
 const KEY='jfm_discovery',CACHE_KEY='jfm_discovery_station_cache_v1',CHANNEL_KEY='jfm_music_channel_v1',NOW=()=>new Date().getFullYear();
 const clamp=v=>Math.max(0,Math.min(100,Number(v)||0));
-const stored=Number(localStorage.getItem(KEY));slider.value=String(Number.isFinite(stored)?clamp(stored):50);
+const rawStored=localStorage.getItem(KEY),stored=rawStored===null?NaN:Number(rawStored);slider.value=String(Number.isFinite(stored)?clamp(stored):50);
 function levelName(v=slider.value){v=clamp(v);if(v<=15)return'Veilig';if(v<=35)return'Vertrouwd';if(v<=65)return'Gebalanceerd';if(v<=85)return'Avontuurlijk';return'Verrassing'}
 function paint(){const v=clamp(slider.value);label.textContent=`${v}% · ${levelName(v)}`;label.title='Geldt alleen voor MAIR Discovery: hoger betekent verder buiten je vertrouwde muzieksmaak.'}
 function stationId(){try{return window.JFMMusicChoice?.channel||localStorage.getItem(CHANNEL_KEY)||'mix'}catch{return localStorage.getItem(CHANNEL_KEY)||'mix'}}

@@ -35,7 +35,8 @@ async function testPrimarySingletonAndNaturalEnd(){
   const bus=new Events(),docBus=new Events(),elements={};for(const id of ['start','play','next','prev','queueInfo'])elements[id]=element(id,elements);
   const localStorage=storage({jfm_spotify_device_id:'device-1'}),sessionStorage=storage({jfm_playback_truth_v1:JSON.stringify({trackId:'B',uri:'spotify:track:BBBBBBBBBBBBBBBBBBBBBB',progressMs:42000,durationMs:240000,isPlaying:false,expectedLive:true,intent:'dj-handoff',operation:{id:9,type:'dj-handoff',expiresAt:Date.now()+50000},deviceId:'stale-page-device',updatedAt:Date.now()})}),metrics={intervals:0,watchdog:null,play:0,transfer:0,pauseSdk:0,resumeSdk:0,previous:0,previousSdk:0},remote={item:{id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'},device:{id:'device-1'},is_playing:false,progress_ms:0};let remoteVisible=true,sdkPlaying=false,allowResume=true;
   const player={getCurrentState:async()=>({paused:!sdkPlaying,position:remote.progress_ms,track_window:{current_track:{id:remote.item.id,uri:remote.item.uri,duration_ms:remote.item.duration_ms||240000}}}),activateElement(){},async pause(){metrics.pauseSdk++;sdkPlaying=false},async resume(){metrics.resumeSdk++;if(allowResume)sdkPlaying=true},async seek(position){remote.progress_ms=position},async previousTrack(){metrics.previousSdk++;remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'};remote.progress_ms=0}};
-  const api=async(path,opt={})=>{if(path==='/me/player'&&opt.method==='PUT'){metrics.transfer++;remote.device={id:opt.body.device_ids[0]};remote.is_playing=!!opt.body.play;return null}if(path==='/me/player')return remoteVisible?structuredClone(remote):null;if(path.startsWith('/me/player/play?')){metrics.play++;const uri=opt.body?.uris?.[0]||'spotify:track:BBBBBBBBBBBBBBBBBBBBBB';remote.item={id:uri.split(':').pop()==='BBBBBBBBBBBBBBBBBBBBBB'?'B':uri.split(':').pop(),uri};remote.is_playing=true;remote.progress_ms=Number(opt.body?.position_ms||0);remote.device={id:'device-1'};return null}if(path.startsWith('/me/player/previous?')){metrics.previous++;if(remote.progress_ms>3000)remote.progress_ms=0;else{remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'};remote.progress_ms=0}return null}throw Error(`Unexpected API ${path} ${opt.method||'GET'}`)};
+  let staleRondes=0,staleItem=null;
+  const api=async(path,opt={})=>{if(path==='/me/player'&&opt.method==='PUT'){metrics.transfer++;remote.device={id:opt.body.device_ids[0]};remote.is_playing=!!opt.body.play;return null}if(path==='/me/player'){if(!remoteVisible)return null;if(staleRondes>0){staleRondes--;return structuredClone({...remote,item:staleItem||remote.item})}return structuredClone(remote)}if(path.startsWith('/me/player/shuffle')){metrics.shuffleCalls=(metrics.shuffleCalls||0)+1;metrics.shuffleUit=/state=false/.test(path);return null}if(path.startsWith('/me/player/play?')){metrics.play++;if(opt.body?.uris)metrics.shuffleVoorLijst=(metrics.shuffleCalls||0)>0&&metrics.shuffleUit===true;const uri=opt.body?.uris?.[0]||'spotify:track:BBBBBBBBBBBBBBBBBBBBBB';remote.item={id:uri.split(':').pop()==='BBBBBBBBBBBBBBBBBBBBBB'?'B':uri.split(':').pop(),uri};remote.is_playing=true;remote.progress_ms=Number(opt.body?.position_ms||0);remote.device={id:'device-1'};return null}if(path.startsWith('/me/player/previous?')){metrics.previous++;if(remote.progress_ms>3000)remote.progress_ms=0;else{remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'};remote.progress_ms=0}return null}throw Error(`Unexpected API ${path} ${opt.method||'GET'}`)};
   const context={window:null,document:{visibilityState:'visible',body:{getAttribute:()=>null},getElementById:id=>elements[id]||null,addEventListener:(...args)=>docBus.addEventListener(...args)},localStorage,sessionStorage,CustomEvent:FakeCustomEvent,api,queue:[{id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA'},{id:'B',uri:'spotify:track:BBBBBBBBBBBBBBBBBBBBBB'}],playback:null,renderPlayback(){},setTimeout:fn=>{queueMicrotask(fn);return 1},setInterval:fn=>{metrics.intervals++;metrics.watchdog=fn;return 1},Promise,Date,Math,console};
   Object.assign(context,{addEventListener:(...args)=>bus.addEventListener(...args),dispatchEvent:(...args)=>bus.dispatchEvent(...args),jfmSpotifyPlayer:player,JFMSpotifySDK:{deviceId:'device-1',ensureDevice:async()=> 'device-1'},JFMPlaybackState:{get:()=>({expectedLive:true,isPlaying:true,trackId:remote.item?.id||'',uri:remote.item?.uri||'',progressMs:remote.progress_ms||0,durationMs:remote.item?.duration_ms||0}),shouldRecover:()=>false,ingest(){},setExpectedLive(){},error(){}}});context.window=context;
   vm.createContext(context);const source=read('playback-primary.js');vm.runInContext(source,context,{filename:'playback-primary.js'});vm.runInContext(source,context,{filename:'playback-primary-duplicate.js'});
@@ -48,6 +49,62 @@ async function testPrimarySingletonAndNaturalEnd(){
   remote.item={id:'C',uri:'spotify:track:CCCCCCCCCCCCCCCCCCCCCC'};remote.progress_ms=0;remote.is_playing=false;remote.device={id:'stale-page-device'};sdkPlaying=false;allowResume=false;const playsBeforeRecover=metrics.play,transfersBeforeRecover=metrics.transfer,handoversBeforeRecover=context.JFMPlayback.health.deviceHandovers,failuresBeforeRecover=context.JFMPlayback.health.failures;assert.equal(await context.JFMPlayback.recover('reload-test'),false);assert.equal(metrics.transfer,transfersBeforeRecover+1,'reload recovery must hand playback to the current browser SDK device');assert.equal(metrics.play,playsBeforeRecover+1,'a stale paused SDK context must be replaced by the persisted live track');assert.equal(context.JFMPlayback.health.reloadNeedsGesture,true,'blocked autoplay must request one explicit play gesture');assert.equal(context.JFMPlayback.health.failures,failuresBeforeRecover,'browser autoplay policy must not count as a playback failure');allowResume=true;assert.equal(await context.JFMPlayback.playPause(),true,'the explicit play gesture must finish the exact restore');assert.equal(metrics.play,playsBeforeRecover+2,'the gesture restore must retry the exact URI');assert.equal(remote.item.id,'B','reload recovery must restore the intended track');assert.ok(remote.progress_ms>=42000,'reload recovery must preserve or advance playback position');assert.equal(remote.is_playing,true,'an active radio must remain playing through exact reload restore');assert.equal(context.JFMPlayback.health.deviceHandovers,handoversBeforeRecover+1,'device handovers must be visible in diagnostics');assert.equal(context.JFMPlayback.health.reloadRestores,1,'exact reload restores must be visible in diagnostics');assert.equal(context.JFMPlayback.health.reloadNeedsGesture,false,'successful gesture restore must clear the autoplay prompt');
   const playsBeforeEndedRecovery=metrics.play;remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};remote.progress_ms=239000;remote.is_playing=false;remote.device={id:'device-1'};sdkPlaying=false;assert.equal(await context.JFMPlayback.recover('foreground-return'),true,'foreground recovery must recognize a track that ended while browser events were suspended');assert.equal(metrics.play,playsBeforeEndedRecovery+1,'ended foreground recovery must advance exactly once');assert.equal(remote.item.id,'B');
   const playsBeforeWatchdog=metrics.play;remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};remote.progress_ms=239000;remote.is_playing=false;sdkPlaying=false;await metrics.watchdog();assert.equal(metrics.play,playsBeforeWatchdog+1,'SDK watchdog must recover one missed ended event without a duplicate skip');assert.equal(remote.item.id,'B');
+
+  // Een vastgelopen speler: paused blijft false, de SDK-klok loopt door voorbij de duur
+  // en Spotify meldt gewoon is_playing true. Gemeten op 23-09-2026 stond de muziek zo ruim
+  // twee minuten stil zonder dat iets het opmerkte, want de watchdog eiste paused.
+  const playsBeforeStall=metrics.play;
+  remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};
+  remote.progress_ms=325665;remote.is_playing=true;sdkPlaying=true;
+  await metrics.watchdog();
+  assert.equal(metrics.play,playsBeforeStall+1,'een speler die voorbij de duur doorloopt moet als afgelopen gelden, ook zonder paused');
+  assert.equal(remote.item.id,'B');
+
+  // Speelt er iets dat niet in de radioset staat, dan gaf stationContext een lijst van
+  // precies een track terug. Spotify speelt die af en kiest daarna zelf verder, en omdat
+  // de volgende track dan ook niet in de set staat komt MAIR er nooit meer op terug.
+  {
+    const vreemd='spotify:track:ZZZZZZZZZZZZZZZZZZZZZZ';
+    const ctx=context.JFMPlayback.stationContext(vreemd);
+    assert.equal(ctx[0],vreemd,'wat nu speelt hoort vooraan te staan');
+    assert.ok(ctx.length>1,'de radioset hoort erachter te blijven staan, anders kiest Spotify vanaf daar zelf');
+    assert.ok(ctx.includes('spotify:track:AAAAAAAAAAAAAAAAAAAAAA'),'de eigen set hoort erin te zitten');
+    assert.equal(context.JFMPlayback.stationContext('').length,0,'zonder track geen context');
+  }
+
+  // Spotify is zelf doorgegaan, maar de Web API meldt de eerste keren nog de track die
+  // net afgelopen is. MAIR concludeerde dan "Spotify ging niet door" en zette er een
+  // eigen track overheen, precies een seconde na de natuurlijke wissel. Daardoor bleef de
+  // zender in een handvol nummers rondcirkelen terwijl er eenenveertig in de wachtrij
+  // stonden. Een verouderde lezing is geen stilstand.
+  {
+    remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};
+    remote.progress_ms=239000;remote.is_playing=true;remote.device={id:'device-1'};sdkPlaying=true;
+    const playsVoor=metrics.play;
+    // Spotify staat al op B, maar de eerste twee lezingen melden nog A.
+    staleItem={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};
+    staleRondes=2;
+    remote.item={id:'B',uri:'spotify:track:BBBBBBBBBBBBBBBBBBBBBB',duration_ms:240000};
+    remote.progress_ms=1000;
+    await context.JFMPlayback.handleNaturalEnd({trackId:'A'});
+    assert.equal(metrics.play,playsVoor,'een verouderde lezing mag geen eigen track over de natuurlijke wissel heen zetten');
+    assert.equal(remote.item.id,'B','de track waar Spotify zelf naartoe ging blijft staan');
+    staleItem=null;staleRondes=0;
+  }
+
+  // Spotify's eigen shuffle gooit de programmering van mair-radio-sequencer.js weg:
+  // gemeten speelde een zender met 41 tracks en een herhaalvenster van 24 er vier, steeds
+  // opnieuw. Voor elke lijst die MAIR aan Spotify geeft hoort shuffle dus uit te gaan.
+  assert.equal(metrics.shuffleVoorLijst,true,'voor een radioset moet Spotify-shuffle expliciet uit');
+  assert.equal(metrics.shuffleUit,true,'de shuffle-aanroep moet state=false zijn');
+
+  // En de play-knop mag zo'n speler nooit als spelend zien, anders pauzeert hij iets
+  // wat al stil staat in plaats van opnieuw te starten.
+  remote.item={id:'A',uri:'spotify:track:AAAAAAAAAAAAAAAAAAAAAA',duration_ms:240000};
+  remote.progress_ms=240000;remote.is_playing=true;sdkPlaying=true;
+  const pausesBeforeStallToggle=metrics.pauseSdk;
+  await context.JFMPlayback.playPause();
+  assert.equal(metrics.pauseSdk,pausesBeforeStallToggle,'de play-knop mag een vastgelopen speler niet pauzeren');
 }
 
 async function testSdkSingleton(){
@@ -93,12 +150,17 @@ function sdkHarness(){
   const elements={queueInfo:{textContent:'',style:{}},status:{classList:{toggle(){}},textContent:''}};
   const context={window:null,document:{getElementById:id=>elements[id]||null,head:{appendChild(){}},createElement:()=>({})},localStorage,sessionStorage,location:{search:'',pathname:'/'},history:{replaceState(){}},URLSearchParams,CustomEvent:FakeCustomEvent,spotifyClientId:'client',ensure:async()=>'token',timedFetch:async()=>response(200,{}),api:async()=>({devices:[{id:'device-1',is_restricted:false}]}),setConnected(){},renderPlayback(){},playback:null,token:'token',refreshToken:'refresh',saveToken(){},setTimeout:(fn,ms)=>ms<250?setTimeout(fn,ms):1,clearTimeout(){},setInterval:()=>1,clearInterval(){},Promise,Date,console,Spotify:{Player}};
   Object.assign(context,{addEventListener:(...args)=>bus.addEventListener(...args),dispatchEvent:(...args)=>bus.dispatchEvent(...args),JFMPlaybackState:{patch(){},ingest(){}}});
+  // Een stuurbare klok, want de projectie van de eindpositie rekent met wandkloktijd.
+  // new Date(x) blijft gewoon werken; alleen Date.now() volgt deze klok.
+  const RealDate=Date;let klok=RealDate.now();
+  context.Date=class extends RealDate{static now(){return klok}};
+  const tik=ms=>{klok+=ms};
   context.window=context;vm.createContext(context);vm.runInContext(read('stability-core.js'),context,{filename:'stability-core.js'});
-  return{context,ends,listeners};
+  return{context,ends,listeners,tik};
 }
 
 async function testSdkContextResetEndDetection(){
-  const{context,ends,listeners}=sdkHarness();
+  const{context,ends,listeners,tik}=sdkHarness();
   await context.JFMSpotifySDK.init();
   const onState=listeners.get('player_state_changed'),onNotReady=listeners.get('not_ready');
   assert.equal(typeof onState,'function','the SDK must expose a player_state_changed listener');
@@ -132,6 +194,24 @@ async function testSdkContextResetEndDetection(){
   ends.length=0;onState(state('E',239500,false));onState(state('E',239500,true));
   assert.equal(ends.length,1,'a track paused at its duration must still signal a natural end');
   assert.equal(ends[0].source,'sdk-paused-end');
+
+  // (d) De Web Playback SDK stuurt geen positie-updates. Gemeten op 23-09-2026 kwam de
+  // laatste melding voor een trackwissel dertien seconden voor het eind binnen. De oude
+  // test - laatst gemeten positie binnen 2,5 s van de duur - kon daardoor vrijwel nooit
+  // slagen, en zonder dat signaal telde de DJ nooit af en kwam hij nooit op de lucht.
+  ends.length=0;onState(state('F',DURATION-13000,false));tik(13000);onState(state('G',0,false));
+  assert.equal(ends.length,1,'a track advance after a reporting gap must still signal a natural end');
+  assert.equal(ends[0].trackId,'F');
+  assert.equal(ends[0].source,'sdk-track-advance');
+  assert.equal(ends[0].positionMs,DURATION,'de doorgerekende positie wordt op de duur afgekapt, zodat transition-controller het bewijs accepteert');
+
+  // (e) Midden in een nummer wegklikken blijft een gebruikersactie, geen einde.
+  ends.length=0;onState(state('H',60000,false));tik(1200);onState(state('I',0,false));
+  assert.equal(ends.length,0,'een wissel ver van het eind mag nooit als natuurlijk einde gelden');
+
+  // (f) Een gepauzeerde track schuift niet op, hoe lang hij ook stilstaat.
+  ends.length=0;onState(state('J',DURATION-13000,true));tik(600000);onState(state('K',0,false));
+  assert.equal(ends.length,0,'een gepauzeerde track mag niet doorgerekend worden naar zijn eind');
 }
 
 function primaryHarness({tracks=['A','B'],nextWorks=true,sdkVolume=false,storedVolume=null}={}){

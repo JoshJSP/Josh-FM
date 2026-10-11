@@ -1,6 +1,6 @@
 (()=>{
  if(window.__mairVoiceEngineInstalling||window.MAIRVoiceEngine?.version)return;window.__mairVoiceEngineInstalling=true;
- const providers=new Map(),cache=new Map(),CACHE_TTL=5*60*1000,MAX_CACHE=8;let installed=false,speaking=false,activeBreakId='',last={provider:'',error:'',prepared:0,played:0,overlapDrops:0,cancelled:0};
+ const providers=new Map(),cache=new Map(),CACHE_TTL=12*60*1000,MAX_CACHE=8;let installed=false,speaking=false,activeBreakId='',last={provider:'',error:'',prepared:0,played:0,overlapDrops:0,cancelled:0};
  const key=(voice,text,jingle)=>`${voice||'default'}|${jingle?'j':'s'}|${String(text||'').trim()}`;
  function currentProfile(){return window.MAIRDJProfiles?.current||window.MAIRCurrentDJ||{id:'josh',name:'Josh'}}
  function speechText(text){let x=String(text||'').trim().replace(/Josh\s*FM/gi,'MAIR').replace(/JoshFM/gi,'MAIR').replace(/MAIR\s*FM/gi,'MAIR');let custom={};try{custom=JSON.parse(localStorage.getItem('mair_pronunciation_v1')||'{}')||{}}catch{/* opslag geblokkeerd: dan zonder opslag */}const dict={Troche:'Trosh',...custom};for(const[k,v]of Object.entries(dict)){if(!k||!v)continue;const safe=k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');x=x.replace(new RegExp(`\\b${safe}\\b`,'gi'),String(v))}return x}

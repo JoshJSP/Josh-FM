@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import {withAI,primeAIGuard} from './_ai-guard-test.mjs';
 import writer from '../api/dj-writer.js';
 
 const originalFetch=globalThis.fetch,originalKey=process.env.GROQ_API_KEY,originalModel=process.env.GROQ_DJ_MODEL;
 function response(){return{statusCode:0,body:null,headers:{},status(code){this.statusCode=code;return this},setHeader(k,v){this.headers[k]=v},json(v){this.body=v;return this}}}
-async function call(body,ip){const res=response();await writer({method:'POST',headers:{'x-forwarded-for':ip},body},res);return res}
+async function call(body,ip){const res=response();await writer(withAI({method:'POST',headers:{'x-forwarded-for':ip},body}),res);return res}
+await primeAIGuard();
 try{
   process.env.GROQ_API_KEY='test-key';delete process.env.GROQ_DJ_MODEL;delete process.env.ANTHROPIC_API_KEY;
   const bodies=[];

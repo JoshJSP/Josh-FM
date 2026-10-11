@@ -5,3 +5,4 @@ node_modules
 .DS_Store
 .aider*
 taken/
+.predeploy-run.log

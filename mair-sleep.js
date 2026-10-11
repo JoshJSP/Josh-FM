@@ -2,9 +2,9 @@
 (()=>{
 'use strict';
 if(window.MAIRSleep)return;
-const KEY='jfm_sleep_timer_v1',$=id=>document.getElementById(id);
-let state=read(),tickTimer=0,stopBusy=false,lastError='',lastStoppedAt=0,open=false;
-function read(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(!x||typeof x!=='object')return null;if(x.mode==='time'&&Number(x.at||0)>Date.now())return x;if(x.mode==='after-track'&&x.trackId)return x}catch{/* opslag geblokkeerd: dan zonder opslag */}return null}
+const KEY='jfm_sleep_timer_v1',GRACE_MS=10*60*1000,RETRY_MS=10000,$=id=>document.getElementById(id);
+let state=read(),tickTimer=0,lastStopTry=0,stopBusy=false,lastError='',lastStoppedAt=0,open=false;
+function read(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(!x||typeof x!=='object')return null;/* Een timer die net is verlopen terwijl de pagina bevroren was (iOS, bfcache) moet alsnog stoppen: de tick voert hem uit. Veel later verlopen = oude restant, niet meer pauzeren. */if(x.mode==='time'&&Number(x.at||0)>Date.now()-GRACE_MS)return x;if(x.mode==='after-track'&&x.trackId)return x}catch{/* opslag geblokkeerd: dan zonder opslag */}return null}
 function save(v){state=v;try{localStorage.setItem(KEY,JSON.stringify(v))}catch{/* opslag geblokkeerd: dan zonder opslag */}emit();render()}
 function clear(){state=null;try{localStorage.setItem(KEY,'null')}catch{/* opslag geblokkeerd: dan zonder opslag */}emit();render()}
 function playback(){return window.JFMPlaybackState?.get?.()||null}
@@ -29,7 +29,7 @@ async function stopRadio(reason='sleep-timer'){
 function scheduleMinutes(minutes){const n=Math.max(1,Math.min(240,Number(minutes)||0));lastError='';save({mode:'time',at:Date.now()+n*60000,minutes:n,createdAt:Date.now()});ensureTick();return status()}
 function scheduleAfterTrack(){const t=track();if(!t.trackId){lastError='Start eerst een nummer voordat je “na dit nummer” gebruikt.';emit();render();return false}lastError='';save({mode:'after-track',trackId:t.trackId,createdAt:Date.now(),title:t.title,artist:t.artist});ensureTick();return true}
 function cancel(){clear();lastError='';return true}
-function ensureTick(){if(tickTimer)return;tickTimer=setInterval(()=>{if(state?.mode==='time'&&Number(state.at||0)<=Date.now())stopRadio('timer').catch(()=>{});if(open)render()},500)}
+function ensureTick(){if(tickTimer)return;tickTimer=setInterval(()=>{const due=state?.mode==='time'?Number(state.at||0):0;if(due&&due<Date.now()-GRACE_MS)clear();else if(due&&due<=Date.now()&&Date.now()-lastStopTry>=RETRY_MS){lastStopTry=Date.now();stopRadio('timer').catch(()=>{})}if(open)render()},500)}
 function nowClock(){return new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
 async function activateSleepStation(){lastError='';const select=window.MAIRStationController?.select||window.JFMMusicChoice?.chooseChannel;if(typeof select!=='function'){lastError='MAIR SLEEP is nog niet klaar. Open het muziekkanaal opnieuw.';render();return false}try{const ok=await select.call(window.MAIRStationController||window.JFMMusicChoice,'sleep');if(ok===false)throw Error('MAIR SLEEP kon niet worden gestart');render();return true}catch(e){lastError=String(e?.message||e);render();return false}}
 function ensureStyle(){if($('mairSleepStyle'))return;const s=document.createElement('style');s.id='mairSleepStyle';s.textContent=`

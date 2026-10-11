@@ -1,4 +1,5 @@
 import { getCache } from '@vercel/functions';
+import { randomInt } from 'node:crypto';
 
 export const config = { regions: ['fra1'] };
 const TTL = 6 * 60 * 60;
@@ -9,7 +10,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const key = code => `mair-passenger:${String(code||'').toUpperCase()}`;
 const json = (res,status,body)=>{res.status(status).setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(body))};
 const clean = (v,n=120)=>String(v||'').trim().replace(/[\u0000-\u001f]/g,' ').slice(0,n);
-function code(){let out='';for(let i=0;i<6;i++)out+=CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)];return out}
+function code(){let out='';for(let i=0;i<6;i++)out+=CODE_CHARS[randomInt(CODE_CHARS.length)];return out}
 function secret(){return `${Date.now().toString(36)}-${crypto.randomUUID()}`}
 async function read(cache,c){return await cache.get(key(c))||null}
 async function write(cache,s){s.updatedAt=Date.now();await cache.set(key(s.code),s,{ttl:TTL,tags:['mair-passenger',`mair-passenger-${s.code}`]});return s}

@@ -6,6 +6,7 @@
 // endpoint dat 500 geeft, blijft hangen of een uitzondering laat ontsnappen
 // kan de clientlaag meesleuren; dat is precies wat hier wordt uitgesloten.
 import assert from 'node:assert/strict';
+import {withAI,primeAIGuard} from './_ai-guard-test.mjs';
 import djWriter from '../api/dj-writer.js';
 import newsBulletin from '../api/news-bulletin.js';
 import discover from '../api/discover.js';
@@ -25,7 +26,8 @@ function response() {
     end(value) { this.body = value; this.ended = true; return this },
   };
 }
-async function call(handler, req) { const res = response(); await handler(req, res); return res }
+async function call(handler, req) { const res = response(); await handler(withAI(req), res); return res }
+await primeAIGuard();
 
 function djBody(id) {
   return {

@@ -28,7 +28,11 @@ Vereist voor de volledige ervaring:
 
 Optioneel:
 
-- `ANTHROPIC_TEXT_MODEL`: expliciet Claude-model. Zonder override gebruikt MAIR `claude-opus-5`. Kies een model dat `output_config.effort` ondersteunt (Claude 4.6 en nieuwer); oudere modellen geven een 400 en vallen dus altijd door naar Groq.
+- `ANTHROPIC_TEXT_MODEL`: expliciet Claude-model. Zonder override gebruikt MAIR `claude-opus-5-5`. Kies een model dat `output_config.effort` ondersteunt (Claude 4.6 en nieuwer); oudere modellen geven een 400 en vallen dus altijd door naar Groq.
+- `MAIR_ALLOWED_SPOTIFY_USERS`: komma-gescheiden Spotify-gebruikers-id's die de AI-routes mogen gebruiken. Zonder lijst mag elke geldige Spotify-sessie erdoor. **Zet dit voordat er een `ANTHROPIC_API_KEY` in gaat**, anders kan iedere Spotify-gebruiker met curl op jouw kosten tekst laten schrijven.
+- `MAIR_ALLOWED_ORIGINS`: extra origins naast het eigen domein (komma-gescheiden, exact). Normaal niet nodig: de app en de Capacitor-shell draaien allebei op het eigen domein.
+
+De vier AI-routes (`/api/dj-writer`, `/api/discover`, `/api/category-filter`, `/api/news-bulletin`) eisen een eigen `Origin` en een Spotify-token (`api/_guard.js`; de client zet dat via `mair-ai-auth.js`). Daarboven staat in de Vercel Firewall de regel *AI-routes rate limit*: 30 verzoeken per minuut per IP, over alle instances heen.
 - `GROQ_DJ_MODEL`: expliciet ondersteund Groq-model. Zonder override probeert MAIR `openai/gpt-oss-120b` en daarna `openai/gpt-oss-20b`.
 - `FISH_AUDIO_MODEL`: expliciet Fish-model. Zonder override probeert MAIR `s2.1-pro-free` en daarna `s2-pro`.
 - `FISH_AUDIO_VOICE_JOSH`, `FISH_AUDIO_VOICE_MAYA`, `FISH_AUDIO_VOICE_MAX`, `FISH_AUDIO_VOICE_NOAH`: per-DJ voice override.

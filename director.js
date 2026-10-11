@@ -1,7 +1,9 @@
 // Josh FM Program Director — adaptive programming with Spotify-authoritative upcoming queue
 (()=>{
 const $=id=>document.getElementById(id),memoryKey='jfm_director_memory';
-const memory=()=>{try{return JSON.parse(localStorage.getItem(memoryKey)||'{"plays":{},"likes":{},"requests":{},"discoveryWins":{},"discoveryLosses":{}}')}catch{return{plays:{},likes:{},requests:{},discoveryWins:{},discoveryLosses:{}}}};
+// Ontbrekende velden (bv. na wissen of een gedeeltelijke import) aanvullen: m.plays[id] mag nooit een TypeError geven.
+const EMPTY_MEMORY=()=>({plays:{},likes:{},requests:{},discoveryWins:{},discoveryLosses:{}});
+const memory=()=>{try{const x=JSON.parse(localStorage.getItem(memoryKey)||'null');return x&&typeof x==='object'&&!Array.isArray(x)?{...EMPTY_MEMORY(),...x}:EMPTY_MEMORY()}catch{return EMPTY_MEMORY()}};
 const save=m=>localStorage.setItem(memoryKey,JSON.stringify(m));
 const artistKey=t=>(t?.artists?.[0]||'').toLowerCase().trim(),yr=t=>Number(String(t?.release||'').slice(0,4))||0;
 const isRequest=t=>{if(!t)return false;try{if(window.JFMRequests?.isRequest?.(t))return true}catch{/* optionele rotatiemodule */}const m=memory();return!!(m.requests[t.id]||m.requests[t.uri])};
@@ -36,7 +38,9 @@ function hideLegacyRadioMode(){const modeTitle=[...document.querySelectorAll('#t
 // aanmaakt, en renderNext() doet er zonder JFMSpotifyUpcomingTruth ook nog een
 // Spotify-aanroep bij. Elke 3 seconden, ook met de app in de achtergrond (audit M-12).
 function paintWhenVisible(){if(document.hidden)return;hideLegacyRadioMode();renderNext()}
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)paintWhenVisible()});
+// Fase 3 (paint) van het wake-protocol in mair-background-guard.js. Deze regel
+// tekende vroeger op 0 ms na terugkomst, met de gegevens van voor het scherm uitging.
+window.addEventListener('mair:wake',e=>{if(e?.detail?.phase==='paint')paintWhenVisible()});
 let seen='';setInterval(()=>{const item=playback?.item,id=item?.id;if(id&&id!==seen){seen=id;const m=memory();m.plays[id]=(m.plays[id]||0)+1;m.lastPlayed=m.lastPlayed||{};m.lastPlayed[id]=Date.now();if(item?.uri&&m.requests[item.uri])m.requests[id]=Math.max(m.requests[id]||0,m.requests[item.uri]);save(m);invalidateUpcoming('trackchange')}paintWhenVisible()},3000);
 window.addEventListener('jfm:trackchange',()=>{invalidateUpcoming('trackchange-event');paintNext();if(!window.JFMSpotifyUpcomingTruth)syncSpotifyUpcoming(true).catch(()=>{})});
 window.addEventListener('jfm:requests-change',()=>{const sig=requestSig();if(sig!==lastRequestSig){lastRequestSig=sig;invalidateUpcoming('request-change');if(!window.JFMSpotifyUpcomingTruth)syncSpotifyUpcoming(true).catch(()=>{})}});

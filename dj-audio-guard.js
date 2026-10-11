@@ -16,17 +16,19 @@
     nextRetryAt=Date.now()+delay;trace('failure',{stage,failures,retryInMs:delay,error:lastError});
     try{window.dispatchEvent(new CustomEvent('jfm:dj-audio-health',{detail:{ok:false,stage,error:lastError,retryInMs:delay}}))}catch{/* event-listener gooide: onschuldig */}
   }
-  async function guarded(fn,stage,{respectBackoff=true}={}){
+  /* Een door de gebruiker afgebroken break (skip) is geen Fish-storing: dan geen backoff van 30 s tot 5 min. */
+  const aborted=args=>args.some(a=>a&&typeof a==='object'&&a.signal?.aborted===true);
+  async function guarded(fn,stage,{respectBackoff=true}={},args=[]){
     if(respectBackoff&&!available()){trace('backoff-skip',{stage,retryInMs:retryIn()});return false}
     lastAttemptAt=Date.now();
-    try{const ok=await fn();if(ok===false){failure('Fish Audio returned no playable speech',stage);return false}success(stage);return ok}catch(e){failure(e,stage);return false}
+    try{const ok=await fn();if(ok===false){if(aborted(args))return false;failure('Fish Audio returned no playable speech',stage);return false}success(stage);return ok}catch(e){if(!aborted(args))failure(e,stage);return false}
   }
   const oldPrepare=window.prepareSpeech;
-  if(typeof oldPrepare==='function')window.prepareSpeech=async(...args)=>guarded(()=>oldPrepare(...args),'prepare',{respectBackoff:true});
+  if(typeof oldPrepare==='function')window.prepareSpeech=async(...args)=>guarded(()=>oldPrepare(...args),'prepare',{respectBackoff:true},args);
   const oldSpeak=window.speakText;
   // Speaking may consume audio that was already prepared before a later jingle/health failure,
   // so allow one playback attempt even while new Fish generation is in backoff.
-  if(typeof oldSpeak==='function')window.speakText=async(...args)=>guarded(()=>oldSpeak(...args),'speak',{respectBackoff:false});
+  if(typeof oldSpeak==='function')window.speakText=async(...args)=>guarded(()=>oldSpeak(...args),'speak',{respectBackoff:false},args);
   async function health(){
     if(!available())return{ok:false,backoff:true,retryInMs:retryIn(),error:lastError};
     try{lastAttemptAt=Date.now();const out=await window.JFMDJAudio?.health?.();success('health');return{ok:true,data:out}}catch(e){failure(e,'health');return{ok:false,error:lastError,retryInMs:retryIn()}}

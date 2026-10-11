@@ -1,0 +1,20 @@
+// Gedragstest voor mair-shortcuts.js met een nep-document (geen browser nodig).
+import fs from 'node:fs';import vm from 'node:vm';
+let fail=0;const ok=(n,c)=>{console.log((c?'PASS ':'FAIL ')+n);if(!c)fail++};
+const clicks=[];let handler;
+const btn=id=>({id,disabled:false,offsetParent:{},click(){clicks.push(id)}});
+const btns={play:btn('play'),next:btn('next'),prev:btn('prev')};
+const document={addEventListener:(t,f)=>{if(t==='keydown')handler=f},getElementById:id=>btns[id]||null};
+const window={};vm.runInNewContext(fs.readFileSync(new URL('../mair-shortcuts.js',import.meta.url),'utf8'),{window,document});
+const key=(k,o={})=>{let prevented=false;handler({key:k,target:{tagName:'BODY',closest:()=>null},preventDefault(){prevented=true},...o});return prevented};
+ok('module registered',!!window.MAIRShortcuts);
+ok('space plays',key(' ')&&clicks.pop()==='play');
+ok('arrow right = next',key('ArrowRight')&&clicks.pop()==='next');
+ok('arrow left = prev',key('ArrowLeft')&&clicks.pop()==='prev');
+clicks.length=0;
+key(' ',{target:{tagName:'INPUT',closest:()=>null}});ok('typing in input ignored',!clicks.length);
+key(' ',{target:{tagName:'DIV',closest:s=>s.startsWith('button')?{}:null}});ok('space on focused button left alone',!clicks.length);
+key('ArrowRight',{ctrlKey:true});ok('modifier ignored',!clicks.length);
+key(' ',{repeat:true});ok('key repeat ignored',!clicks.length);
+btns.play.offsetParent=null;key(' ');ok('hidden play button (other tab) ignored',!clicks.length);
+console.log(`MAIR shortcuts: ${fail?'FAIL':'PASS'}`);process.exit(fail?1:0);

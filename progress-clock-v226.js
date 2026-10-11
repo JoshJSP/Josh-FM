@@ -26,6 +26,9 @@
   }
   const timer=setInterval(tick,250);
   window.addEventListener('pageshow',()=>{anchor=performance.now();syncFromPlayback();tick()});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){anchor=performance.now();syncFromPlayback();tick()}});
+  // Fase 3 (paint) van het wake-protocol: pas tekenen als playback-primary de
+  // waarheid bij Spotify heeft opgehaald. Anders anchorde deze klok op verouderde
+  // gegevens en sprong de balk een tel later alsnog.
+  window.addEventListener('mair:wake',e=>{if(e?.detail?.phase!=='paint')return;anchor=performance.now();syncFromPlayback();tick()});
   window.JFMProgressClock={version:'v226-local-progress',sync:syncFromPlayback,tick,stop:()=>clearInterval(timer)};
 })();

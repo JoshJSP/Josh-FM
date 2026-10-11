@@ -31,7 +31,8 @@
     set('jfmNNLNow',t,'jfmNNLNowWhy');set('jfmNNLNext',n,'jfmNNLNextWhy');set('jfmNNLLater',l,'jfmNNLLaterWhy');
   }
   ['jfm:playback-state','jfm:trackchange','jfm:requests-change','jfm:clock-tick','jfm:show-change','jfm:runtime-mode'].forEach(name=>window.addEventListener(name,render));
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)render()});
+  // Fase 3 (paint) van het wake-protocol in mair-background-guard.js.
+  window.addEventListener('mair:wake',e=>{if(e?.detail?.phase==='paint')render()});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ensure);else ensure();
   setInterval(()=>{const ms=window.JFMRuntimeModes?.batteryBudget?.().uiIntervalMs||2500;if(Date.now()-(window.__jfmLiveUiAt||0)<ms)return;window.__jfmLiveUiAt=Date.now();render()},2500);
   window.JFMLiveUI={version:'mair-live-ui-v3-no-duplicate-meta',render};

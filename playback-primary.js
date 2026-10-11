@@ -75,11 +75,14 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     if(!player()?.setVolume&&!deviceId())return false;
     const ok=await rampVolume(clampVolume(volume*DUCK_RATIO));
     if(ok)ducked=true;
+    else{try{await pushVolume(volume)}catch{/* terugzetten mislukt: de watchdog en de volgende unduck proberen opnieuw */}}// halverwege mislukte ramp: terug naar de stand van de luisteraar
     return ok;
   }
   async function djUnduck(){
     if(!ducked)return true;
-    const ok=await rampVolume(volume);
+    let ok=await rampVolume(volume);
+    // Eén directe herstelpoging als de ramp halverwege faalde: anders blijft de muziek op de tussenstand hangen.
+    if(!ok){try{await pushVolume(volume);ok=true}catch{/* ook dit mislukte: loslaten, de volgende volume-actie herstelt */}}
     // Ook bij mislukking loslaten: blijven hangen op 'ducked' zou de muziek
     // permanent zacht houden en elke volgende unduck overslaan.
     ducked=false;
@@ -109,11 +112,19 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   }
   async function verify(predicate,tries=10){for(let i=0;i<tries;i++){await wait(140+i*45);const s=await remote();if(s&&predicate(s))return s}return null}
   async function verifySdk(predicate,tries=8){const p=player();if(!p)return null;for(let i=0;i<tries;i++){try{const s=await p.getCurrentState();if(s&&predicate(s))return s}catch(e){window.MAIRRuntime?.caught?.('playback-primary.verifySdk',e)}await wait(45+i*25)}return null}
-  async function nudgeSdkPlayback(){if(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,4))return true;try{await player()?.resume?.()}catch(e){window.MAIRRuntime?.caught?.('playback-primary.nudgeSdkPlayback',e)}return!!(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,6))}
+  async function nudgeSdkPlayback(){if(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,4))return true;try{await player()?.resume?.()}catch(e){note('sdk-nudge-failed',e)}return!!(await verifySdk(s=>!!s?.track_window?.current_track&&!s.paused,6))}
   const sdkUri=s=>String(s?.track_window?.current_track?.uri||'');
+  // Een speler die voorbij de duur doorloopt maakt geen geluid meer, hoe hard hij
+  // ook volhoudt dat hij speelt. Zonder deze controle zou de play-knop bij een
+  // vastgelopen speler pauzeren in plaats van opnieuw te starten - precies het
+  // tegenovergestelde van wat je dan wilt.
+  const parkedPastEnd=(durationMs,positionMs)=>Number(durationMs||0)>0&&Number(positionMs||0)>=Number(durationMs);
   async function observedPlaying(){
-    try{const sdk=await player()?.getCurrentState?.();if(sdk?.track_window?.current_track)return!sdk.paused}catch(e){window.MAIRRuntime?.caught?.('playback-primary.observedPlaying',e)}
-    const s=await remote();if(s?.item)return!!s.is_playing;
+    try{
+      const sdk=await player()?.getCurrentState?.(),current=sdk?.track_window?.current_track;
+      if(current){if(!sdk.paused&&parkedPastEnd(current.duration_ms,sdk.position))return false;return!sdk.paused}
+    }catch(e){note('sdk-state-read-failed',e)}
+    const s=await remote();if(s?.item)return!!s.is_playing&&!parkedPastEnd(s.item.duration_ms,s.progress_ms);
     const t=truth()?.get?.();if(t?.trackId||t?.uri)return!!t.isPlaying;
     return null
   }
@@ -122,14 +133,45 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   // meest waarschijnlijke verklaring voor "de vorige-knop doet soms niks": de watchdog
   // draait elke 5 seconden en zet busy. Nu krijgt de gebruiker in elk geval antwoord.
   async function withBusy(fn){if(busy){info('MAIRFM is nog met de vorige opdracht bezig. Probeer het zo opnieuw.');return false}setBusy(true);try{return await fn()}finally{setBusy(false)}}
-  function ingest(s,source='primary'){if(!s)return;const confirmed=String(s?.device?.id||'').trim();if(confirmed&&localStorage.getItem(DEVICE_KEY)!==confirmed)localStorage.setItem(DEVICE_KEY,confirmed);clearResumeGuard(String(s?.item?.id||''));try{playback=s;renderPlayback(s)}catch{/* UI-render faalde: afspelen gaat door */};try{truth()?.ingest?.(s,source)}catch(e){window.MAIRRuntime?.caught?.('playback-primary.ingest2',e)}}
-  function rememberError(e,prefix){lastError=String(e?.message||e);failures++;try{truth()?.error?.(lastError)}catch{/* foutrapportage zelf faalde */};info(prefix+lastError,true);return false}
+  function ingest(s,source='primary'){if(!s)return;const confirmed=String(s?.device?.id||'').trim();if(confirmed&&localStorage.getItem(DEVICE_KEY)!==confirmed)localStorage.setItem(DEVICE_KEY,confirmed);clearResumeGuard(String(s?.item?.id||''));try{playback=s;renderPlayback(s)}catch(e){note('render-failed',e,{source})};try{truth()?.ingest?.(s,source)}catch(e){note('state-ingest-failed',e,{source})}}
+  function rememberError(e,prefix){lastError=String(e?.message||e);failures++;try{truth()?.error?.(lastError)}catch(inner){note('truth-error-sink',inner)};info(prefix+lastError,true);return false}
+  // Niet elke lege catch is fout - try{localStorage...}catch{} vangt een bekende,
+  // onschuldige storing af. Maar een fout die gedrag verbergt hoort geregistreerd
+  // te worden, anders blijft de ringbuffer leeg terwijl er wel iets misging. Dit
+  // is bewust geen herstelpad: de aanroeper doet precies wat hij al deed.
+  const note=(stage,error,extra={})=>{try{window.MAIRRuntime?.record?.('playback.'+stage,{module:'playback-primary',error:String(error?.message||error||'onbekend').slice(0,300),...extra},'warn')}catch{/* de logger zelf faalde: nooit afspelen blokkeren */}};
   function stationQueue(){try{return Array.isArray(queue)?queue.filter(t=>t?.uri):[]}catch{return[]}}
   function stationIndex(stateOrUri){const q=stationQueue(),uri=typeof stateOrUri==='string'?stateOrUri:stateOrUri?.item?.uri,id=typeof stateOrUri==='string'?'':stateOrUri?.item?.id;let i=uri?q.findIndex(t=>t?.uri===uri):-1;if(i<0&&id)i=q.findIndex(t=>t?.id===id);return i}
-  function stationContext(uri,max=30){const q=stationQueue(),i=stationIndex(uri);if(i<0)return uri?[uri]:[];return [...new Set(q.slice(i,i+max).map(t=>t?.uri).filter(Boolean))]}
+  // Speelt er iets dat niet in de radioset staat - een verzoek, of playback die is
+  // afgedwaald - dan gaf deze functie een lijst van precies één track terug. Spotify
+  // speelt die ene af en kiest daarna zelf verder, en omdat de volgende track dan ook
+  // niet in de set staat, komt MAIR er nooit meer op terug. Gemeten op 23-09-2026: een
+  // zender met 42 tracks in de wachtrij waarvan er drie op rij speelden die er geen van
+  // alle in stonden; die had Spotify zelf gekozen. De set eraan plakken kost niets en
+  // houdt de eigen programmering in beeld: eerst wat er nu speelt, dan de radio verder.
+  function stationContext(uri,max=30){
+    const q=stationQueue(),i=stationIndex(uri);
+    if(i<0){
+      if(!uri)return[];
+      return [...new Set([uri,...q.slice(0,Math.max(0,max-1)).map(t=>t?.uri).filter(Boolean)])];
+    }
+    return [...new Set(q.slice(i,i+max).map(t=>t?.uri).filter(Boolean))]
+  }
   function stationNeighbor(state,delta){const q=stationQueue(),i=stationIndex(state);if(i<0)return'';return q[i+delta]?.uri||''}
+  // MAIR programmeert zijn eigen volgorde: mair-radio-sequencer.js spreidt de lijst,
+  // bewaakt een herhaalvenster van 24 tracks en zet nooit twee nummers van dezelfde
+  // artiest achter elkaar. Staat Spotify's eigen shuffle aan, dan gooit Spotify die hele
+  // programmering weg. Gemeten op 23-09-2026: een zender met 41 tracks in de wachtrij en
+  // een herhaalvenster van 24 speelde in twintig minuten vier unieke nummers, steeds
+  // opnieuw. Een radiozender bepaalt zijn eigen volgorde, dus zet hem uit bij het starten.
+  // Mislukken mag nooit het starten blokkeren; dan klinkt de volgorde alleen minder goed.
+  async function disableSpotifyShuffle(id){
+    try{await api('/me/player/shuffle?state=false'+(id?'&device_id='+encodeURIComponent(id):''),{method:'PUT'})}
+    catch(e){note('shuffle-off-failed',e,{deviceId:id?'[present]':''})}
+  }
   async function playContextDirect(uri,id,source='primary-uri'){
     const uris=stationContext(uri);if(!uris.length)throw Error('De track staat niet meer in de MAIRFM-radioset.');
+    await disableSpotifyShuffle(id);
     await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&uris.includes(x.item?.uri),10);if(!s)throw Error('Spotify bevestigde geen afspeelbare track uit de radioset.');
     await nudgeSdkPlayback();ingest(s,source);truth()?.setExpectedLive?.(true,'play-track');return s
@@ -144,7 +186,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     // vertraagde daardoor de hele start. Nu vuurt hij los en loopt hij desnoods
     // over de intro heen, precies zoals een radiojingle hoort te doen.
     if($('jingles')?.checked&&typeof speakText==='function'){Promise.resolve(speakText('MAIRFM. Jouw muziek, jouw radio.',true)).catch(()=>false)}
-    info('Muziek wordt gestart…');await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
+    info('Muziek wordt gestart…');await disableSpotifyShuffle(id);await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&!!x.item?.id);if(!s)throw Error('Spotify bevestigde het starten niet.');await nudgeSdkPlayback();
     try{session=[];lastTrackId=null;renderHistory();scheduleTalk();startPolling()}catch(e){window.MAIRRuntime?.caught?.('playback-primary.uris',e)};ingest(s,'primary-start');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;info(`MAIRFM is live · ${queue.length} tracks klaar.`);return true
   }
@@ -166,7 +208,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     if(!playing){truth()?.setExpectedLive?.(false,'pause');return true}
     truth()?.setExpectedLive?.(false,'pause');
     try{
-      let local=false;try{await p.pause();local=!!(await verifySdk(x=>x.paused,8))}catch(e){window.MAIRRuntime?.caught?.('playback-primary.pauseDirect2',e)}
+      let local=false;try{await p.pause();local=!!(await verifySdk(x=>x.paused,8))}catch(e){note('sdk-pause-fallback',e)}
       let s=await verify(x=>x.device?.id===id&&!x.is_playing,3);
       if(!local&&!s){await api('/me/player/pause?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&!x.is_playing,8)}
       if(!local&&!s)throw Error('Spotify bevestigde pauzeren niet.');if(s)ingest(s,'primary-pause');info('MAIRFM staat gepauzeerd.');return true
@@ -177,7 +219,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     const hasTrack=!!(state?.item||sdk?.track_window?.current_track||truth()?.get?.()?.trackId),playing=sdk?.track_window?.current_track?!sdk.paused:(state?.item?!!state.is_playing:!!truth()?.get?.()?.isPlaying);
     if(playing){if(state)ingest(state,'primary-resume-already');truth()?.setExpectedLive?.(true,'resume');recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM speelt.');return true}
     if(!hasTrack){truth()?.setExpectedLive?.(true,'restart-empty');return startDirect()}
-    truth()?.setExpectedLive?.(true,'resume');let local=false;try{await p.resume();local=!!(await verifySdk(x=>!x.paused,8))}catch(e){window.MAIRRuntime?.caught?.('playback-primary.resumeDirect2',e)}
+    truth()?.setExpectedLive?.(true,'resume');let local=false;try{await p.resume();local=!!(await verifySdk(x=>!x.paused,8))}catch(e){note('sdk-resume-fallback',e)}
     let s=await verify(x=>x.device?.id===id&&x.is_playing,3);if(!local&&!s){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,8)}
     if(!local&&!s)throw Error('Spotify bevestigde hervatten niet.');if(s)ingest(s,'primary-resume');recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM speelt.');return true
   }
@@ -190,7 +232,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   async function djPauseDirect(expectedUri=''){
     const id=await freshDevice(),p=await ensurePlayer();
     const t=truth()?.get?.();if(expectedUri&&t?.uri&&t.uri!==expectedUri)throw Error('DJ-pauze hoort niet meer bij de huidige track.');
-    let local=false;try{await p.pause();local=!!(await verifySdk(s=>s.paused&&(!expectedUri||sdkUri(s)===expectedUri),8))}catch(e){window.MAIRRuntime?.caught?.('playback-primary.djPauseDirect',e)}
+    let local=false;try{await p.pause();local=!!(await verifySdk(s=>s.paused&&(!expectedUri||sdkUri(s)===expectedUri),8))}catch(e){note('sdk-dj-pause-fallback',e,{expectedUri})}
     let s=await verify(x=>x.device?.id===id&&!x.is_playing&&(!expectedUri||x.item?.uri===expectedUri),3);
     if(!local&&!s){await api('/me/player/pause?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&!x.is_playing&&(!expectedUri||x.item?.uri===expectedUri),6)}
     if(!local&&!s)throw Error('Spotify bevestigde DJ-pauze niet.');if(s)ingest(s,'primary-dj-pause');truth()?.setExpectedLive?.(true,'dj-handoff');return true
@@ -198,7 +240,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   async function djResumeDirect(expectedUri=''){
     const id=await freshDevice(),p=await ensurePlayer();
     const t=truth()?.get?.();if(expectedUri&&t?.uri&&t.uri!==expectedUri)throw Error('DJ-resume hoort niet meer bij de huidige track.');
-    let local=false;try{await p.resume();local=!!(await verifySdk(s=>!s.paused&&(!expectedUri||sdkUri(s)===expectedUri),8))}catch(e){window.MAIRRuntime?.caught?.('playback-primary.djResumeDirect',e)}
+    let local=false;try{await p.resume();local=!!(await verifySdk(s=>!s.paused&&(!expectedUri||sdkUri(s)===expectedUri),8))}catch(e){note('sdk-dj-resume-fallback',e,{expectedUri})}
     let s=await verify(x=>x.device?.id===id&&x.is_playing&&(!expectedUri||x.item?.uri===expectedUri),3);
     if(!local&&!s){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing&&(!expectedUri||x.item?.uri===expectedUri),6)}
     if(!local&&!s)throw Error('Spotify bevestigde DJ-resume niet.');if(s)ingest(s,'primary-dj-resume');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;return true
@@ -217,7 +259,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     const fallbackUri=stationNeighbor(state,1);
     try{await api('/me/player/next?device_id='+encodeURIComponent(id),{method:'POST'})}catch(e){window.MAIRRuntime?.caught?.('playback-primary.advance2',e)}
     let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,6);
-    if(!s){try{await player()?.nextTrack?.()}catch(e){window.MAIRRuntime?.caught?.('playback-primary.advance3',e)};s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,4)}
+    if(!s){try{await player()?.nextTrack?.()}catch(e){note('sdk-next-failed',e)};s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,4)}
     if(!s&&fallbackUri)s=await playContextDirect(fallbackUri,id,source+'-fallback');
     if(!s)throw Error('Spotify bevestigde volgende niet.');
     if(!s.is_playing){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,5)||s}
@@ -225,6 +267,13 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   }
   async function fastNaturalAdvance(endedId){
     let s=await remote();
+    // Spotify's Web API loopt vlak na een wissel achter en meldt dan nog de track die
+    // net afgelopen is. Zonder deze controle concludeert MAIR "Spotify is niet
+    // doorgegaan" en zet hij er een eigen track overheen - precies één seconde na de
+    // natuurlijke wissel. Gemeten op 23-09-2026: Spotify ging zelf naar B, MAIR zette er
+    // C overheen, en daardoor bleef de zender in een handvol nummers rondcirkelen terwijl
+    // er eenenveertig in de wachtrij stonden. Geef de bron eerst even de tijd.
+    if(!s?.item?.id||s.item.id===endedId)s=await verify(x=>x.item?.id&&x.item.id!==endedId,4)||s;
     if(s?.item?.id&&s.item.id!==endedId){
       if(!s.is_playing){const id=await freshDevice();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.item?.id!==endedId&&x.is_playing,4)||s}
       ingest(s,'primary-natural-auto');return s
@@ -232,6 +281,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     const fallbackUri=stationNeighbor(s,1);
     if(fallbackUri){
       const id=await freshDevice(),uris=stationContext(fallbackUri);
+      await disableSpotifyShuffle(id);
       await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
       s=await verify(x=>x.device?.id===id&&x.is_playing&&uris.includes(x.item?.uri),6);
       if(s){ingest(s,'primary-natural-fast');truth()?.setExpectedLive?.(true,'radio-live');return s}
@@ -250,7 +300,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
            als de eerste al gewisseld had, en dan sprong hij twee nummers terug. Nu wordt
            eerst gekeken of er al iets veranderd is. */
         if(position>3000){await wait(220);const moved=await verify(x=>x.item?.id&&x.item.id!==before,2);if(!moved){try{await p.previousTrack()}catch{await api('/me/player/previous?device_id='+encodeURIComponent(id),{method:'POST'})}}}let s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,8);
-        if(!s){try{await player()?.previousTrack?.()}catch(e){window.MAIRRuntime?.caught?.('playback-primary.skip2',e)};s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,5)}
+        if(!s){try{await player()?.previousTrack?.()}catch(e){note('sdk-previous-failed',e)};s=await verify(x=>x.device?.id===id&&x.item?.id&&x.item.id!==before,5)}
         if(!s&&fallbackUri)s=await playContextDirect(fallbackUri,id,'primary-prev-fallback');if(!s)throw Error('Spotify bevestigde vorige niet.');if(!s.is_playing){await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT'});s=await verify(x=>x.device?.id===id&&x.is_playing,6)||s}ingest(s,'primary-prev');truth()?.setExpectedLive?.(true,'previous');recoveryFailures=0;recoveryCooldownUntil=0;info('MAIRFM speelt.');return true
       }catch(e){return rememberError(e,(delta>0?'Volgende':'Vorige')+' mislukt: ')}
     })
@@ -266,10 +316,15 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   }
 
   function endedPlayback(state,currentTruth=truth()?.get?.()){
-    if(!state?.item||state.is_playing)return null;
+    if(!state?.item)return null;
+    const parked=Number(state.progress_ms||0)>0&&Number(state.item.duration_ms||0)>0&&Number(state.progress_ms)>=Number(state.item.duration_ms);
+    if(state.is_playing&&!parked)return null;
     const remoteId=String(state.item.id||''),truthId=String(currentTruth?.trackId||''),sameTruth=!truthId||truthId===remoteId;
     const duration=Math.max(0,Number(state.item.duration_ms||0),sameTruth?Number(currentTruth?.durationMs||0):0);
     const position=Math.max(0,Number(state.progress_ms||0),sameTruth?Number(currentTruth?.progressMs||0):0);
+    // is_playing van Spotify sluit een afgelopen track niet uit: een vastgelopen
+    // speler blijft is_playing true melden met de positie geparkeerd op de duur.
+    // Die vorm werd hierboven al weggefilterd; vandaar dat hij hier apart terugkomt.
     if(!remoteId||duration<=0||position<Math.max(0,duration-3500))return null;
     return{trackId:remoteId,uri:String(state.item.uri||currentTruth?.uri||''),durationMs:duration,positionMs:position,source:'primary-ended-recovery'}
   }
@@ -279,7 +334,17 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     const t=truth()?.get?.();if(!t?.expectedLive)return false;
     try{
       const sdk=await player()?.getCurrentState?.(),track=sdk?.track_window?.current_track,duration=Number(track?.duration_ms||0),position=Number(sdk?.position||0);
-      if(track?.id&&sdk.paused&&duration>0&&position>=Math.max(0,duration-3500))return handleNaturalEnd({trackId:String(track.id),uri:String(track.uri||''),durationMs:duration,positionMs:position,source:'primary-sdk-watchdog'});
+      // Twee vormen van een afgelopen track, en de tweede werd gemist. Gepauzeerd
+      // vlak voor de duur is de bekende vorm. De andere is een vastgelopen speler:
+      // de SDK houdt paused op false en laat zijn klok gewoon doorlopen voorbij de
+      // duur, terwijl er geen geluid meer is. Gemeten op 23-09-2026: positie 325665
+      // op een track van 173976 ms, paused false, en Spotify's Web API meldde
+      // ondertussen is_playing true. Geen enkele bewaking zag dat, dus MAIR stond
+      // ruim twee minuten stil zonder het te merken. Een positie voorbij de duur kan
+      // bij gezond afspelen niet voorkomen - dan is de volgende track er al - dus
+      // dit is een veilig en ondubbelzinnig signaal.
+      const ended=duration>0&&(sdk?.paused?position>=Math.max(0,duration-3500):position>=duration);
+      if(track?.id&&ended)return handleNaturalEnd({trackId:String(track.id),uri:String(track.uri||''),durationMs:duration,positionMs:Math.min(position,duration),source:sdk?.paused?'primary-sdk-watchdog':'primary-sdk-watchdog-stalled'});
     }catch(e){window.MAIRRuntime?.caught?.('playback-primary.watchdog',e)}
     return recover('watchdog')
   }
@@ -294,7 +359,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   window.addEventListener('jfm:natural-track-end',e=>handleNaturalEnd(e.detail||{}).catch(()=>{}));
 
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
-  window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>recover('visible'),450)});setInterval(()=>watchdog(),5000);/* 5s: de watchdog leest alleen lokale SDK-state zolang muziek speelt; Spotify wordt uitsluitend benaderd als playback daadwerkelijk stilstaat. */
+  window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));window.addEventListener('mair:wake',e=>{const d=e?.detail;if(d?.phase!=='reconcile'||d.reconciled)return;d.tasks?.push(recover('visible'))});/* Fase 1 van het wake-protocol in mair-background-guard.js. Dit was een eigen visibilitychange met een zelfgekozen vertraging van 450 ms, terwijl director.js op 0 ms al tekende met wat er nog in het geheugen stond. Reconciled betekent dat de eigenaar zelf al met Spotify heeft gepraat. */setInterval(()=>watchdog(),5000);/* 5s: de watchdog leest alleen lokale SDK-state zolang muziek speelt; Spotify wordt uitsluitend benaderd als playback daadwerkelijk stilstaat. */
 
   window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,djDuck,djUnduck,playUri,recover,setVolume,bindVolume,get ducked(){return ducked},get volume(){return volume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);

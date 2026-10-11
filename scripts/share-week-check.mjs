@@ -1,0 +1,21 @@
+// Gedragstest voor mair-share-week.js met een nep-canvas: lange teksten worden afgekapt, niets valt buiten het plaatje, delen valt terug op downloaden.
+import fs from 'node:fs';import vm from 'node:vm';
+let fail=0;const ok=(n,c)=>{console.log((c?'PASS ':'FAIL ')+n);if(!c)fail++};
+const calls=[];const grad={addColorStop(){}};
+const ctx2d=new Proxy({fillText:(t,x,y)=>calls.push({t:String(t),x,y}),measureText:t=>({width:String(t).length*20}),createLinearGradient:()=>grad,createRadialGradient:()=>grad,beginPath(){},roundRect(){},fill(){},fillRect(){}},{get:(o,k)=>k in o?o[k]:undefined,set:()=>true});
+let downloads=0,shared=0,canShare=false;
+const canvas={width:0,height:0,getContext:()=>ctx2d,toBlob:cb=>cb({size:10,type:'image/png'})};
+const a={click(){downloads++},remove(){}};
+const document={createElement:t=>t==='canvas'?canvas:a,body:{appendChild(){}}};
+const navigator={canShare:()=>canShare,share:async()=>{shared++}};
+const window={};
+vm.runInNewContext(fs.readFileSync(new URL('../mair-share-week.js',import.meta.url),'utf8'),{window,document,navigator,URL:{createObjectURL:()=>'blob:x',revokeObjectURL(){}},File:class{constructor(b,n,o){this.name=n;this.type=o.type}},setTimeout:()=>0,Math,String,Error,Promise});
+await window.MAIRShareWeek.render({title:'t',topArtist:'A'.repeat(200),topTrack:'Kort',tracks:12,discoveries:3,insight:'woord '.repeat(60)});
+ok('canvas is 1080x1350',canvas.width===1080&&canvas.height===1350);
+ok('lange artiest wordt afgekapt met …',calls.some(c=>c.t.endsWith('…')&&c.t.startsWith('A')));
+ok('niets buiten het plaatje',calls.every(c=>c.y>0&&c.y<=1350));
+ok('lange insight blijft op maximaal 3 regels',calls.filter(c=>c.t.startsWith('woord')).length<=3);
+ok('cijfers staan erin',calls.some(c=>c.t==='12')&&calls.some(c=>c.t==='3'));
+let r=await window.MAIRShareWeek.share({});ok('zonder share-ondersteuning wordt het gedownload',r==='downloaded'&&downloads===1&&shared===0);
+canShare=true;r=await window.MAIRShareWeek.share({});ok('met share-ondersteuning wordt het gedeeld',r==='shared'&&shared===1&&downloads===1);
+console.log(`MAIR deel je week: ${fail?'FAIL':'PASS'}`);process.exit(fail?1:0);
