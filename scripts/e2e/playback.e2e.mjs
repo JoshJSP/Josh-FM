@@ -137,7 +137,8 @@ async function scenarioRateLimit(){
     await h.page.evaluate(()=>document.getElementById('next').click());
     await sleep(6000);
     const st=await mock(h.page);
-    c.ok('429 op devices-lookup koppelt de speler niet los',st.playing===true&&st.idx>=1,JSON.stringify(st));
+    c.ok('429 op devices-lookup: muziek speelt door',st.playing===true&&st.idx>=1,JSON.stringify(st));
+    c.ok('429 op devices-lookup koppelt de werkende speler niet los',st.disconnects===0,'disconnects '+st.disconnects);
     noErrors('429: geen page errors',h);
   }finally{await h.close()}
 }
@@ -234,7 +235,45 @@ async function scenarioHidden(){
   }finally{await h.close()}
 }
 
-const scenarios={hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// Een skip tijdens het voorbereiden van een break mag de DJ-stem niet 30 s tot 5 min stilleggen (Fish-backoff).
+async function scenarioSkipThenBreak(){
+  const h=await launch({trackMs:16000});
+  try{
+    await startStation(h);
+    await h.page.evaluate(()=>window.MAIRDJ.armManual());
+    await h.page.evaluate(()=>window.__mock.finishTrack(2500));
+    await until(h.page,()=>{const s=window.MAIRDJ.state();return s.busy||s.activeBreak||s.prepared},null,20000,'break is bezig');
+    await h.page.evaluate(()=>document.getElementById('next').click());
+    await sleep(5000);
+    const failuresAfterSkip=await h.page.evaluate(()=>window.JFMDJAudioGuard?.state?.failures??-1);
+    c.ok('skip tijdens break telt niet als Fish-storing',failuresAfterSkip===0,'failures '+failuresAfterSkip);
+    await h.page.evaluate(()=>window.MAIRDJ.armManual());
+    await h.page.evaluate(()=>window.__mock.finishTrack(2500));
+    await until(h.page,()=>{const t=window.MAIRDJ.state().terminalBreaks||[];return t.length&&['COMPLETED','FAILED'].includes(t[t.length-1].status)&&t[t.length-1].breakId!==window.__firstBreak},null,40000,'tweede break afgerond').catch(()=>{});
+    const b=await lastBreak(h.page);
+    c.ok('na de skip komt de volgende break gewoon op de lucht',b?.status==='COMPLETED',JSON.stringify(b));
+    noErrors('skip-dan-break: geen page errors',h);
+  }finally{await h.close()}
+}
+
+// De stap-voor-stap volumeherstel na een break faalt één keer (SDK-hapering): de muziek mag niet op de tussenstand blijven hangen.
+async function scenarioUnduckFails(){
+  const h=await launch({trackMs:16000});
+  try{
+    await startStation(h);
+    await h.page.evaluate(()=>window.MAIRDJ.armManual());
+    await h.page.evaluate(()=>window.__mock.finishTrack(2500));
+    await until(h.page,()=>(window.__mock.volLog||[]).some(x=>x[1]<0.2),null,40000,'muziek is geduckt');
+    await h.page.evaluate(()=>{window.__mock.failVolume=1});
+    await sleep(9000);
+    const st=await mock(h.page),v=await vols(h.page);
+    c.ok('unduck faalt één keer: volume komt toch terug op 0,5',Math.abs(st.volume-0.5)<0.02,'volume '+st.volume+' log '+v.join(','));
+    c.ok('unduck faalt één keer: muziek speelt door',st.playing===true,JSON.stringify(st));
+    noErrors('unduck: geen page errors',h);
+  }finally{await h.close()}
+}
+
+const scenarios={unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
