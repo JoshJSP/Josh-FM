@@ -25,6 +25,12 @@
 /* Albumhoes: zacht in beeld wanneer .hidden eraf gaat. */
 #artImg:not(.hidden){animation:mairMotionFade var(--duration-fast) var(--ease-out)}
 
+/* Sheets en overlays die met display/hidden wisselen: entree via keyframe, sluiten blijft direct.
+   De verzoek-sheet staat met translateX(-50%) gecentreerd, dus die keyframe neemt die offset mee. */
+@keyframes mairMotionSheetUp{from{opacity:0;transform:translate(-50%,24px)}}
+.mair-request-pane.mair-sheet-open{animation:mairMotionSheetUp var(--duration-medium) var(--ease-smooth-out)}
+body.mair-request-open:before,.mair-request-sheet,.mair-dj-sheet:not(.hidden),.mair-sleep-overlay:not([hidden]){animation:mairMotionFade var(--duration-fast) var(--ease-out)}
+
 /* Knoppen en chips: hover-in snel, hover-uit/ontdoen zachter; press-scale direct op :active. */
 .tab,.chip,.circle,.cta,.secondary,.quick,.taste button,.mair-nav-btn,.mair-station-card,.result button,.searchrow button{
   transition:transform var(--duration-fast) var(--ease-smooth-out),opacity var(--duration-fast) var(--ease-smooth-out),
@@ -58,7 +64,7 @@
 
 /* Reduced motion: alle beweging uit, alleen korte opacity-fades. */
 @media (prefers-reduced-motion:reduce){
-  .tabpane.active>*:nth-child(-n+6),.tabpane.active>#mairProfilePage,.mair-diagnostics-sheet.is-open,#artImg:not(.hidden){animation:mairMotionFade var(--duration-quick) var(--ease-out);animation-delay:0s}
+  .tabpane.active>*:nth-child(-n+6),.tabpane.active>#mairProfilePage,.mair-diagnostics-sheet.is-open,#artImg:not(.hidden),.mair-request-pane.mair-sheet-open{animation:mairMotionFade var(--duration-quick) var(--ease-out);animation-delay:0s}
   .tab:not(:disabled):active,.chip:not(:disabled):active,.circle:not(:disabled):active,.cta:not(:disabled):active,.secondary:not(:disabled):active,
   .quick:not(:disabled):active,.taste button:not(:disabled):active,.mair-nav-btn:active,.mair-station-card:active,.result button:not(:disabled):active,.searchrow button:not(:disabled):active{transform:none}
   .switch span:after{transition:none}
