@@ -1,7 +1,9 @@
 // Josh FM Program Director — adaptive programming with Spotify-authoritative upcoming queue
 (()=>{
 const $=id=>document.getElementById(id),memoryKey='jfm_director_memory';
-const memory=()=>{try{return JSON.parse(localStorage.getItem(memoryKey)||'{"plays":{},"likes":{},"requests":{},"discoveryWins":{},"discoveryLosses":{}}')}catch{return{plays:{},likes:{},requests:{},discoveryWins:{},discoveryLosses:{}}}};
+// Ontbrekende velden (bv. na wissen of een gedeeltelijke import) aanvullen: m.plays[id] mag nooit een TypeError geven.
+const EMPTY_MEMORY=()=>({plays:{},likes:{},requests:{},discoveryWins:{},discoveryLosses:{}});
+const memory=()=>{try{const x=JSON.parse(localStorage.getItem(memoryKey)||'null');return x&&typeof x==='object'&&!Array.isArray(x)?{...EMPTY_MEMORY(),...x}:EMPTY_MEMORY()}catch{return EMPTY_MEMORY()}};
 const save=m=>localStorage.setItem(memoryKey,JSON.stringify(m));
 const artistKey=t=>(t?.artists?.[0]||'').toLowerCase().trim(),yr=t=>Number(String(t?.release||'').slice(0,4))||0;
 const isRequest=t=>{if(!t)return false;try{if(window.JFMRequests?.isRequest?.(t))return true}catch{/* optionele rotatiemodule */}const m=memory();return!!(m.requests[t.id]||m.requests[t.uri])};

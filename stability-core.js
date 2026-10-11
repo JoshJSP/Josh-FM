@@ -115,7 +115,8 @@
     reconnectPromise=(async()=>{const old=player;rememberDevice('');initPromise=null;player=null;window.jfmSpotifyPlayer=null;try{old?.disconnect?.()}catch{/* oude speler al losgekoppeld */};await new Promise(r=>setTimeout(r,180));const id=await initPlayer();if(!id)throw Error('Spotify-device kon niet opnieuw worden geregistreerd.');return id})().finally(()=>{reconnectPromise=null});
     return reconnectPromise
   }
-  async function isAvailable(id=deviceId){if(!id)return false;try{const d=await api('/me/player/devices');return Array.isArray(d?.devices)&&d.devices.some(x=>x?.id===id&&!x?.is_restricted)}catch{return false}}
+  // Een mislukte devices-lookup (429, timeout, offline) is geen bewijs dat het device weg is: dan niet reconnecten, want dat koppelt een werkende speler los.
+  async function isAvailable(id=deviceId){if(!id)return false;try{const d=await api('/me/player/devices');if(!Array.isArray(d?.devices))return true;return d.devices.some(x=>x?.id===id&&!x?.is_restricted)}catch{return true}}
   async function ensureDevice(){let id=deviceId;if(id&&await isAvailable(id))return id;return reconnect()}
   async function transfer(play=false){const id=await ensureDevice();await api('/me/player',{method:'PUT',body:{device_ids:[id],play:!!play}});return id}
   async function playUris(uris){const id=await ensureDevice();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris}});return true}
