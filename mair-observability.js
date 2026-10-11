@@ -14,7 +14,7 @@ const clean=value=>runtime()?.sanitize?.(value)??sanitize(value);
 // herleiden was.
 function sanitize(value,depth=0){
   if(value==null||typeof value==='boolean'||typeof value==='number')return value;
-  if(typeof value==='string')return /bearer\s+[a-z0-9._-]{12,}|(?:token|secret|api[_-]?key)\s*[:=]\s*\S+/i.test(value)?'[redacted]':value.slice(0,1000);
+  if(typeof value==='string')return /bearer\s+[a-z0-9._-]{12,}|(?:token|secret|api[_-]?key)\s*[:=]\s*\S+|[\w.+-]+@[\w-]+\.[\w.]+|[?&](?:code|access_token|refresh_token)=[^&\s]+/i.test(value)?'[redacted]':value.slice(0,1000);
   if(Array.isArray(value))return depth>4?`[… ${value.length} items]`:value.slice(0,30).map(x=>sanitize(x,depth+1));
   if(typeof value==='object'){if(depth>4)return `{… ${Object.keys(value).length} velden}`;const out={};for(const[k,v]of Object.entries(value).slice(0,50))out[k]=/token|secret|authorization|cookie|code_verifier|client_secret/i.test(k)?'[redacted]':sanitize(v,depth+1);return out}
   return String(value).slice(0,300)
