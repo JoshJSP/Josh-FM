@@ -54,6 +54,8 @@ Wijzigingen worden ontwikkeld op een branch en met `npm run predeploy` gevalidee
 
 `npm run predeploy` voert de statische regressiepoort en gedragsimulaties uit voor playback, queue, requests, DJ-scheduling, voice, TTS en API-fouten.
 
+`npm run e2e` draait de echte app in headless Chrome tegen een nep-Spotify (`scripts/e2e/`): station starten, pauze, skip, natuurlijke trackwissel, DJ-break met ducking, writer/TTS-storing, skip tijdens een break, apparaatverlies, 429, tokenverversing, verzoeken, slaaptimer en verborgen tab. Geen account, netwerk of Widevine nodig; wel Playwright en Chrome. Het zit bewust niet in `predeploy`. Het zegt iets over de aansturing, niet over hoe het klinkt of hoe echte Spotify zich gedraagt: een luistertest op een echt toestel blijft nodig.
+
 Open in de app `Instellingen` → `Diagnose` voor:
 
 - huidige en volgende track;
