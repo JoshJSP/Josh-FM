@@ -273,7 +273,24 @@ async function scenarioUnduckFails(){
   }finally{await h.close()}
 }
 
-const scenarios={unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// Pagina herladen terwijl er muziek speelt (iOS doet dit bij terugkomen in de PWA): het SDK-device is weg, de Spotify-kant blijft.
+async function scenarioReload(){
+  const h=await launch({trackMs:60000});
+  try{
+    await startStation(h);
+    const before=await mock(h.page);
+    await h.page.reload({waitUntil:'load'});
+    await h.page.waitForFunction(()=>window.JFMPlayback&&window.__mock,null,{timeout:15000});
+    await sleep(12000);
+    const st=await mock(h.page),info=await h.page.evaluate(()=>({gesture:window.JFMPlayback.health.reloadNeedsGesture,restores:window.JFMPlayback.health.reloadRestores,artist:document.getElementById('artist')?.textContent,pb:window.JFMPlaybackState.get().lastError}));
+    c.ok('herlaad: Spotify-kant is hersteld (restored)',st.uris>0);
+    c.ok('herlaad: muziek speelt weer of vraagt netjes om een tik',st.playing===true||info.gesture===true,JSON.stringify({st,info}));
+    c.ok('herlaad: zelfde nummer (niet teruggezet naar het begin van de lijst)',st.uri===before.uri||info.gesture,st.uri+' vs '+before.uri);
+    noErrors('herlaad: geen page errors',h);
+  }finally{await h.close()}
+}
+
+const scenarios={reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);

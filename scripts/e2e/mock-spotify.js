@@ -7,6 +7,9 @@ const toTrack=c=>({id:c.id,uri:'spotify:track:'+c.id,name:c.name,artists:c.artis
 const byUri=u=>{const id=String(u).split(':').pop();const c=CAT.find(x=>x.id===id);return c?toTrack(c):null};
 const S={deviceId:'mock-device-1',deviceName:'MAIRFM',active:false,uris:[],idx:0,pos:0,playing:false,since:0,volume:1,shuffle:false,repeat:'off',userQueue:[],calls:[],listeners:{},ended:0,failNext:null,delayMs:0};
 window.__mock=S;
+try{const saved=JSON.parse(sessionStorage.getItem('__mock_state')||'null');if(saved&&saved.uris?.length){S.uris=saved.uris;S.idx=saved.idx;S.pos=saved.pos;S.userQueue=saved.userQueue||[];S.volume=saved.volume??1;S.restored=true}}catch{}
+const persist=()=>{try{sessionStorage.setItem('__mock_state',JSON.stringify({uris:S.uris,idx:S.idx,pos:position(),userQueue:S.userQueue,volume:S.volume}))}catch{}};
+setInterval(persist,300);
 const now=()=>Date.now();
 const cur=()=>S.uris.length?byUri(S.uris[S.idx]):null;
 const position=()=>{if(!S.playing)return S.pos;const p=S.pos+(now()-S.since);const c=cur();return c?Math.min(p,c.duration_ms):p};
