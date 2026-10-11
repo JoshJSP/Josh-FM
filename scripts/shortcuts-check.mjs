@@ -5,7 +5,7 @@ const clicks=[];let handler;
 const btn=id=>({id,disabled:false,offsetParent:{},click(){clicks.push(id)}});
 const btns={play:btn('play'),next:btn('next'),prev:btn('prev')};
 const document={addEventListener:(t,f)=>{if(t==='keydown')handler=f},getElementById:id=>btns[id]||null};
-const window={};vm.runInNewContext(fs.readFileSync(new URL('../mair-shortcuts.js',import.meta.url),'utf8'),{window,document});
+const vols=[];const window={JFMPlayback:{volume:0.5,setVolume:v=>vols.push(v)}};vm.runInNewContext(fs.readFileSync(new URL('../mair-shortcuts.js',import.meta.url),'utf8'),{window,document});
 const key=(k,o={})=>{let prevented=false;handler({key:k,target:{tagName:'BODY',closest:()=>null},preventDefault(){prevented=true},...o});return prevented};
 ok('module registered',!!window.MAIRShortcuts);
 ok('space plays',key(' ')&&clicks.pop()==='play');
@@ -16,5 +16,7 @@ key(' ',{target:{tagName:'INPUT',closest:()=>null}});ok('typing in input ignored
 key(' ',{target:{tagName:'DIV',closest:s=>s.startsWith('button')?{}:null}});ok('space on focused button left alone',!clicks.length);
 key('ArrowRight',{ctrlKey:true});ok('modifier ignored',!clicks.length);
 key(' ',{repeat:true});ok('key repeat ignored',!clicks.length);
-btns.play.offsetParent=null;key(' ');ok('hidden play button (other tab) ignored',!clicks.length);
+key('ArrowUp');key('ArrowDown');ok('pijl omhoog/omlaag stelt het volume bij',vols.join(',')==='0.55,0.45');
+window.JFMPlayback.volume=0.98;key('ArrowUp');ok('volume blijft binnen 0..1',vols.at(-1)===1);
+btns.play.offsetParent=null;key('ArrowUp');ok('op andere tabs blijft pijl-omhoog scrollen',vols.length===3);key(' ');ok('hidden play button (other tab) ignored',!clicks.length);
 console.log(`MAIR shortcuts: ${fail?'FAIL':'PASS'}`);process.exit(fail?1:0);
