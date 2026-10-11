@@ -16,4 +16,8 @@ const read=f=>fs.readFileSync(new URL('../'+f,import.meta.url),'utf8');
  const p=read('pwa-platform.js');ok('pwa: controllerchange wacht op pauze',p.includes('isPlaying()')&&p.includes("setInterval(()=>{if(isPlaying())return;clearInterval(t);location.reload()},10000)"))}
 // speler: mislukte devices-lookup koppelt niets los
 {const s=read('stability-core.js');ok('stability: mislukte devices-lookup telt als beschikbaar',/async function isAvailable\(id=deviceId\)\{if\(!id\)return false;try\{const d=await api\('\/me\/player\/devices'\);if\(!Array\.isArray\(d\?\.devices\)\)return true;[^\n]*catch\{return true\}\}/.test(s))}
+// MY MAIR: kanaalsleutel staat op mix voordat de persoonlijke set wordt gebouwd
+{const s=read('channel-click-fix.js'),i=s.indexOf("if(id==='mix'){"),j=s.indexOf('await buildSet()',i);ok('MY MAIR: kanaal op mix voor buildSet',i>0&&j>i&&s.slice(i,j).includes("setItem('jfm_music_channel_v1','mix')"))}
+]*localStorage.setItem('jfm_music_channel_v1','mix')[^
+]*const r=await buildSet()/.test(s))}
 console.log(`MAIR nachtronde fixes: ${fail?'FAIL':'PASS'}`);process.exit(fail?1:0);
