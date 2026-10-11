@@ -4,7 +4,7 @@ const FISH_VERSION='fish-audio-v7-mair-nl-safe';
 const JFM_BUILD='audit-fish-v7-mair-nl';
 const IS_IOS=/iPhone|iPad|iPod/i.test(navigator.userAgent)||(/Macintosh/i.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
 let selectedLanguage='nl';
-const speechCache=new Map(),SPEECH_CACHE_TTL=5*60*1000,SPEECH_CACHE_MAX=8;
+const speechCache=new Map(),SPEECH_CACHE_TTL=12*60*1000,SPEECH_CACHE_MAX=8;
 let lastError='',lastProvider='',lastModel='',lastVoiceId='',lastVoiceTitle='',lastLatency=0,lastAudibleTestAt=0,lastPlaybackMode='',lastPlaybackAt=0,activePlayback=null;
 
 function currentProfile(){return window.MAIRDJProfiles?.current?.id||window.MAIRCurrentDJ?.id||localStorage.getItem('mair_dj_profile_v1')||'josh'}
@@ -73,7 +73,14 @@ function keepAliveStop(reason='expected-live-off'){
   finally{keepAliveAudio=null;keepAliveSince=0;window.MAIRRuntime?.record?.('audio.keep-alive-stopped',{reason},'info')}
   return true;
 }
-async function keepAliveStart(reason='expected-live'){
+// Eén start tegelijk: een tweede aanroep voordat play() klaar is maakte een tweede lus-Audio die keepAliveStop nooit stopte.
+let keepAliveStarting=null;
+function keepAliveStart(reason='expected-live'){
+  if(keepAliveAudio)return Promise.resolve(true);
+  if(!keepAliveStarting)keepAliveStarting=keepAliveStartOnce(reason).finally(()=>{keepAliveStarting=null});
+  return keepAliveStarting;
+}
+async function keepAliveStartOnce(reason){
   if(keepAliveAudio)return true;
   if(!nativeShell())return false;
   try{
@@ -119,7 +126,7 @@ async function playWithMediaElement(blob,label,meta={}){
   try{
     await primeMedia().catch(()=>false);if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
     mediaAudio.pause();mediaAudio.src=url;mediaAudio.currentTime=0;mediaAudio.volume=voiceLevel();
-    await mediaAudio.play();playbackStartedAt=Date.now();lastPlaybackMode='html-audio';lastPlaybackAt=playbackStartedAt;
+    await mediaAudio.play();if(meta.signal?.aborted){mediaAudio.pause();throw cancelledError(meta.signal.reason)}playbackStartedAt=Date.now();lastPlaybackMode='html-audio';lastPlaybackAt=playbackStartedAt;
     setInfo(`${label} is on air ✓`,'onair');notifyPlayback(meta,'onPlaybackStart',{playbackStartedAt,route:'html-audio',success:true});
     await new Promise((resolve,reject)=>{let done=false;const finish=e=>{if(done)return;done=true;mediaAudio.onended=null;mediaAudio.onerror=null;meta.signal?.removeEventListener?.('abort',cancel);clearTimeout(timer);if(activePlayback?.finish===finish)activePlayback=null;e?reject(e):resolve()},cancel=()=>{mediaAudio.pause();finish(cancelledError(meta.signal?.reason))},timer=setTimeout(()=>finish(new Error('Afspelen van Fish Audio duurde te lang')),45000);activePlayback={breakId:String(meta.breakId||''),finish,cancel};mediaAudio.onended=()=>finish();mediaAudio.onerror=()=>finish(new Error('De browser kon Fish Audio niet afspelen'));meta.signal?.addEventListener?.('abort',cancel,{once:true})});
     success=true;return true
@@ -132,6 +139,8 @@ async function playWithMediaElement(blob,label,meta={}){
 async function playWithWebAudio(blob,label,meta={}){
   if(!djContext)throw new Error('Web Audio is niet beschikbaar');if(djContext.state==='suspended')await djContext.resume();if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
   const arr=await blob.arrayBuffer(),buffer=await djContext.decodeAudioData(arr.slice(0)),source=djContext.createBufferSource();source.buffer=buffer;djGain.gain.value=voiceLevel();source.connect(djGain);
+  // Een skip tijdens het decoderen kwam nog niet bij een luisteraar aan: nu alsnog afbreken.
+  if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
   let playbackStartedAt=0,success=false,failure=null;
   try{
     await new Promise((resolve,reject)=>{let done=false;const finish=e=>{if(done)return;done=true;source.onended=null;meta.signal?.removeEventListener?.('abort',cancel);clearTimeout(timer);if(activePlayback?.finish===finish)activePlayback=null;e?reject(e):resolve()},cancel=()=>{try{source.stop()}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}finish(cancelledError(meta.signal?.reason))},timer=setTimeout(()=>{try{source.stop()}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}finish(new Error('Web Audio bleef hangen tijdens de DJ-break'))},Math.min(45000,Math.max(3000,Math.ceil((Number(buffer.duration)||0)*1000)+3000)));activePlayback={breakId:String(meta.breakId||''),finish,cancel};source.onended=()=>finish();meta.signal?.addEventListener?.('abort',cancel,{once:true});try{source.start(0);playbackStartedAt=Date.now();lastPlaybackMode='web-audio';lastPlaybackAt=playbackStartedAt;setInfo(`${label} is on air ✓`,'onair');notifyPlayback(meta,'onPlaybackStart',{playbackStartedAt,route:'web-audio',success:true})}catch(e){finish(e)}});

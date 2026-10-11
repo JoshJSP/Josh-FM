@@ -75,11 +75,14 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     if(!player()?.setVolume&&!deviceId())return false;
     const ok=await rampVolume(clampVolume(volume*DUCK_RATIO));
     if(ok)ducked=true;
+    else{try{await pushVolume(volume)}catch{/* terugzetten mislukt: de watchdog en de volgende unduck proberen opnieuw */}}// halverwege mislukte ramp: terug naar de stand van de luisteraar
     return ok;
   }
   async function djUnduck(){
     if(!ducked)return true;
-    const ok=await rampVolume(volume);
+    let ok=await rampVolume(volume);
+    // Eén directe herstelpoging als de ramp halverwege faalde: anders blijft de muziek op de tussenstand hangen.
+    if(!ok){try{await pushVolume(volume);ok=true}catch{/* ook dit mislukte: loslaten, de volgende volume-actie herstelt */}}
     // Ook bij mislukking loslaten: blijven hangen op 'ducked' zou de muziek
     // permanent zacht houden en elke volgende unduck overslaan.
     ducked=false;
