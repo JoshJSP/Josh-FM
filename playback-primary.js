@@ -88,6 +88,14 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     ducked=false;
     return ok;
   }
+  // Zacht uitfaden voor de slaaptimer. Verandert 'volume' (de stand van de luisteraar) niet; restoreVolume zet
+  // het Spotify-volume na de pauze terug. Mislukken mag de pauze nooit tegenhouden.
+  async function fadeOut(ms=8000){
+    const p=player();if(!p?.setVolume)return false;
+    const from=appliedVolume,steps=16;
+    try{for(let i=1;i<=steps;i++){await p.setVolume(clampVolume(from*(1-i/steps)));if(i<steps)await wait(ms/steps)}appliedVolume=0;return true}catch{return false}
+  }
+  async function restoreVolume(){try{await pushVolume(volume);return true}catch{return false}}
   async function setVolume(next){
     const v=clampVolume(next);if(!Number.isFinite(v))return false;
     volume=v;try{localStorage.setItem(VOLUME_KEY,String(v))}catch{/* opslag geblokkeerd: dan maar zonder opslag */}
@@ -361,7 +369,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
   window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));window.addEventListener('mair:wake',e=>{const d=e?.detail;if(d?.phase!=='reconcile'||d.reconciled)return;d.tasks?.push(recover('visible'))});/* Fase 1 van het wake-protocol in mair-background-guard.js. Dit was een eigen visibilitychange met een zelfgekozen vertraging van 450 ms, terwijl director.js op 0 ms al tekende met wat er nog in het geheugen stond. Reconciled betekent dat de eigenaar zelf al met Spotify heeft gepraat. */setInterval(()=>watchdog(),5000);/* 5s: de watchdog leest alleen lokale SDK-state zolang muziek speelt; Spotify wordt uitsluitend benaderd als playback daadwerkelijk stilstaat. */
 
-  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,djDuck,djUnduck,playUri,recover,setVolume,bindVolume,get ducked(){return ducked},get volume(){return volume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
+  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,djDuck,djUnduck,fadeOut,restoreVolume,playUri,recover,setVolume,bindVolume,get ducked(){return ducked},get volume(){return volume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
   window.MAIRRuntime?.register?.('playback-primary',{version:'primary-v17-end-detection-guard',owner:'transport'});
 })();
