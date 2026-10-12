@@ -1,9 +1,11 @@
+import {guardAI} from './_guard.js';
 const MB_BASE='https://musicbrainz.org/ws/2';
 const UA='JoshFM/2.3 (https://github.com/JoshJSP/Josh-FM)';
 const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
 async function timedFetch(url,opt={},ms=5500){const c=new AbortController(),timer=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{...opt,signal:c.signal})}finally{clearTimeout(timer)}}
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  if(!await guardAI(req,res))return;
   const track=req.body?.track;if(!track?.name)return res.status(400).json({error:'Missing track'});
   const artist=String((track.artists||[])[0]||'').slice(0,160),album=String(track.album||'').slice(0,220),release=String(track.release||'').slice(0,32),trackName=String(track.name||'').slice(0,220);const interesting=[];let sourceUrl='',sources=[];
   async function wikiEnglish(){
