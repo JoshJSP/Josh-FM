@@ -76,7 +76,7 @@
     try{
       status(['hits','top40','nl'].includes(id)?`${stationLabel(id)} laadt de Nederlandse Spotify-selectie…`:`${stationLabel(id)} zoekt muziek op Spotify…`);
       let list,verified=true,fallback=false,source='';
-      if(id==='mix'){/* buildSet en de persoonlijke bron kiezen op het actieve kanaal: zonder dit bouwen ze de wachtrij van het vorige station opnieuw. De catch zet previousId terug. */try{localStorage.setItem('jfm_music_channel_v1','mix')}catch{/* opslag geblokkeerd: dan zonder opslag */}const r=await buildSet();list=Array.isArray(r)&&r.length?r:(Array.isArray(queue)?queue:[])}
+      if(id==='mix'){const r=await buildSet();list=Array.isArray(r)&&r.length?r:(Array.isArray(queue)?queue:[])}
       else{const built=await buildPool(id);list=built.tracks;verified=built.verified;fallback=built.fallback;source=built.source||''}
       if(!list?.length)throw Error(`${stationLabel(id)} kreeg tijdelijk geen bruikbare tracks van Spotify.`);
       const prepared=dedupe(list).slice(0,id==='top40'?40:50);queue=window.JFMQueue?.commit?.(prepared,{source:id==='mix'?'personal':'station',station:id,reason:'station-switch'})||prepared;
