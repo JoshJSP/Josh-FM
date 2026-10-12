@@ -334,7 +334,28 @@ async function scenarioIosVoiceVolume(){
   }finally{await h.close()}
 }
 
-const scenarios={iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// Verzoek via de UI: zoeken, resultaat is leesbaar (was zwart op bijna zwart), tikken plant een verzoek.
+async function scenarioRequestUi(){
+  const h=await launch({trackMs:30000});
+  try{
+    await startStation(h);
+    await h.page.locator('text=Nummer aanvragen').locator('visible=true').first().click();
+    await sleep(800);
+    await h.page.fill('input[placeholder*="Zoek een nummer"]','Testnummer 12');
+    await h.page.click('#searchBtn');
+    await until(h.page,()=>document.querySelectorAll('.result').length>0,null,8000,'zoekresultaten');
+    const look=await h.page.evaluate(()=>{const lum=c=>{const m=c.match(/[0-9]+/g).map(Number);const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)};return .2126*f(m[0])+.7152*f(m[1])+.0722*f(m[2])};const r=document.querySelector('.result'),b=r.querySelector('b'),fg=lum(getComputedStyle(b).color),bg=lum(getComputedStyle(r).backgroundColor);return {ratio:(Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05),n:document.querySelectorAll('.result').length}});
+    c.ok('verzoek-UI: zoekresultaten verschijnen',look.n>0,JSON.stringify(look));
+    c.ok('verzoek-UI: titel is leesbaar (contrast minstens 4,5:1)',look.ratio>=4.5,'contrast '+look.ratio.toFixed(2));
+    await h.page.locator('.result').first().click();
+    await sleep(2000);
+    const reqs=await h.page.evaluate(()=>window.JFMRequests.list().filter(r=>['planned','armed'].includes(r.status)).length);
+    c.ok('verzoek-UI: tikken op een resultaat plant een verzoek',reqs===1,'actief: '+reqs);
+    noErrors('verzoek-UI: geen page errors',h);
+  }finally{await h.close()}
+}
+
+const scenarios={requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);

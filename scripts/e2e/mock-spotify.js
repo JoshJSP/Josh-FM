@@ -3,7 +3,7 @@
 // player_state_changed komt alleen bij echte toestandswisselingen (play, pauze, seek, trackwissel), niet per seconde.
 (()=>{
 const CAT=[];for(let i=1;i<=600;i++)CAT.push({id:'Tt'+String(i).padStart(20,'0'),name:`Testnummer ${i}`,artists:[{id:'art'+(i%12),name:`Testartiest ${i%12}`}],dur:Number(localStorage.getItem('__mock_dur')||20000)});
-const toTrack=c=>({id:c.id,uri:'spotify:track:'+c.id,name:c.name,artists:c.artists.map(a=>({id:a.id,name:a.name,uri:'spotify:artist:'+a.id})),album:{id:'alb'+c.id,name:'Album '+c.name,release_date:'2024-01-01',images:[{url:'data:image/gif;base64,R0lGODlhAQABAAAAACw=',height:640,width:640}]},duration_ms:c.dur,explicit:false,popularity:70,is_playable:true,external_urls:{spotify:'https://open.spotify.com/track/'+c.id},type:'track'});
+const toTrack=c=>({id:c.id,uri:'spotify:track:'+c.id,name:c.name,artists:c.artists.map(a=>({id:a.id,name:a.name,uri:'spotify:artist:'+a.id})),album:{id:'alb'+c.id,name:'Album '+c.name,release_date:'2024-01-01',images:[{url:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',height:640,width:640}]},duration_ms:c.dur,explicit:false,popularity:70,is_playable:true,external_urls:{spotify:'https://open.spotify.com/track/'+c.id},type:'track'});
 const byUri=u=>{const id=String(u).split(':').pop();const c=CAT.find(x=>x.id===id);return c?toTrack(c):null};
 const S={deviceId:'mock-device-1',deviceName:'MAIRFM',active:false,uris:[],idx:0,pos:0,playing:false,since:0,volume:1,shuffle:false,repeat:'off',userQueue:[],calls:[],listeners:{},ended:0,failNext:null,delayMs:0};
 window.__mock=S;
