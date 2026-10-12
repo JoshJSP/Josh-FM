@@ -292,7 +292,26 @@ async function scenarioReload(){
   }finally{await h.close()}
 }
 
-const scenarios={reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// Regressies uit de nachtronde van 12-10-2026, elk vóór de reparatie aantoonbaar stuk.
+async function scenarioRegressions(){
+  const h=await launch({trackMs:30000});
+  await h.page.addInitScript(()=>{if(!sessionStorage.__seeded){sessionStorage.__seeded='1';localStorage.setItem('jfm_director_memory','{"completions":{"x":1}}')}});
+  try{
+    await boot(h);
+    await tab(h.page,'Instellingen');
+    const slider=await h.page.evaluate(()=>document.querySelector('#mairProfilePage input[type=range]')?.value);
+    c.ok('discovery-slider begint op 50 bij een verse start (was 0)',slider==='50',String(slider));
+    await tab(h.page,'Stations');
+    await h.page.locator('[data-mair-station="hits"]').locator('visible=true').first().click();
+    await until(h.page,()=>window.__mock.state().playing,null,25000,'station speelt');
+    await sleep(6000);
+    c.ok('director: gedeeltelijk geheugen geeft geen TypeError (was: plays ontbreekt)',h.log.pageErrors.length===0,h.log.pageErrors.join(' | '));
+    const n=await h.page.evaluate(async()=>{const u='spotify:track:Tt00000000000000000090';await Promise.all([window.JFMRequests.add(u),window.JFMRequests.add(u)]);return window.JFMRequests.list().filter(r=>['planned','armed'].includes(r.status)).length});
+    c.ok('verzoek: dubbele tik geeft één verzoek (was: twee)',n===1,'actief: '+n);
+  }finally{await h.close()}
+}
+
+const scenarios={regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
