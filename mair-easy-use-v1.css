@@ -13,3 +13,4 @@
 .result:active{background:#1a2233}
 .chip.active{border-color:#ff6a00!important;background:#2a1305!important;color:#ffb070!important}
 #searchBtn{color:#140800!important;font-weight:800}
+input[type=range]{accent-color:#ff6a00}
