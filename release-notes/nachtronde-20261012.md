@@ -40,7 +40,9 @@ Elk punt hieronder is eerst met `npm run e2e` of een test stuk gezien en daarna 
 
 - Sneltoetsen op de Radio-tab: spatie, pijl links en rechts, pijl omhoog en omlaag voor het volume.
 - Deel je week: Profiel, Deel je week. Maakt een plaatje van je weekoverzicht.
-- De DJ-stem volgt de volumeschuif (overgenomen uit de wip-commit van de dj-test-branch).
+- De DJ-stem volgt de volumeschuif (overgenomen uit de wip-commit van de dj-test-branch). Dit werkt waar de browser
+  het volume van een audio-element toestaat. Op iPhone is dat volume vast, dus daar werkt het naar verwachting niet.
+  Het alternatief (de stem via WebAudio) is op iPhone juist het pad dat bij vergrendeld scherm stilvalt.
 - De slaaptimer faadt acht seconden uit voor hij pauzeert.
 - Car Mode houdt het scherm aan zolang het open staat.
 - Foutlog kopiëren in Diagnostiek.

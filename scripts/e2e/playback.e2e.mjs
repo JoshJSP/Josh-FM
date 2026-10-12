@@ -14,7 +14,8 @@ async function startStation(h){
 }
 const lastBreak=page=>page.evaluate(()=>{const t=window.MAIRDJ.state().terminalBreaks||[];return t[t.length-1]||null});
 const vols=page=>page.evaluate(()=>(window.__mock.volLog||[]).map(x=>x[1]));
-const noErrors=(name,h)=>c.ok(name,h.log.pageErrors.length===0,h.log.pageErrors.join(' | '));
+// Mislukte fetches van de bewust uitgeschakelde nep-routes (503) en de nep-SDK tellen niet; alles anders in de console wel.
+const noErrors=(name,h)=>{const e=[...h.log.pageErrors,...h.log.errors.filter(x=>!/Failed to load resource/.test(x))];c.ok(name,e.length===0,e.slice(0,3).join(' | '))};
 
 async function scenarioStart(){
   const h=await launch({trackMs:20000});

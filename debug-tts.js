@@ -67,7 +67,9 @@ function silentWavUrl(seconds=10,rate=8000){
 }
 const nativeShell=()=>{try{return !!window.Capacitor?.isNativePlatform?.()}catch{return false}};
 let keepAliveAudio=null,keepAliveUrl='',keepAliveSince=0,keepAliveError='';
+let keepAliveStopWanted=false;
 function keepAliveStop(reason='expected-live-off'){
+  keepAliveStopWanted=!!keepAliveStarting;// stop tijdens een lopende start: de start ruimt zelf op zodra play() klaar is
   if(!keepAliveAudio)return false;
   try{keepAliveAudio.pause();keepAliveAudio.removeAttribute('src');keepAliveAudio.load()}catch(e){keepAliveError=String(e?.message||e)}
   finally{keepAliveAudio=null;keepAliveSince=0;window.MAIRRuntime?.record?.('audio.keep-alive-stopped',{reason},'info')}
@@ -82,12 +84,14 @@ function keepAliveStart(reason='expected-live'){
 }
 async function keepAliveStartOnce(reason){
   if(keepAliveAudio)return true;
+  keepAliveStopWanted=false;
   if(!nativeShell())return false;
   try{
     keepAliveUrl=keepAliveUrl||silentWavUrl(10);
     const audio=new Audio(keepAliveUrl);
     audio.loop=true;audio.playsInline=true;audio.setAttribute('playsinline','');audio.preload='auto';audio.volume=1;
     await audio.play();
+    if(keepAliveStopWanted){keepAliveStopWanted=false;try{audio.pause();audio.removeAttribute('src');audio.load()}catch{/* al gestopt */}return false}
     keepAliveAudio=audio;keepAliveSince=Date.now();keepAliveError='';
     window.MAIRRuntime?.record?.('audio.keep-alive-started',{reason,seconds:10},'info');
     return true;
