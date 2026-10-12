@@ -6,12 +6,19 @@
 if(window.MAIRShortcuts)return;
 const KEYS={' ':'play','ArrowRight':'next','ArrowLeft':'prev','ArrowUp':'volume+','ArrowDown':'volume-'},STEP=.05;
 function typing(t){return !!t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.closest?.('[role=slider],[role=dialog]'))}
+// Achter een open overlay (Car Mode, verzoek-sheet, diagnostiek, slaapscherm, passenger) doen sneltoetsen niets.
+const OVERLAY_CLASSES=['mair-car-mode-open','mair-car-mode','jfm-car-mode','mair-request-open','mair-diagnostics-open'];
+function overlayOpen(){
+  const b=document.body;if(b&&OVERLAY_CLASSES.some(c=>b.classList?.contains(c)))return true;
+  for(const id of ['mairSleepOverlay','mairPassengerSheet']){const el=document.getElementById(id);if(el&&!el.hidden)return true}
+  return false;
+}
 function onKey(e){
   const id=KEYS[e.key];
   if(!id||e.defaultPrevented||e.ctrlKey||e.metaKey||e.altKey||e.shiftKey||e.repeat&&!id.startsWith('volume'))return;
   if(typing(e.target)||(e.key===' '&&e.target?.closest?.('button,a,summary')))return;
   const play=document.getElementById('play');
-  if(!play||play.offsetParent===null)return;
+  if(!play||play.offsetParent===null||overlayOpen())return;
   if(id.startsWith('volume')){
     const pb=window.JFMPlayback;if(typeof pb?.setVolume!=='function')return;
     const now=Number.isFinite(Number(pb.volume))?Number(pb.volume):1;

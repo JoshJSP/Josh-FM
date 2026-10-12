@@ -93,7 +93,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   async function fadeOut(ms=8000){
     const p=player();if(!p?.setVolume)return false;
     const from=appliedVolume,steps=16;
-    try{for(let i=1;i<=steps;i++){await p.setVolume(clampVolume(from*(1-i/steps)));if(i<steps)await wait(ms/steps)}appliedVolume=0;return true}catch{return false}
+    try{for(let i=1;i<=steps;i++){await p.setVolume(clampVolume(from*(1-i/steps)));if(i<steps)await wait(ms/steps)}appliedVolume=0;return true}catch{try{await pushVolume(volume)}catch{/* terugzetten mislukt: de volgende volume-actie herstelt */}return false}
   }
   async function restoreVolume(){try{await pushVolume(volume);return true}catch{return false}}
   async function setVolume(next){

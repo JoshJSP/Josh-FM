@@ -67,7 +67,9 @@ function silentWavUrl(seconds=10,rate=8000){
 }
 const nativeShell=()=>{try{return !!window.Capacitor?.isNativePlatform?.()}catch{return false}};
 let keepAliveAudio=null,keepAliveUrl='',keepAliveSince=0,keepAliveError='';
+let keepAliveStopWanted=false;
 function keepAliveStop(reason='expected-live-off'){
+  keepAliveStopWanted=!!keepAliveStarting;// stop tijdens een lopende start: de start ruimt zelf op zodra play() klaar is
   if(!keepAliveAudio)return false;
   try{keepAliveAudio.pause();keepAliveAudio.removeAttribute('src');keepAliveAudio.load()}catch(e){keepAliveError=String(e?.message||e)}
   finally{keepAliveAudio=null;keepAliveSince=0;window.MAIRRuntime?.record?.('audio.keep-alive-stopped',{reason},'info')}
@@ -82,12 +84,14 @@ function keepAliveStart(reason='expected-live'){
 }
 async function keepAliveStartOnce(reason){
   if(keepAliveAudio)return true;
+  keepAliveStopWanted=false;
   if(!nativeShell())return false;
   try{
     keepAliveUrl=keepAliveUrl||silentWavUrl(10);
     const audio=new Audio(keepAliveUrl);
     audio.loop=true;audio.playsInline=true;audio.setAttribute('playsinline','');audio.preload='auto';audio.volume=1;
     await audio.play();
+    if(keepAliveStopWanted){keepAliveStopWanted=false;try{audio.pause();audio.removeAttribute('src');audio.load()}catch{/* al gestopt */}return false}
     keepAliveAudio=audio;keepAliveSince=Date.now();keepAliveError='';
     window.MAIRRuntime?.record?.('audio.keep-alive-started',{reason,seconds:10},'info');
     return true;
@@ -122,10 +126,11 @@ async function fetchFish(text,jingle=false,meta={}){const started=performance.no
 const cancelledError=reason=>Object.assign(new Error(String(reason||'DJ-audio geannuleerd')),{name:'AbortError'});
 function notifyPlayback(meta,name,detail={}){try{meta?.[name]?.({breakId:String(meta?.breakId||''),provider:'fish',...detail})}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}}
 async function playWithMediaElement(blob,label,meta={}){
-  const url=URL.createObjectURL(blob);let playbackStartedAt=0,success=false,failure=null;
+  // Volume zit in de samples (zie mair-voice-gain.js): element-volume is op iPhone vast. Bij elke fout speelt de originele blob.
+  const level=voiceLevel(),scaled=level<0.95?await(window.MAIRVoiceGain?.scale?.(blob,level,djContext)??blob):blob,url=URL.createObjectURL(scaled);let playbackStartedAt=0,success=false,failure=null;
   try{
     await primeMedia().catch(()=>false);if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
-    mediaAudio.pause();mediaAudio.src=url;mediaAudio.currentTime=0;mediaAudio.volume=voiceLevel();
+    mediaAudio.pause();mediaAudio.src=url;mediaAudio.currentTime=0;mediaAudio.volume=scaled===blob?level:1;
     await mediaAudio.play();if(meta.signal?.aborted){mediaAudio.pause();throw cancelledError(meta.signal.reason)}playbackStartedAt=Date.now();lastPlaybackMode='html-audio';lastPlaybackAt=playbackStartedAt;
     setInfo(`${label} is on air ✓`,'onair');notifyPlayback(meta,'onPlaybackStart',{playbackStartedAt,route:'html-audio',success:true});
     await new Promise((resolve,reject)=>{let done=false;const finish=e=>{if(done)return;done=true;mediaAudio.onended=null;mediaAudio.onerror=null;meta.signal?.removeEventListener?.('abort',cancel);clearTimeout(timer);if(activePlayback?.finish===finish)activePlayback=null;e?reject(e):resolve()},cancel=()=>{mediaAudio.pause();finish(cancelledError(meta.signal?.reason))},timer=setTimeout(()=>finish(new Error('Afspelen van Fish Audio duurde te lang')),45000);activePlayback={breakId:String(meta.breakId||''),finish,cancel};mediaAudio.onended=()=>finish();mediaAudio.onerror=()=>finish(new Error('De browser kon Fish Audio niet afspelen'));meta.signal?.addEventListener?.('abort',cancel,{once:true})});

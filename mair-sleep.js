@@ -3,10 +3,10 @@
 'use strict';
 if(window.MAIRSleep)return;
 const KEY='jfm_sleep_timer_v1',GRACE_MS=10*60*1000,RETRY_MS=10000,$=id=>document.getElementById(id);
-let state=read(),tickTimer=0,lastStopTry=0,stopBusy=false,lastError='',lastStoppedAt=0,open=false;
+let state=read(),tickTimer=0,lastStopTry=0,fadeTried=false,stopBusy=false,lastError='',lastStoppedAt=0,open=false;
 function read(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(!x||typeof x!=='object')return null;/* Een timer die net is verlopen terwijl de pagina bevroren was (iOS, bfcache) moet alsnog stoppen: de tick voert hem uit. Veel later verlopen = oude restant, niet meer pauzeren. */if(x.mode==='time'&&Number(x.at||0)>Date.now()-GRACE_MS)return x;if(x.mode==='after-track'&&x.trackId)return x}catch{/* opslag geblokkeerd: dan zonder opslag */}return null}
 function save(v){state=v;try{localStorage.setItem(KEY,JSON.stringify(v))}catch{/* opslag geblokkeerd: dan zonder opslag */}emit();render()}
-function clear(){state=null;try{localStorage.setItem(KEY,'null')}catch{/* opslag geblokkeerd: dan zonder opslag */}emit();render()}
+function clear(){state=null;fadeTried=false;try{localStorage.setItem(KEY,'null')}catch{/* opslag geblokkeerd: dan zonder opslag */}emit();render()}
 function playback(){return window.JFMPlaybackState?.get?.()||null}
 function track(){const p=playback()||{};return{trackId:String(p.trackId||''),uri:String(p.uri||''),title:String($('title')?.textContent||'MAIR'),artist:String($('artist')?.textContent||'')}}
 function remainingMs(){return state?.mode==='time'?Math.max(0,Number(state.at||0)-Date.now()):0}
@@ -20,7 +20,7 @@ async function stopRadio(reason='sleep-timer'){
     const pause=window.JFMPlayback?.pause;
     if(typeof pause!=='function')throw Error('MAIR playback-controller is nog niet beschikbaar');
     // Zacht uitfaden, maar alleen bij de timer: 'na dit nummer' stopt al op een natuurlijk einde.
-    let faded=false;if(reason==='timer'){try{faded=await window.JFMPlayback?.fadeOut?.(8000)===true}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.fadeOut',e)}}
+    let faded=false;if(reason==='timer'&&!fadeTried){fadeTried=true;try{faded=await window.JFMPlayback?.fadeOut?.(8000)===true}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.fadeOut',e)}}
     let ok=false;try{ok=await pause()}finally{if(faded)try{await window.JFMPlayback?.restoreVolume?.()}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.restoreVolume',e)}}if(!ok)throw Error(window.JFMPlayback?.health?.lastError||'Spotify kon niet worden gepauzeerd');
     lastStoppedAt=Date.now();clear();
     try{window.dispatchEvent(new CustomEvent('mair:sleep-complete',{detail:{reason,at:lastStoppedAt}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}
@@ -28,7 +28,7 @@ async function stopRadio(reason='sleep-timer'){
   }catch(e){if(before?.expectedLive)try{truth?.setExpectedLive?.(true,'sleep-pause-failed')}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.setExpectedLive',e)};lastError=String(e?.message||e||'Sleep timer kon MAIR niet pauzeren');emit();render();return false}
   finally{try{if(op)truth?.end?.(op,{error:lastError})}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.end',e)};stopBusy=false}
 }
-function scheduleMinutes(minutes){const n=Math.max(1,Math.min(240,Number(minutes)||0));lastError='';save({mode:'time',at:Date.now()+n*60000,minutes:n,createdAt:Date.now()});ensureTick();return status()}
+function scheduleMinutes(minutes){fadeTried=false;const n=Math.max(1,Math.min(240,Number(minutes)||0));lastError='';save({mode:'time',at:Date.now()+n*60000,minutes:n,createdAt:Date.now()});ensureTick();return status()}
 function scheduleAfterTrack(){const t=track();if(!t.trackId){lastError='Start eerst een nummer voordat je “na dit nummer” gebruikt.';emit();render();return false}lastError='';save({mode:'after-track',trackId:t.trackId,createdAt:Date.now(),title:t.title,artist:t.artist});ensureTick();return true}
 function cancel(){clear();lastError='';return true}
 function ensureTick(){if(tickTimer)return;tickTimer=setInterval(()=>{const due=state?.mode==='time'?Number(state.at||0):0;if(due&&due<Date.now()-GRACE_MS)clear();else if(due&&due<=Date.now()&&Date.now()-lastStopTry>=RETRY_MS){lastStopTry=Date.now();stopRadio('timer').catch(()=>{})}if(open)render()},500)}

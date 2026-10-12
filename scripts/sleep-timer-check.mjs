@@ -31,4 +31,6 @@ r=run({mode:'time',at:now0-1000,minutes:1,createdAt:now0-61000},{pauseOk:true});
 ok('timer: eerst uitfaden, dan pauze, dan volume terug',r.order.join(',')==='fade,pause,restore');
 r=run({mode:'time',at:now0-1000,minutes:1,createdAt:now0-61000},{pauseOk:false});r.tick();await flush();
 ok('ook bij mislukte pauze komt het volume terug',r.order.join(',')==='fade,pause,restore');
+r.advance(10500);r.tick();await flush();
+ok('herhaalpoging na mislukte pauze fadet niet opnieuw',r.order.join(',')==='fade,pause,restore,pause','volgorde '+r.order.join(','));
 console.log(`MAIR sleep timer: ${fail?'FAIL':'PASS'}`);process.exit(fail?1:0);

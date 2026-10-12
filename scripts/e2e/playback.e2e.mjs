@@ -14,7 +14,8 @@ async function startStation(h){
 }
 const lastBreak=page=>page.evaluate(()=>{const t=window.MAIRDJ.state().terminalBreaks||[];return t[t.length-1]||null});
 const vols=page=>page.evaluate(()=>(window.__mock.volLog||[]).map(x=>x[1]));
-const noErrors=(name,h)=>c.ok(name,h.log.pageErrors.length===0,h.log.pageErrors.join(' | '));
+// Mislukte fetches van de bewust uitgeschakelde nep-routes (503) en de nep-SDK tellen niet; alles anders in de console wel.
+const noErrors=(name,h)=>{const e=[...h.log.pageErrors,...h.log.errors.filter(x=>!/Failed to load resource/.test(x))];c.ok(name,e.length===0,e.slice(0,3).join(' | '))};
 
 async function scenarioStart(){
   const h=await launch({trackMs:20000});
@@ -311,7 +312,50 @@ async function scenarioRegressions(){
   }finally{await h.close()}
 }
 
-const scenarios={regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// iPhone-pad: de stem loopt via <audio> (element-volume is daar vast), dus het volume moet in de samples zitten.
+async function scenarioIosVoiceVolume(){
+  const h=await launch({trackMs:16000});
+  await h.page.addInitScript(()=>{
+    Object.defineProperty(navigator,'userAgent',{get:()=>'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'});
+    Object.defineProperty(navigator,'platform',{get:()=>'iPhone'});
+    window.__blobs=[];const oc=URL.createObjectURL;URL.createObjectURL=function(b){window.__blobs.push((b.type||'?')+':'+b.size);return oc.call(URL,b)};
+  });
+  try{
+    await startStation(h);
+    await h.page.evaluate(()=>window.JFMPlayback.setVolume(0.12));await sleep(500);
+    await h.page.evaluate(()=>{window.__blobs.length=0;window.MAIRDJ.armManual()});
+    await h.page.evaluate(()=>window.__mock.finishTrack(2500));
+    await until(h.page,()=>{const t=window.MAIRDJ.state().terminalBreaks||[];return t.length&&['COMPLETED','FAILED'].includes(t[t.length-1].status)},null,40000,'DJ-break afgerond');
+    const r=await h.page.evaluate(()=>({blobs:window.__blobs,route:window.MAIRDJ.state().voice?.route,status:window.MAIRDJ.state().terminalBreaks.slice(-1)[0]?.status}));
+    c.ok('iPhone: de stem loopt via het audio-element',r.route==='html-audio',JSON.stringify(r));
+    c.ok('iPhone: bij 12% volume is de stem in de samples geschaald (WAV)',r.blobs.some(b=>b.startsWith('audio/wav')),JSON.stringify(r.blobs));
+    c.ok('iPhone: de break is afgespeeld',r.status==='COMPLETED',r.status);
+    noErrors('iPhone: geen page errors',h);
+  }finally{await h.close()}
+}
+
+// Verzoek via de UI: zoeken, resultaat is leesbaar (was zwart op bijna zwart), tikken plant een verzoek.
+async function scenarioRequestUi(){
+  const h=await launch({trackMs:30000});
+  try{
+    await startStation(h);
+    await h.page.locator('text=Nummer aanvragen').locator('visible=true').first().click();
+    await sleep(800);
+    await h.page.fill('input[placeholder*="Zoek een nummer"]','Testnummer 12');
+    await h.page.click('#searchBtn');
+    await until(h.page,()=>document.querySelectorAll('.result').length>0,null,8000,'zoekresultaten');
+    const look=await h.page.evaluate(()=>{const lum=c=>{const m=c.match(/[0-9]+/g).map(Number);const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)};return .2126*f(m[0])+.7152*f(m[1])+.0722*f(m[2])};const r=document.querySelector('.result'),b=r.querySelector('b'),fg=lum(getComputedStyle(b).color),bg=lum(getComputedStyle(r).backgroundColor);return {ratio:(Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05),n:document.querySelectorAll('.result').length}});
+    c.ok('verzoek-UI: zoekresultaten verschijnen',look.n>0,JSON.stringify(look));
+    c.ok('verzoek-UI: titel is leesbaar (contrast minstens 4,5:1)',look.ratio>=4.5,'contrast '+look.ratio.toFixed(2));
+    await h.page.locator('.result').first().click();
+    await sleep(2000);
+    const reqs=await h.page.evaluate(()=>window.JFMRequests.list().filter(r=>['planned','armed'].includes(r.status)).length);
+    c.ok('verzoek-UI: tikken op een resultaat plant een verzoek',reqs===1,'actief: '+reqs);
+    noErrors('verzoek-UI: geen page errors',h);
+  }finally{await h.close()}
+}
+
+const scenarios={requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
