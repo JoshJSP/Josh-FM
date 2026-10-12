@@ -191,8 +191,10 @@ async function scenarioTokenRefresh(){
 }
 
 // Lange run (opt-in: node scripts/e2e/playback.e2e.mjs soak). 70 natuurlijke wissels met korte nummers en een zoekpool die nooit opraakt.
-// Bekende zwakte (12-10-2026): zodra de nep-Spotify de uris-lijst afmaakt en MAIR's eigen vangnet geen volgend nummer vindt, valt de zender stil na ~40 nummers.
-// Echte Spotify gaat dan in autoplay door, dus dit is een aanwijzing, geen bewijs. Daarom niet in de standaardrun.
+// Let op: een te kleine nep-catalogus raakt op door de herhaalvensters (45 bij HITS) en lijkt dan op een stilvallende zender; de catalogus telt daarom 600 nummers.
+// Waarneming 12-10-2026 (nep-Spotify, dus een aanwijzing en geen bewijs): de zender blijft doorspelen, maar bij het einde van Spotify's lijst (~30 nummers)
+// is er een stilte van enkele seconden en start MAIR opnieuw vanaf zijn eigen wachtrij, waardoor nummers binnen het herhaalvenster terugkomen (35 unieke op 70).
+// Echte Spotify kan dit anders afhandelen (autoplay). Daarom opt-in en op een echt toestel natrekken.
 async function scenarioSoak(){
   const h=await launch({trackMs:3200});
   await h.page.addInitScript(()=>{window.__mock.rolling=true});

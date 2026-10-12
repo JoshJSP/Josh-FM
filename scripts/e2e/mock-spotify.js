@@ -2,7 +2,7 @@
 // Wordt als init-script geladen, dus vóór de app. Gedraagt zich als de echte SDK waar het ertoe doet:
 // player_state_changed komt alleen bij echte toestandswisselingen (play, pauze, seek, trackwissel), niet per seconde.
 (()=>{
-const CAT=[];for(let i=1;i<=120;i++)CAT.push({id:'Tt'+String(i).padStart(20,'0'),name:`Testnummer ${i}`,artists:[{id:'art'+(i%12),name:`Testartiest ${i%12}`}],dur:Number(localStorage.getItem('__mock_dur')||20000)});
+const CAT=[];for(let i=1;i<=600;i++)CAT.push({id:'Tt'+String(i).padStart(20,'0'),name:`Testnummer ${i}`,artists:[{id:'art'+(i%12),name:`Testartiest ${i%12}`}],dur:Number(localStorage.getItem('__mock_dur')||20000)});
 const toTrack=c=>({id:c.id,uri:'spotify:track:'+c.id,name:c.name,artists:c.artists.map(a=>({id:a.id,name:a.name,uri:'spotify:artist:'+a.id})),album:{id:'alb'+c.id,name:'Album '+c.name,release_date:'2024-01-01',images:[{url:'data:image/gif;base64,R0lGODlhAQABAAAAACw=',height:640,width:640}]},duration_ms:c.dur,explicit:false,popularity:70,is_playable:true,external_urls:{spotify:'https://open.spotify.com/track/'+c.id},type:'track'});
 const byUri=u=>{const id=String(u).split(':').pop();const c=CAT.find(x=>x.id===id);return c?toTrack(c):null};
 const S={deviceId:'mock-device-1',deviceName:'MAIRFM',active:false,uris:[],idx:0,pos:0,playing:false,since:0,volume:1,shuffle:false,repeat:'off',userQueue:[],calls:[],listeners:{},ended:0,failNext:null,delayMs:0};
@@ -17,7 +17,7 @@ const sdkTrack=t=>t&&({id:t.id,uri:t.uri,name:t.name,type:'track',media_type:'au
 function sdkState(){const t=cur();if(!t)return null;const next=[...S.userQueue.map(byUri),...S.uris.slice(S.idx+1).map(byUri)].filter(Boolean).slice(0,2);return{paused:!S.playing,position:position(),duration:t.duration_ms,timestamp:now(),loading:false,shuffle:S.shuffle,repeat_mode:0,track_window:{current_track:sdkTrack(t),previous_tracks:S.uris.slice(Math.max(0,S.idx-2),S.idx).map(byUri).filter(Boolean).map(sdkTrack),next_tracks:next.map(sdkTrack)},context:{uri:null,metadata:{}},disallows:{},playback_id:'pb'+S.idx,playback_quality:'HIGH'}}
 function emit(){const st=sdkState();(S.listeners.player_state_changed||[]).forEach(f=>{try{f(st)}catch(e){console.error('mock listener',e)}})}
 function setPos(p){S.pos=p;S.since=now()}
-function advance(){S.ended++;if(S.userQueue.length){const u=S.userQueue.shift();S.uris.splice(S.idx+1,0,u)}if(S.idx<S.uris.length-1){S.idx++;setPos(0);S.playing=true;schedule();emit()}else{S.playing=false;setPos(0);emit()}}
+function advance(){S.ended++;if(S.userQueue.length){const u=S.userQueue.shift();S.uris.splice(S.idx+1,0,u)}if(S.idx<S.uris.length-1){S.idx++;setPos(0);S.playing=true;schedule();emit()}else{/* einde van de lijst: Spotify blijft 'geparkeerd' op het einde van het laatste nummer */S.playing=false;const c=cur();setPos(c?c.duration_ms:0);emit()}}
 let timer=0;
 function schedule(){clearTimeout(timer);if(!S.playing)return;const c=cur();if(!c)return;timer=setTimeout(()=>{if(S.playing&&position()>=c.duration_ms-5)advance();else schedule()},Math.max(5,c.duration_ms-position()))}
 S.finishTrack=(leftMs=300)=>{const c=cur();if(c){setPos(Math.max(0,c.duration_ms-leftMs));schedule();emit()}};
