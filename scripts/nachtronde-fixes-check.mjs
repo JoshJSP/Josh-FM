@@ -16,6 +16,8 @@ const read=f=>fs.readFileSync(new URL('../'+f,import.meta.url),'utf8');
  const p=read('pwa-platform.js');ok('pwa: controllerchange wacht op pauze',p.includes('isPlaying()')&&p.includes("setInterval(()=>{if(isPlaying())return;clearInterval(t);location.reload()},10000)"))}
 // speler: mislukte devices-lookup koppelt niets los
 {const s=read('stability-core.js');ok('stability: mislukte devices-lookup telt als beschikbaar',/async function isAvailable\(id=deviceId\)\{if\(!id\)return false;try\{const d=await api\('\/me\/player\/devices'\);if\(!Array\.isArray\(d\?\.devices\)\)return true;[^\n]*catch\{return true\}\}/.test(s))}
-// MY MAIR: kanaalsleutel staat op mix voordat de persoonlijke set wordt gebouwd
-{const s=read('channel-click-fix.js'),i=s.indexOf("if(id==='mix'){"),j=s.indexOf('await buildSet()',i);ok('MY MAIR: kanaal op mix voor buildSet',i>0&&j>i&&s.slice(i,j).includes("setItem('jfm_music_channel_v1','mix')"))}
+// foutlog: e-mail en OAuth-code worden gewist; sw cachet geen inlog-URL's; update-lus heeft een rem
+{for(const f of ['mair-runtime.js','mair-observability.js'])ok(`${f}: sanitizer wist e-mail en ?code=`,read(f).includes(String.raw`refresh_token)=[^&\s]+`)&&read(f).includes(String.raw`[\w.+-]+@`));
+ ok('sw: navigatie met ?code= of ?state= wordt niet gecachet',read('sw.js').includes('!/[?&](code|state)=/.test(request.url)'));
+ ok('version.js: updatelus maximaal 1 keer per minuut',read('version.js').includes('Date.now()-lastUpdateForce>60000'))}
 console.log(`MAIR nachtronde fixes: ${fail?'FAIL':'PASS'}`);process.exit(fail?1:0);

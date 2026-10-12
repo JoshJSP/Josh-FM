@@ -19,7 +19,9 @@ async function stopRadio(reason='sleep-timer'){
     try{op=truth?.begin?.('pause',{expectedUri:String(before?.uri||''),timeoutMs:10000})||0;truth?.setExpectedLive?.(false,reason)}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.begin',e)}
     const pause=window.JFMPlayback?.pause;
     if(typeof pause!=='function')throw Error('MAIR playback-controller is nog niet beschikbaar');
-    const ok=await pause();if(!ok)throw Error(window.JFMPlayback?.health?.lastError||'Spotify kon niet worden gepauzeerd');
+    // Zacht uitfaden, maar alleen bij de timer: 'na dit nummer' stopt al op een natuurlijk einde.
+    let faded=false;if(reason==='timer'){try{faded=await window.JFMPlayback?.fadeOut?.(8000)===true}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.fadeOut',e)}}
+    let ok=false;try{ok=await pause()}finally{if(faded)try{await window.JFMPlayback?.restoreVolume?.()}catch(e){window.MAIRRuntime?.caught?.('mair-sleep.restoreVolume',e)}}if(!ok)throw Error(window.JFMPlayback?.health?.lastError||'Spotify kon niet worden gepauzeerd');
     lastStoppedAt=Date.now();clear();
     try{window.dispatchEvent(new CustomEvent('mair:sleep-complete',{detail:{reason,at:lastStoppedAt}}))}catch{/* event versturen mislukt: alleen een melding, geen gevolg */}
     return true

@@ -17,7 +17,7 @@
   // en dan met een regel die zegt wat er stond in plaats van dat er iets weg is.
   const safe=(value,depth=0)=>{
     if(value==null||typeof value==='boolean'||typeof value==='number')return value;
-    if(typeof value==='string'){const x=value.slice(0,500);return /bearer\s+[a-z0-9._~+\/-]{10,}|(?:token|secret|api[_-]?key|client[_-]?secret|password)\s*[:=]\s*\S+/i.test(x)?'[redacted]':x}
+    if(typeof value==='string'){const x=value.slice(0,500);return /bearer\s+[a-z0-9._~+\/-]{10,}|(?:token|secret|api[_-]?key|client[_-]?secret|password)\s*[:=]\s*\S+|[\w.+-]+@[\w-]+\.[\w.]+|[?&](?:code|access_token|refresh_token)=[^&\s]+/i.test(x)?'[redacted]':x}
     if(Array.isArray(value))return depth>3?`[… ${value.length} items]`:value.slice(0,20).map(x=>safe(x,depth+1));
     if(typeof value==='object'){if(depth>3)return `{… ${Object.keys(value).length} velden}`;const out={};for(const[k,v]of Object.entries(value).slice(0,30)){if(/token|secret|authorization|cookie|code_verifier/i.test(k))out[k]='[redacted]';else out[k]=safe(v,depth+1)}return out}
     return String(value).slice(0,200)
