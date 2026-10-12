@@ -1,0 +1,23 @@
+// mair-voice-gain.js: samples worden geschaald, WAV is geldig, fouten geven de originele blob terug.
+import fs from 'node:fs';import vm from 'node:vm';
+let fail=0;const ok=(n,c)=>{console.log((c?'PASS ':'FAIL ')+n);if(!c)fail++};
+const window={};
+class FakeBlob{constructor(parts,o){this.parts=parts;this.type=o?.type||'';this.size=parts.reduce((a,p)=>a+(p.byteLength??p.length??0),0)}async arrayBuffer(){return new ArrayBuffer(8)}}
+vm.runInNewContext(fs.readFileSync(new URL('../mair-voice-gain.js',import.meta.url),'utf8'),{window,Blob:FakeBlob,DataView,ArrayBuffer,Math,Number,Array,String});
+const buf={numberOfChannels:2,length:4,sampleRate:24000,duration:4/24000,getChannelData:c=>Float32Array.from(c?[-1,-0.5,0.25,0]:[1,0.5,-0.25,0])};
+const view=window.MAIRVoiceGain.wav(buf,0.5);
+const ascii=(o,n)=>String.fromCharCode(...Array.from({length:n},(_,i)=>view.getUint8(o+i)));
+ok('WAV-header klopt',ascii(0,4)==='RIFF'&&ascii(8,4)==='WAVE'&&ascii(36,4)==='data'&&view.getUint16(22,true)===2&&view.getUint32(24,true)===24000);
+ok('lengte klopt (44 + 4 samples x 2 kanalen x 2 bytes)',view.byteLength===44+16);
+ok('samples zijn gehalveerd (1.0 -> ~16383)',Math.abs(view.getInt16(44,true)-16383)<2&&Math.abs(view.getInt16(46,true)+16384)<2);
+ok('gain 0 geeft stilte',(()=>{const v=window.MAIRVoiceGain.wav(buf,0);for(let i=44;i<v.byteLength;i+=2)if(v.getInt16(i,true)!==0)return false;return true})());
+ok('boven 1 wordt afgekapt, niet doorgedraaid',window.MAIRVoiceGain.wav({...buf,getChannelData:()=>Float32Array.from([1,1,1,1])},3).getInt16(44,true)===32767);
+const blob=new FakeBlob([new Uint8Array(8)],{type:'audio/mpeg'});
+const ctx={decodeAudioData:async()=>buf};
+const out=await window.MAIRVoiceGain.scale(blob,0.12,ctx);
+ok('bij laag volume komt er een geschaalde WAV uit',out!==blob&&out.type==='audio/wav');
+ok('bij vol volume blijft de blob onaangeroerd',(await window.MAIRVoiceGain.scale(blob,1,ctx))===blob);
+ok('zonder AudioContext blijft de blob onaangeroerd',(await window.MAIRVoiceGain.scale(blob,0.1,null))===blob);
+ok('decodeerfout geeft de originele blob terug',(await window.MAIRVoiceGain.scale(blob,0.1,{decodeAudioData:async()=>{throw new Error('kapot')}}))===blob);
+ok('te lange audio wordt niet gescaled',(await window.MAIRVoiceGain.scale(blob,0.1,{decodeAudioData:async()=>({...buf,duration:500})}))===blob);
+console.log(`MAIR voice gain: ${fail?'FAIL':'PASS'}`);process.exit(fail?1:0);

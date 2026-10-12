@@ -40,9 +40,9 @@ Elk punt hieronder is eerst met `npm run e2e` of een test stuk gezien en daarna 
 
 - Sneltoetsen op de Radio-tab: spatie, pijl links en rechts, pijl omhoog en omlaag voor het volume.
 - Deel je week: Profiel, Deel je week. Maakt een plaatje van je weekoverzicht.
-- De DJ-stem volgt de volumeschuif (overgenomen uit de wip-commit van de dj-test-branch). Dit werkt waar de browser
-  het volume van een audio-element toestaat. Op iPhone is dat volume vast, dus daar werkt het naar verwachting niet.
-  Het alternatief (de stem via WebAudio) is op iPhone juist het pad dat bij vergrendeld scherm stilvalt.
+- De DJ-stem volgt de volumeschuif (begonnen in de wip-commit van de dj-test-branch). Op iPhone is het volume van een
+  audio-element vast. Daarom schaalt `mair-voice-gain.js` de samples zelf voor het afspelen, zodat het ook daar werkt.
+  Bij elke fout speelt de originele stem. Alleen in headless Chrome met een iPhone-useragent getest, niet op een echte iPhone.
 - De slaaptimer faadt acht seconden uit voor hij pauzeert.
 - Car Mode houdt het scherm aan zolang het open staat.
 - Foutlog kopiëren in Diagnostiek.

@@ -126,10 +126,11 @@ async function fetchFish(text,jingle=false,meta={}){const started=performance.no
 const cancelledError=reason=>Object.assign(new Error(String(reason||'DJ-audio geannuleerd')),{name:'AbortError'});
 function notifyPlayback(meta,name,detail={}){try{meta?.[name]?.({breakId:String(meta?.breakId||''),provider:'fish',...detail})}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}}
 async function playWithMediaElement(blob,label,meta={}){
-  const url=URL.createObjectURL(blob);let playbackStartedAt=0,success=false,failure=null;
+  // Volume zit in de samples (zie mair-voice-gain.js): element-volume is op iPhone vast. Bij elke fout speelt de originele blob.
+  const level=voiceLevel(),scaled=level<0.95?await(window.MAIRVoiceGain?.scale?.(blob,level,djContext)??blob):blob,url=URL.createObjectURL(scaled);let playbackStartedAt=0,success=false,failure=null;
   try{
     await primeMedia().catch(()=>false);if(meta.signal?.aborted)throw cancelledError(meta.signal.reason);
-    mediaAudio.pause();mediaAudio.src=url;mediaAudio.currentTime=0;mediaAudio.volume=voiceLevel();
+    mediaAudio.pause();mediaAudio.src=url;mediaAudio.currentTime=0;mediaAudio.volume=scaled===blob?level:1;
     await mediaAudio.play();if(meta.signal?.aborted){mediaAudio.pause();throw cancelledError(meta.signal.reason)}playbackStartedAt=Date.now();lastPlaybackMode='html-audio';lastPlaybackAt=playbackStartedAt;
     setInfo(`${label} is on air ✓`,'onair');notifyPlayback(meta,'onPlaybackStart',{playbackStartedAt,route:'html-audio',success:true});
     await new Promise((resolve,reject)=>{let done=false;const finish=e=>{if(done)return;done=true;mediaAudio.onended=null;mediaAudio.onerror=null;meta.signal?.removeEventListener?.('abort',cancel);clearTimeout(timer);if(activePlayback?.finish===finish)activePlayback=null;e?reject(e):resolve()},cancel=()=>{mediaAudio.pause();finish(cancelledError(meta.signal?.reason))},timer=setTimeout(()=>finish(new Error('Afspelen van Fish Audio duurde te lang')),45000);activePlayback={breakId:String(meta.breakId||''),finish,cancel};mediaAudio.onended=()=>finish();mediaAudio.onerror=()=>finish(new Error('De browser kon Fish Audio niet afspelen'));meta.signal?.addEventListener?.('abort',cancel,{once:true})});

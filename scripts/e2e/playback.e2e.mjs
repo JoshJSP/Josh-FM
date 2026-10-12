@@ -312,7 +312,29 @@ async function scenarioRegressions(){
   }finally{await h.close()}
 }
 
-const scenarios={regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// iPhone-pad: de stem loopt via <audio> (element-volume is daar vast), dus het volume moet in de samples zitten.
+async function scenarioIosVoiceVolume(){
+  const h=await launch({trackMs:16000});
+  await h.page.addInitScript(()=>{
+    Object.defineProperty(navigator,'userAgent',{get:()=>'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'});
+    Object.defineProperty(navigator,'platform',{get:()=>'iPhone'});
+    window.__blobs=[];const oc=URL.createObjectURL;URL.createObjectURL=function(b){window.__blobs.push((b.type||'?')+':'+b.size);return oc.call(URL,b)};
+  });
+  try{
+    await startStation(h);
+    await h.page.evaluate(()=>window.JFMPlayback.setVolume(0.12));await sleep(500);
+    await h.page.evaluate(()=>{window.__blobs.length=0;window.MAIRDJ.armManual()});
+    await h.page.evaluate(()=>window.__mock.finishTrack(2500));
+    await until(h.page,()=>{const t=window.MAIRDJ.state().terminalBreaks||[];return t.length&&['COMPLETED','FAILED'].includes(t[t.length-1].status)},null,40000,'DJ-break afgerond');
+    const r=await h.page.evaluate(()=>({blobs:window.__blobs,route:window.MAIRDJ.state().voice?.route,status:window.MAIRDJ.state().terminalBreaks.slice(-1)[0]?.status}));
+    c.ok('iPhone: de stem loopt via het audio-element',r.route==='html-audio',JSON.stringify(r));
+    c.ok('iPhone: bij 12% volume is de stem in de samples geschaald (WAV)',r.blobs.some(b=>b.startsWith('audio/wav')),JSON.stringify(r.blobs));
+    c.ok('iPhone: de break is afgespeeld',r.status==='COMPLETED',r.status);
+    noErrors('iPhone: geen page errors',h);
+  }finally{await h.close()}
+}
+
+const scenarios={iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
