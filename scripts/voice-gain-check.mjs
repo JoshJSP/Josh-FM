@@ -20,4 +20,11 @@ ok('bij vol volume blijft de blob onaangeroerd',(await window.MAIRVoiceGain.scal
 ok('zonder AudioContext blijft de blob onaangeroerd',(await window.MAIRVoiceGain.scale(blob,0.1,null))===blob);
 ok('decodeerfout geeft de originele blob terug',(await window.MAIRVoiceGain.scale(blob,0.1,{decodeAudioData:async()=>{throw new Error('kapot')}}))===blob);
 ok('te lange audio wordt niet gescaled',(await window.MAIRVoiceGain.scale(blob,0.1,{decodeAudioData:async()=>({...buf,duration:500})}))===blob);
+const G=window.MAIRVoiceGain.normGain;
+ok('radiobewerking brengt zachte spraak naar het vaste niveau',Math.abs(G({rms:0.05,peak:0.3})-2)<1e-9);
+ok('radiobewerking houdt de piek onder -1 dB',Math.abs(G({rms:0.05,peak:0.8})-0.89/0.8)<1e-9);
+ok('stilte wordt niet opgeblazen',G({rms:0,peak:0})===1);
+ok('zonder OfflineAudioContext blijft de blob onaangeroerd',(await window.MAIRVoiceGain.polish(blob))===blob);
+window.OfflineAudioContext=class{decodeAudioData(){return Promise.reject(new Error('kapot'))}};
+ok('decodeerfout in de radiobewerking geeft de originele blob terug',(await window.MAIRVoiceGain.polish(blob))===blob);
 console.log(`MAIR voice gain: ${fail?'FAIL':'PASS'}`);process.exit(fail?1:0);

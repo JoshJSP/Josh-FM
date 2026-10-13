@@ -3,7 +3,12 @@ import {withAI,primeAIGuard} from './_ai-guard-test.mjs';
 import tts from '../api/tts.js';
 import writer from '../api/dj-writer.js';
 
-const originalFetch=globalThis.fetch;
+const originalFetch=globalThis.fetch,originalWebSocket=globalThis.WebSocket;
+// Edge is de eerste stem. Standaard valt hij hier uit, zodat de Fish-terugval getest wordt; een test zet hem expliciet aan.
+class DeadEdge{constructor(){throw new Error('edge down')}}
+// Nep-Edge: stuurt een audioframe (2 bytes headerlengte, headers, mp3) en daarna turn.end.
+function fakeEdge(sent){return class{constructor(url,opt){sent.push({url,opt,messages:[]});this.sent=sent.at(-1);setTimeout(()=>this.onopen?.(),0)}send(m){this.sent.messages.push(m);if(!m.includes('Path:ssml'))return;const head=Buffer.from('X-RequestId:x\r\nContent-Type:audio/mpeg\r\nPath:audio'),frame=Buffer.concat([Buffer.from([head.length>>8,head.length&255]),head,Buffer.from([0xff,0xf3,0x64,1])]);setTimeout(()=>{this.onmessage?.({data:frame.buffer.slice(frame.byteOffset,frame.byteOffset+frame.length)});this.onmessage?.({data:'X-RequestId:x\r\nPath:turn.end\r\n\r\n{}'})},0)}close(){}}}
+globalThis.WebSocket=DeadEdge;
 const originalEnv={...process.env};
 function response(){return{statusCode:0,headers:{},body:null,status(code){this.statusCode=code;return this},setHeader(name,value){this.headers[name]=value},json(value){this.body=value;return this},send(value){this.body=value;return this}}}
 async function call(handler,req){const res=response();await handler(withAI(req),res);return res}
@@ -15,7 +20,16 @@ function restoreEnv(){for(const key of Object.keys(process.env))if(!(key in orig
 try{
   delete process.env.FISH_AUDIO_API_KEY;
   let res=await call(tts,{method:'POST',body:{text:'Hallo'}});
-  assert.equal(res.statusCode,503);assert.equal(res.body.error,'fish_key_missing');
+  assert.equal(res.statusCode,503);assert.equal(res.body.error,'fish_key_missing');assert.ok(res.body.edge?.detail,'de Edge-fout staat in het antwoord');
+
+  // Edge werkt: geen Fish-sleutel nodig, juiste stem per DJ, MAIR wordt Mair en tekst wordt ge-escaped.
+  let sent=[];globalThis.WebSocket=fakeEdge(sent);
+  res=await call(tts,{method:'POST',body:{text:'Dit is MAIR met Simon & Garfunkel <live>.',djProfile:'noah'}});
+  assert.equal(res.statusCode,200);assert.equal(res.headers['X-JoshFM-TTS'],'edge');assert.equal(res.headers['X-JoshFM-Voice'],'nl-NL-MaartenNeural');assert.equal(res.headers['X-MAIR-DJ'],'noah');assert.ok(Buffer.isBuffer(res.body)&&res.body[0]===0xff);
+  assert.match(sent[0].url,/Sec-MS-GEC=[0-9A-F]{64}&Sec-MS-GEC-Version=/);assert.match(sent[0].opt.headers.Origin,/^chrome-extension:/);
+  const ssml=sent[0].messages.find(m=>m.includes('Path:ssml'));assert.match(ssml,/pitch='-10Hz' rate='-8%'/);assert.match(ssml,/Dit is Mair met Simon &amp; Garfunkel &lt;live&gt;\./);
+  for(const[dj,voice]of[['josh','Maarten'],['maya','Fenna'],['max','Maarten']]){sent=[];globalThis.WebSocket=fakeEdge(sent);res=await call(tts,{method:'POST',body:{text:'Hoi.',djProfile:dj}});assert.equal(res.headers['X-JoshFM-Voice'],`nl-NL-${voice}Neural`)}
+  globalThis.WebSocket=DeadEdge;
 
   process.env.FISH_AUDIO_API_KEY='test-key';delete process.env.FISH_AUDIO_MODEL;
   let calls=[];
@@ -29,12 +43,12 @@ try{
 
   process.env.FISH_AUDIO_VOICE_NOAH='custom-english-only';
   globalThis.fetch=async()=>fishResponse(JSON.stringify({_id:'custom-english-only',title:'English only',languages:['en']}),{type:'application/json'});
-  res=await call(tts,{method:'GET',query:{djProfile:'noah'}});assert.equal(res.statusCode,422);assert.equal(res.body.voice.dutchReady,false);assert.match(res.body.voice.detail,/geen Nederlandse/);delete process.env.FISH_AUDIO_VOICE_NOAH;
+  res=await call(tts,{method:'GET',query:{djProfile:'noah'}});assert.equal(res.statusCode,200,'Fish is de terugval: een Fish-probleem maakt de health niet rood');assert.equal(res.body.provider,'edge');assert.equal(res.body.edge.voice,'nl-NL-MaartenNeural');assert.equal(res.body.voice.dutchReady,false);assert.match(res.body.voice.detail,/geen Nederlandse/);delete process.env.FISH_AUDIO_VOICE_NOAH;
 
   calls=[];
   globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return calls.length===1?fishResponse(JSON.stringify({message:'temporary'}),{status:500,type:'application/json'}):fishResponse(Buffer.from([0x49,0x44,0x33,1]))};
   res=await call(tts,{method:'POST',body:{text:'Dit is een test.',djProfile:'maya'}});
-  assert.equal(res.statusCode,200);assert.equal(calls.length,2);assert.equal(res.headers['X-MAIR-DJ'],'maya');assert.equal(res.headers['X-JoshFM-Fish-Model'],'s2-pro');assert.ok(res.headers['X-MAIR-Request-ID']);assert.ok(Buffer.isBuffer(res.body));
+  assert.equal(res.statusCode,200);assert.equal(calls.length,2);assert.equal(res.headers['X-JoshFM-TTS'],'fish-audio','Edge valt uit, Fish neemt het over');assert.equal(res.headers['X-MAIR-DJ'],'maya');assert.equal(res.headers['X-JoshFM-Fish-Model'],'s2-pro');assert.ok(res.headers['X-MAIR-Request-ID']);assert.ok(Buffer.isBuffer(res.body));
 
   calls=[];globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return fishResponse(Buffer.from('not-an-mp3'))};
   res=await call(tts,{method:'POST',body:{text:'Malformed audio.'}});assert.equal(res.statusCode,502);assert.equal(calls.length,2);assert.match(res.body.detail,/malformed MP3/i);
@@ -133,4 +147,4 @@ try{
   }
 
   console.log('MAIR API failure behavior: PASS');
-}finally{globalThis.fetch=originalFetch;restoreEnv()}
+}finally{globalThis.fetch=originalFetch;globalThis.WebSocket=originalWebSocket;restoreEnv()}
