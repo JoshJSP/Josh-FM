@@ -51,7 +51,7 @@ export async function launch({trackMs=20000,djWriter='ok',ttsOk=true,tokens=true
     if(p==='/api/version')return json({version:'e2e',displayVersion:'e2e',commit:'e2e',cache:'e2e'});
     if(p==='/api/live-headlines')return json({items:[]});
     if(p==='/api/nl-charts')return json({tracks:[],partial:true});
-    if(p==='/api/category-filter'||p==='/api/discover')return json({error:'mock_not_available'},503);
+    if(p==='/api/category-filter'||p==='/api/discover'||p==='/api/station-picks')return json({error:'mock_not_available'},503);
     if(p==='/api/news-bulletin')return json({fallback:true,text:''});
     return json({error:'mock_unhandled',path:p},404)};
   await page.route(ORIGIN+'/api/**',api);

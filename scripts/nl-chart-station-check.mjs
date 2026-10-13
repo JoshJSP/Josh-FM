@@ -11,7 +11,8 @@ ok(endpoint.includes("station==='nl'")&&endpoint.includes("source:'Spotify · Je
 ok(endpoint.includes('chartSources.length-1')&&endpoint.includes('hitsMix'),'Hits must reward tracks appearing across multiple Dutch chart sources');
 ok(controller.includes("/api/nl-charts?station=")&&controller.includes("if(id==='nl')"),'Nederlandstalig must use the authoritative Dutch playlist path');
 ok(controller.includes("mair_station_pool_cache_v5_nl_editorial_strict"),'Nederlandstalig strict mode must invalidate older mixed station pools');
-ok(controller.includes("NL_EDITORIAL_SOURCE='spotify-editorial-je-moerstaal'")&&controller.includes("if(id==='nl'&&x?.source!==NL_EDITORIAL_SOURCE)return[]"),'Nederlandstalig cache must only accept Je Moerstaal snapshots');
+// Sinds de AI-selectie (station-picks) mag ook die pool in de nl-cache; generiek zoekwerk nog steeds niet.
+ok(controller.includes("NL_EDITORIAL_SOURCE='spotify-editorial-je-moerstaal'")&&controller.includes("const nlTrusted=source=>source===NL_EDITORIAL_SOURCE||source===AI_SOURCE;")&&controller.includes("if(id==='nl'&&!nlTrusted(x?.source))return[]")&&controller.includes("if(id==='nl'&&!nlTrusted(source))return;"),'Nederlandstalig cache must only accept Je Moerstaal or AI-selectie snapshots');
 ok(controller.includes("MAIR speelt geen andere Nederlandstalige selectie als vervanging"),'Nederlandstalig must fail closed when Je Moerstaal and its trusted cache are unavailable');
 const nlBlock=controller.slice(controller.indexOf("if(id==='nl'){"),controller.indexOf("if(['hits','top40'].includes(id))"));
 ok(nlBlock.includes("dutchChartPool('nl')")&&!nlBlock.includes('for(const q of queries(id))')&&!nlBlock.includes('search(q)'),'Nederlandstalig must never fall through to generic Spotify Search');
