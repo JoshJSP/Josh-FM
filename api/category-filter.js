@@ -1,5 +1,5 @@
 import {guardAI} from './_guard.js';
-import {claudeText,groqText,hasClaude,hasGroq} from './_ai.js';
+import {claudeText,groqText,hasClaude,hasGroq,parseJson} from './_ai.js';
 // Deze route doet zelf geen fetch meer: _ai.js bewaakt de deadlines.
 const GROQ_MODELS=['openai/gpt-oss-120b','openai/gpt-oss-20b'];
 const RATE=new Map();
@@ -70,4 +70,3 @@ function providers({instructions,input}){
   return list;
 }
 
-function parseJson(text){try{return JSON.parse(text)}catch{}const cleaned=String(text||'').replace(/^```(?:json)?\s*/i,'').replace(/```$/,'').trim();try{return JSON.parse(cleaned)}catch{}const a=cleaned.indexOf('{'),b=cleaned.lastIndexOf('}');if(a>=0&&b>a){try{return JSON.parse(cleaned.slice(a,b+1))}catch{}}return null}
