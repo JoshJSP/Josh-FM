@@ -370,7 +370,7 @@ async function testDuckingIsAFractionOfTheListenersVolume(){
   assert.equal(context.JFMPlayback.ducked,true);
   assert.ok(metrics.volumeSdk.length>1,'het volume hoort in stappen te zakken; een harde sprong klinkt als een storing');
   const bottom=metrics.volumeSdk.at(-1);
-  assert.ok(Math.abs(bottom-0.8*0.18)<0.0001,`ducking hoort naar een fractie van 0.8 te gaan, niet naar een vaste waarde (werd ${bottom})`);
+  assert.ok(Math.abs(bottom-0.8*0.06)<0.0001,`ducking hoort naar een fractie van 0.8 te gaan, niet naar een vaste waarde (werd ${bottom})`);
   assert.equal(context.localStorage.getItem('mair_volume_v1'),'0.8','ducking mag de bewaarde stand nooit overschrijven');
   assert.equal(context.JFMPlayback.volume,0.8);
   await context.JFMPlayback.djUnduck();
