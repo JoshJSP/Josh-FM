@@ -1,55 +1,52 @@
-/* MAIR desktop-layout: alleen vanaf 1024px. Telefoon (<=760px) en Car Mode blijven ongemoeid.
-   Twee varianten, te kiezen met een class op <body>: .mair-desk-c (banner + Hierna-rij) of .mair-desk-e (C, verfijnd). */
+/* MAIR desktop-layout (laptop, vanaf 1024px): banner met wazige hoeskleur, Hierna als rij kaartjes met hoesje.
+   Telefoon en Car Mode blijven ongemoeid. Uitzetten kan met de class mair-no-desktop op <body>. */
+@media(max-width:1023px){
+.mair-up-art{display:none}
+.mairfm-up-next .mair-up-row:nth-child(n+4){display:none}
+}
 @media(min-width:1024px){
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .shell{width:min(100%,1160px)!important;max-width:1160px!important;padding:28px 40px 40px!important}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-radio.active{display:grid;column-gap:44px;row-gap:0;align-items:start;align-content:start;grid-template-rows:auto auto auto auto auto}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-radio-header{grid-column:1/-1;grid-row:1;min-height:58px;padding-right:318px;margin:0 0 18px}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) :is(.mairfm-notice,.mairfm-welcome,.mairfm-connect){grid-column:1/-1;grid-row:2}
+/* P = body.mairfm-ux-v1:not(.mair-no-desktop): zelfde gewicht als mair-ux-v1.css, dat later laadt. */
+body.mairfm-ux-v1:not(.mair-no-desktop) .shell{width:min(100%,1160px)!important;max-width:1160px!important;padding:28px 40px 40px!important}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-radio.active{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto auto auto;row-gap:0;align-items:start;align-content:start;--art:min(370px,max(200px,calc(100dvh - 490px)))}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-radio-header{grid-column:1/-1;grid-row:1;min-height:58px;padding-right:318px;margin:0 0 18px}
+body.mairfm-ux-v1:not(.mair-no-desktop) :is(.mairfm-notice,.mairfm-welcome,.mairfm-connect){grid-column:1/-1;grid-row:2}
 /* Slaap-, auto- en passagiersstand horen niet bij de laptop; op de telefoon blijven ze, de functies blijven in de code. */
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) :is(#mairSleepOpen,#mairCarModeOpen,#mairPassengerOpen){display:none!important}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-up-next .mair-up-row b{font-size:14px}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-up-next .mair-up-row span{font-size:12px}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-up-next h3{font-size:18px!important}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-secondary-actions>button{min-height:52px;font-size:14px;transition:border-color .15s,background .15s}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-secondary-actions>button:hover{border-color:#5a3a22;background:#17140f}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now .mairfm-taste button{min-height:42px!important;font-size:12px!important}
+body.mairfm-ux-v1:not(.mair-no-desktop) :is(#mairSleepOpen,#mairCarModeOpen,#mairPassengerOpen){display:none!important}
 
-/* C: brede "nu op MAIRFM"-banner met de hoeskleur wazig erachter, Hierna als rij eronder. */
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-radio.active{grid-template-columns:minmax(0,1fr);--art:min(420px,max(210px,calc(100dvh - 450px)))}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now{grid-column:1;grid-row:3;position:relative;overflow:hidden!important;isolation:isolate;display:grid!important;grid-template-columns:var(--art) minmax(0,1fr);column-gap:44px;align-content:center;padding:32px 40px!important;background:#101012!important;border:1px solid var(--mairfm-line)!important;border-radius:28px!important}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now::before{content:"";position:absolute;inset:-60px;z-index:-2;background:var(--mair-art,none) center/cover;filter:blur(60px) saturate(1.5);opacity:.55}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(7,7,7,.15),rgba(7,7,7,.65))}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now>*{grid-column:2;min-width:0}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now>.art{grid-column:1;grid-row:1/9;max-width:none!important;margin:0!important;border-radius:18px!important;align-self:center;box-shadow:0 24px 70px rgba(0,0,0,.5)!important}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now .mair-track-title{font-size:38px!important;line-height:1.1;margin:0 0 6px!important;align-self:end}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now .mair-track-artist{font-size:17px!important;margin:0 0 22px!important}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now .transport{margin:20px 0 8px!important;justify-content:flex-start}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now .mairfm-playback-status{text-align:left}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-now .mairfm-taste{margin:10px 0 0!important;max-width:420px}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-up-next{grid-column:1;grid-row:4;margin-top:18px!important}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mair-up-next-list{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:0}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-up-next .mair-up-row{border-top:0;border-left:1px solid #24262a;padding:4px 16px}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-up-next .mair-up-row:first-child{border-left:0;padding-left:0}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-up-next h3{margin-bottom:12px!important}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-secondary-actions{grid-column:1;grid-row:5;margin-top:14px;grid-template-columns:minmax(0,340px)}
-body.mairfm-ux-v1:is(.mair-desk-c,.mair-desk-e) .mairfm-radio>.mairfm-dj-public{grid-column:1;grid-row:5;margin-top:14px}
+/* Banner: hoes links, titel en bediening rechts, hoeskleur wazig erachter (var --mair-art uit mair-desktop.js). */
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now{grid-column:1;grid-row:3;position:relative;overflow:hidden!important;isolation:isolate;display:grid!important;grid-template-columns:var(--art) minmax(0,1fr);column-gap:44px;align-content:center;padding:26px 40px!important;background:#101012!important;border:1px solid var(--mairfm-line)!important;border-radius:28px!important}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now::before{content:"";position:absolute;inset:-60px;z-index:-2;background:var(--mair-art,none) center/cover;filter:blur(60px) saturate(1.5);opacity:.55}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(7,7,7,.15),rgba(7,7,7,.65))}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now>*{grid-column:2;min-width:0}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now>.art{grid-column:1;grid-row:1/9;max-width:none!important;margin:0!important;border-radius:18px!important;align-self:center;box-shadow:0 24px 70px rgba(0,0,0,.5)!important}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now .mair-track-title{font-size:46px!important;font-weight:800!important;letter-spacing:-.01em;line-height:1.05;margin:0 0 6px!important;align-self:end}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now .mair-track-artist{font-size:17px!important;margin:0 0 16px!important}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now .transport{margin:14px 0 6px!important;justify-content:flex-start}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now .mairfm-playback-status{text-align:left}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now .mairfm-taste{margin:10px 0 0!important;max-width:360px}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now .mairfm-taste button{min-height:42px!important;font-size:12px!important}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-now #whyTrack{text-align:left!important;margin:10px 0 0!important;font-size:12px}
 
-/* E: C, verfijnd. Lagere banner, grotere titel, aanvraagknop in de banner, Hierna als rij kaartjes met hoesje. */
-body.mairfm-ux-v1.mair-desk-e .mairfm-radio.active{--art:min(370px,max(200px,calc(100dvh - 490px)))}
-body.mairfm-ux-v1.mair-desk-e .mairfm-now{padding:26px 40px!important}
-body.mairfm-ux-v1.mair-desk-e .mairfm-now .mair-track-title{font-size:46px!important;font-weight:800!important;letter-spacing:-.01em;line-height:1.05}
-body.mairfm-ux-v1.mair-desk-e .mairfm-now .mair-track-artist{margin-bottom:16px!important}
-body.mairfm-ux-v1.mair-desk-e .mairfm-now .transport{margin:14px 0 6px!important}
-body.mairfm-ux-v1.mair-desk-e .mairfm-now .mairfm-taste{max-width:360px}
-body.mairfm-ux-v1.mair-desk-e .mairfm-now #whyTrack{text-align:left!important;margin:10px 0 0!important;font-size:12px}
-body.mairfm-ux-v1.mair-desk-e .mairfm-secondary-actions{grid-row:3;align-self:end;justify-self:end;width:190px;margin:0 40px 70px 0;z-index:2}
-body.mairfm-ux-v1.mair-desk-e .mairfm-secondary-actions>button{background:rgba(255,106,0,.14)!important;border-color:#8a3d0e!important;color:#ffb27a!important;text-align:center}
-body.mairfm-ux-v1.mair-desk-e .mairfm-secondary-actions>button:hover{background:rgba(255,106,0,.24)!important;border-color:#ff6a00!important}
-body.mairfm-ux-v1.mair-desk-e .mairfm-up-next{padding:18px 20px 20px!important}
-body.mairfm-ux-v1.mair-desk-e .mair-up-next-list{grid-auto-flow:row;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));grid-template-rows:auto;grid-auto-rows:0;overflow:hidden;gap:0 12px}
-body.mairfm-ux-v1.mair-desk-e .mairfm-up-next .mair-up-row{border:1px solid #26282d;border-radius:14px;background:#17181c;padding:10px 12px;align-items:center;min-height:0}
-body.mairfm-ux-v1.mair-desk-e .mairfm-up-next .mair-up-row:first-child{padding-left:12px}
-body.mairfm-ux-v1.mair-desk-e .mairfm-up-next .mair-up-row:has(.mair-up-art){grid-template-columns:52px minmax(0,1fr);gap:12px}
-body.mairfm-ux-v1.mair-desk-e .mairfm-up-next .mair-up-row:has(.mair-up-art) .mair-up-num{display:none}
+/* "Nummer aanvragen" als oranje knop rechtsonder in de banner (de bestaande knop, dus dezelfde actie). */
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-secondary-actions{grid-column:1;grid-row:3;align-self:end;justify-self:end;width:190px;margin:0 40px 70px 0;z-index:2;grid-template-columns:1fr}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-secondary-actions>button{min-height:52px;font-size:14px;text-align:center;background:rgba(255,106,0,.14)!important;border-color:#8a3d0e!important;color:#ffb27a!important;transition:border-color .15s,background .15s}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-secondary-actions>button:hover{background:rgba(255,106,0,.24)!important;border-color:#ff6a00!important}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-radio>.mairfm-dj-public{grid-column:1;grid-row:5;margin-top:14px}
+
+/* Hierna: rij kaartjes met hoesje; meer dan een rij valt weg. */
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-up-next{grid-column:1;grid-row:4;margin-top:18px!important;padding:18px 20px 20px!important}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-up-next h3{font-size:18px!important;margin-bottom:12px!important}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mair-up-next-list{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));grid-template-rows:auto;grid-auto-rows:0;overflow:hidden;gap:0 12px}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-up-next .mair-up-row{border:1px solid #26282d;border-radius:14px;background:#17181c;padding:10px 12px;align-items:center;min-height:0}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-up-next .mair-up-row b{font-size:14px}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-up-next .mair-up-row span{font-size:12px}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-up-next .mair-up-row:has(.mair-up-art){grid-template-columns:52px minmax(0,1fr);gap:12px}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mairfm-up-next .mair-up-row:has(.mair-up-art) .mair-up-num{display:none}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mair-up-next-list>.mair-up-empty{grid-column:1/-1}
 .mair-up-art{width:52px;height:52px;border-radius:9px;object-fit:cover;background:#26282d}
+
+/* Stations: twee kolommen in plaats van een eindeloze lijst met halflege rijen. */
+body.mairfm-ux-v1:not(.mair-no-desktop) .mair-station-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+body.mairfm-ux-v1:not(.mair-no-desktop) .mair-station-grid>.mair-station-card{margin:0}
+body.mairfm-ux-v1:not(.mair-no-desktop) #tab-stations-mair .mair-page-title{margin-bottom:18px}
 }
