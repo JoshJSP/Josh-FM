@@ -23,5 +23,24 @@ async function scale(blob,gain,ctx){
     return new Blob([wav(buf,Math.max(0,g))],{type:'audio/wav'});
   }catch(e){window.MAIRRuntime?.caught?.('voice-gain.scale',e);return blob}
 }
-window.MAIRVoiceGain={version:'mair-voice-gain-v1',scale,wav};
+// Radiobewerking: highpass tegen rommel, minder modder, meer presence, lichte compressie,
+// en dan naar een vast spraakniveau met piekgrens. Zo klinken alle DJ's en beide providers even hard.
+const TARGET_RMS=0.1,PEAK=0.89;
+function level(buf){let sum=0,peak=0,n=0;for(let c=0;c<buf.numberOfChannels;c++){const d=buf.getChannelData(c);for(let i=0;i<d.length;i++){const v=Math.abs(d[i]);sum+=v*v;if(v>peak)peak=v}n+=d.length}return{rms:n?Math.sqrt(sum/n):0,peak}}
+function normGain({rms,peak}){if(!(rms>0)||!(peak>0))return 1;return Math.min(TARGET_RMS/rms,PEAK/peak)}
+async function polish(blob){
+  try{
+    const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;if(!OAC)return blob;
+    const src=await new OAC(1,1,44100).decodeAudioData((await blob.arrayBuffer()).slice(0));
+    if(!src||!src.length||src.duration>MAX_SECONDS)return blob;
+    const ctx=new OAC(1,src.length,src.sampleRate),node=ctx.createBufferSource();node.buffer=src;
+    const f=(type,freq,gain=0)=>{const b=ctx.createBiquadFilter();b.type=type;b.frequency.value=freq;b.gain.value=gain;return b};
+    const comp=ctx.createDynamicsCompressor();comp.threshold.value=-20;comp.ratio.value=3;comp.attack.value=0.005;comp.release.value=0.12;comp.knee.value=6;
+    const chain=[f('highpass',90),f('peaking',250,-2),f('peaking',3500,3),comp];
+    chain.reduce((a,b)=>(a.connect(b),b),node).connect(ctx.destination);node.start();
+    const out=await ctx.startRendering();
+    return new Blob([wav(out,normGain(level(out)))],{type:'audio/wav'});
+  }catch(e){window.MAIRRuntime?.caught?.('voice-gain.polish',e);return blob}
+}
+window.MAIRVoiceGain={version:'mair-voice-gain-v2',scale,wav,polish,normGain};
 })();
