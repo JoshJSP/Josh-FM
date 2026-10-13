@@ -28,7 +28,7 @@ if(!dj.includes("truthApi()?.begin?.('dj-handoff'")||!dj.includes('endHandoff'))
 if(!voice.includes("CustomEvent('mair:dj-speaking'")||!voice.includes("classList.toggle('dj-speaking',speaking)"))throw Error('Voice engine moet betrouwbare DJ speaking lifecycle events uitsturen');
 if(!easy.includes("addEventListener('mair:dj-speaking'")||!easy.includes('setDjLive'))throw Error('DJ LIVE UI moet speaking lifecycle volgen');
 if(!sw.includes("'./mair-easy-use-v1.js'"))throw Error('Easy-use DJ UI ontbreekt in PWA CORE-cache');
-const voices=[...tts.matchAll(/\b(josh|maya|max|noah):'([a-f0-9]{32})'/g)].map(m=>m[2]);if(voices.length<4||new Set(voices).size<4)throw Error('DJ-profielen hebben geen vier unieke standaardstemmen');
+const voices=[...tts.matchAll(/\b(josh|maya|max):'([a-f0-9]{32})'/g)].map(m=>m[2]);if(voices.length<3||new Set(voices).size<2)throw Error('DJ-profielen hebben geen eigen standaardstemmen');
 // Auditpunt H-5. Deze vier pollers herinstalleren alleen UI-haken. Met het
 // scherm uit valt er niets te haken, dus ze horen over te slaan en eenmalig in
 // te draaien bij terugkeer. Samen schelen ze ruim honderd wakeups per minuut

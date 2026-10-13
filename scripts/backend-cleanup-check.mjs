@@ -27,6 +27,6 @@ for(const retired of ['Data Saver','Battery Friendly Mode','Night Interface nu',
 if(modes.includes('jfmRuntimeModes')||modes.includes('ensureSettings'))fail('runtime-modes.js injecteert nog een legacy instellingenkaart');
 for(const id of ['jfmRuntimeModes','jfmSleepCard','mairAdvancedDiagnostics'])if(!controls.includes(`'${id}'`))fail(`Nieuwe instellingenlaag verwijdert gecachete legacy UI niet: ${id}`);
 for(const id of ['mairAdvancedDiagnostics','jfmSleepCard','jfmDataPortability'])if(!hub.includes(`'${id}'`))fail(`Diagnose-hub verwijdert retired kaart niet: ${id}`);
-for(const id of ['josh','maya','max','noah']){const asset=`assets/dj-${id}.webp`;if(!exists(asset))fail(`Concept DJ asset ontbreekt: ${asset}`);if(!visuals.includes(`./${asset}`))fail(`DJ visuals verwijst niet naar ${asset}`);if(!sw.includes(`'./${asset}'`))fail(`PWA cache mist ${asset}`)}
+for(const id of ['josh','maya','max']){const asset=`assets/dj-${id}.webp`;if(!exists(asset))fail(`Concept DJ asset ontbreekt: ${asset}`);if(!visuals.includes(`./${asset}`))fail(`DJ visuals verwijst niet naar ${asset}`);if(!sw.includes(`'./${asset}'`))fail(`PWA cache mist ${asset}`)}
 if(!sw.includes("'./mair-dj-visuals.js'"))fail('PWA cache mist mair-dj-visuals.js');
 console.log('MAIR backend cleanup checks: OK');

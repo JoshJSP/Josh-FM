@@ -1,8 +1,8 @@
-// MAIR DJ visuals — one visual source for Josh, Maya, Max and Noah.
+// MAIR DJ visuals — one visual source for Josh, Maya and Max.
 (()=>{
 'use strict';
 if(window.MAIRDJVisuals)return;
-const AVATARS={josh:'./assets/dj-josh.webp',maya:'./assets/dj-maya.webp',max:'./assets/dj-max.webp',noah:'./assets/dj-noah.webp'};
+const AVATARS={josh:'./assets/dj-josh.webp',maya:'./assets/dj-maya.webp',max:'./assets/dj-max.webp'};
 function idFrom(el){if(!el)return'josh';for(const id of Object.keys(AVATARS))if(el.classList?.contains(`dj-${id}`)||el.dataset?.mairDj===id)return id;const card=el.closest?.('[data-mair-dj]');return AVATARS[card?.dataset?.mairDj]?card.dataset.mairDj:(window.MAIRCurrentDJ?.id||window.MAIRDJProfiles?.current?.id||'josh')}
 function img(id,kind='avatar'){const src=AVATARS[id]||AVATARS.josh;return `<img class="mair-dj-photo mair-dj-photo-${kind}" src="${src}" alt="" loading="eager" decoding="async">`}
 function decorate(el){if(!el||el.dataset.mairConceptPhoto==='1')return;const id=idFrom(el);el.dataset.mairConceptPhoto='1';el.dataset.mairDjId=id;el.insertAdjacentHTML('afterbegin',img(id,el.classList.contains('mair-profile-avatar')?'profile':'avatar'));}
