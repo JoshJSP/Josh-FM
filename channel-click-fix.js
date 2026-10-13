@@ -5,6 +5,7 @@
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   async function boundedFetch(url,opt={},ms=10000){const c=new AbortController(),timer=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{...opt,signal:c.signal})}finally{clearTimeout(timer)}}
   const POOL_CACHE='mair_station_pool_cache_v5_nl_editorial_strict',CACHE_TTL=12*60*60*1000,NL_EDITORIAL_SOURCE='spotify-editorial-je-moerstaal';
+  const AI_SOURCE='mair-ai-picks',AI_TTL=24*60*60*1000,AI_KEEP=7*24*60*60*1000,AI_MIN=20,AI_START_DELAY=4000;
   const choice=()=>window.JFMMusicChoice,status=(text,bad=false)=>{const q=document.getElementById('queueInfo');if(q){q.textContent=text;q.style.color=bad?'#ffb4b4':''}};
   const policy=()=>window.MAIRStationPolicy;
   const stationIdFromButton=b=>String(b?.dataset?.jfmChannel||b?.dataset?.mairStation||'');
@@ -16,9 +17,53 @@
   const queries=id=>policy()?.queries?.(id)||[];
   const dedupe=list=>{const s=new Set();return(list||[]).filter(t=>t?.id&&t?.uri&&!s.has(t.id)&&(s.add(t.id),true))};
   function readPools(){try{return JSON.parse(localStorage.getItem(POOL_CACHE)||'{}')}catch{return{}}}
-  function cachedPool(id){const x=readPools()?.[id];if(id==='nl'&&x?.source!==NL_EDITORIAL_SOURCE)return[];return x?.at&&Date.now()-Number(x.at)<CACHE_TTL&&Array.isArray(x.items)?dedupe(x.items):[]}
-  function savePool(id,items,source='station-pool'){if(!id||!items?.length)return;if(id==='nl'&&source!==NL_EDITORIAL_SOURCE)return;try{const all=readPools();all[id]={at:Date.now(),source,items:dedupe(items).slice(0,50)};localStorage.setItem(POOL_CACHE,JSON.stringify(all))}catch{/* opslag geblokkeerd: dan zonder opslag */}}
+  // Voor 'nl' telt alleen Je Moerstaal of de AI-selectie (die vraagt expliciet om Nederlandstalige zang); nooit generiek zoekwerk.
+  const nlTrusted=source=>source===NL_EDITORIAL_SOURCE||source===AI_SOURCE;
+  function cachedPool(id){const x=readPools()?.[id];if(id==='nl'&&!nlTrusted(x?.source))return[];return x?.at&&Date.now()-Number(x.at)<CACHE_TTL&&Array.isArray(x.items)?dedupe(x.items):[]}
+  function savePool(id,items,source='station-pool'){if(!id||!items?.length)return;if(id==='nl'&&!nlTrusted(source))return;try{const all=readPools();all[id]={at:Date.now(),source,items:dedupe(items).slice(0,50)};localStorage.setItem(POOL_CACHE,JSON.stringify(all))}catch{/* opslag geblokkeerd: dan zonder opslag */}}
   async function search(q){const d=await api('/search?type=track&limit=10&q='+encodeURIComponent(q));return(d?.tracks?.items||[]).filter(t=>t?.id&&t?.uri).map(toTrack)}
+  // Bij een Spotify-cooldown één keer wachten en opnieuw, zoals de stationzoekopdrachten altijd al deden.
+  async function withCooldown(run,errors=[]){try{return await run()}catch(e){const msg=String(e?.message||e);errors.push(msg);if(/cooldown|rate limit|429|wacht/i.test(msg)){const ms=Math.max(0,Number(window.JFMSpotifyGuard?.state?.cooldownUntil||0)-Date.now());if(ms&&ms<65000){await wait(ms+180);try{return await run()}catch(retryErr){errors.push(String(retryErr?.message||retryErr))}}}return[]}}
+  // --- AI-selectie: de AI kiest nummers op genre, Spotify bevestigt dat ze echt bestaan. ---
+  // JFMSpotifyGuard laat maar één zoekopdracht per 1,5 s door, dus 60 nummers opzoeken duurt ruim een minuut.
+  // Daarom bouwt dit op de achtergrond en speelt een station de AI-pool pas als die klaar is.
+  // Tot 24 uur oud is de pool vers; tot 7 dagen speelt hij nog terwijl er op de achtergrond een nieuwe komt.
+  const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim();
+  const baseTitle=s=>norm(String(s||'').replace(/\s[-–]\s.*$/,'').replace(/\s*[([][^)\]]*[)\]]/g,''))||norm(s);
+  const mainArtist=s=>norm(String(s||'').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b|\bmet\b)\s*/i)[0]);
+  // Een treffer telt alleen als titel én artiest echt overeenkomen: 'Summer' van een willekeurige band is geen 'Summer' van Calvin Harris.
+  function matchesPick(pick,t){const a=mainArtist(pick?.artist),full=norm(pick?.artist),artists=(t?.artists||[]).map(norm);return !!a&&baseTitle(t?.name)===baseTitle(pick?.title)&&(artists.includes(a)||artists.includes(full))}
+  const clean=s=>String(s||'').replace(/["]/g,'').trim();
+  async function lookupPick(id,pick,errors){const q=`track:"${clean(pick.title)}" artist:"${clean(pick.artist)}"`;const hits=(await withCooldown(async()=>{const d=await api('/search?type=track&limit=3&q='+encodeURIComponent(q));return(d?.tracks?.items||[]).filter(t=>t?.id&&t?.uri).map(toTrack)},errors)).filter(t=>matchesPick(pick,t));return hardFilter(id,hits)[0]||hits[0]||null}
+  let taste=null;
+  async function tasteProfile(){if(taste)return taste;const[a,t]=await Promise.all([api('/me/top/artists?limit=15&time_range=medium_term').catch(()=>null),api('/me/top/tracks?limit=15&time_range=short_term').catch(()=>null)]);taste={topArtists:(a?.items||[]).map(x=>String(x?.name||'')).filter(Boolean).slice(0,15),topTracks:(t?.items||[]).map(x=>({artist:String(x?.artists?.[0]?.name||''),title:String(x?.name||'')})).filter(x=>x.artist&&x.title).slice(0,15)};return taste}
+  const aiEntry=id=>{const x=readPools()?.[id];return x?.source===AI_SOURCE&&Date.now()-Number(x.at||0)<AI_KEEP&&Array.isArray(x.items)?x:null};
+  const shuffle=list=>{const a=[...list];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+  const aiBuilding=new Map();
+  function buildAiPool(id){
+    if(!policy()?.picks?.(id))return Promise.resolve(null);
+    if(aiBuilding.has(id))return aiBuilding.get(id);
+    const job=(async()=>{
+      const profile=await tasteProfile().catch(()=>({topArtists:[],topTracks:[]}));
+      const r=await boundedFetch('/api/station-picks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({station:id,description:policy().picks(id),personalization:policy()?.personalization?.(id),...profile})},40000);
+      if(!r.ok)return null;
+      const d=await r.json().catch(()=>null),picks=(Array.isArray(d?.tracks)?d.tracks:[]).filter(p=>typeof p?.artist==='string'&&typeof p?.title==='string').slice(0,60);
+      const found=[],errors=[];let next=0;
+      // Twee tegelijk: de guard zet ze toch achter elkaar, en zo kan een verzoeknummer van Josh er steeds tussendoor.
+      await Promise.all([0,1].map(async()=>{while(next<picks.length&&found.length<50){const t=await lookupPick(id,picks[next++],errors);if(t)found.push(t)}}));
+      const out=diversify(hardFilter(id,dedupe(found)));
+      if(out.length<AI_MIN)return null;
+      savePool(id,out,AI_SOURCE);return out;
+    })().catch(()=>null).finally(()=>aiBuilding.delete(id));
+    aiBuilding.set(id,job);return job;
+  }
+  function aiPool(id){
+    if(!policy()?.picks?.(id))return null;
+    const x=aiEntry(id);
+    if(!x||Date.now()-Number(x.at)>AI_TTL)setTimeout(()=>{buildAiPool(id)},AI_START_DELAY);
+    const items=dedupe(x?.items||[]);
+    return items.length>=AI_MIN?{tracks:shuffle(items),verified:true,fallback:false,source:'MAIR-selectie'}:null;
+  }
   async function dutchChartPool(id){
     if(!['hits','top40','nl'].includes(id))return null;
     const r=await boundedFetch('/api/nl-charts?station='+encodeURIComponent(id),{cache:'no-store'}),d=await r.json().catch(()=>({}));
@@ -34,6 +79,8 @@
   async function buildPool(id){
     if(!ensurePolicy())throw Error('Stations worden nog geladen.');
     let raw=[],searchErrors=[];
+    // Eerst de AI-selectie. Is die er (nog) niet, dan de oude methode hieronder; die blijft het vangnet.
+    const picked=aiPool(id);if(picked)return picked;
     if(id==='nl'){
       try{
         const editorial=await dutchChartPool('nl');
@@ -49,7 +96,7 @@
       try{const chart=await dutchChartPool(id);if(chart?.tracks?.length){savePool(id,chart.tracks,'nl-chart');return chart}}catch(e){searchErrors.push('Nederlandse playlist: '+String(e?.message||e))}
     }
     for(const q of queries(id)){
-      try{raw.push(...await search(q))}catch(e){const msg=String(e?.message||e);searchErrors.push(msg);if(/cooldown|rate limit|429|wacht/i.test(msg)){const ms=Math.max(0,Number(window.JFMSpotifyGuard?.state?.cooldownUntil||0)-Date.now());if(ms&&ms<65000){await wait(ms+180);try{raw.push(...await search(q))}catch(retryErr){searchErrors.push(String(retryErr?.message||retryErr))}}}}
+      raw.push(...await withCooldown(()=>search(q),searchErrors));
       await wait(65);
     }
     raw=dedupe(raw);
@@ -97,5 +144,5 @@
   function own(){if(!ensurePolicy())return false;const c=choice();if(!c)return false;c.chooseChannel=choose;c.rebuild=()=>choose(localStorage.getItem('jfm_music_channel_v1')||'mix');try{Object.defineProperty(c,'channel',{configurable:true,get:()=>localStorage.getItem('jfm_music_channel_v1')||'mix'})}catch{/* opslag geblokkeerd: dan zonder opslag */}c.hotfix='authoritative-stations-v17-nl-editorial-strict';paint(localStorage.getItem('jfm_music_channel_v1')||'mix');protectBuild();return true}
   document.addEventListener('click',async e=>{const b=e.target?.closest?.('[data-jfm-channel],[data-mair-station]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const n=Date.now();if(n-lastTap<250)return;lastTap=n;const id=stationIdFromButton(b);if(!id)return;await choose(id).catch(()=>false)},true);
   const boot=()=>own();boot();setTimeout(boot,300);setTimeout(boot,1200);window.addEventListener('pageshow',()=>setTimeout(boot,150));window.addEventListener('mair:runtime-ready',boot);window.addEventListener('mair:foundation-ready',()=>paint(localStorage.getItem('jfm_music_channel_v1')||'mix',false));
-  window.MAIRStationController={version:'mair-station-controller-v4.1-nl-editorial-strict',select:choose,harden:own,buildPool,get switching(){return switching},get channel(){return localStorage.getItem('jfm_music_channel_v1')||'mix'}};window.JFMChannelTapGuard=window.MAIRStationController;
+  window.MAIRStationController={version:'mair-station-controller-v4.1-nl-editorial-strict',select:choose,harden:own,buildPool,buildAiPool,get switching(){return switching},get channel(){return localStorage.getItem('jfm_music_channel_v1')||'mix'}};window.JFMChannelTapGuard=window.MAIRStationController;
 })();
