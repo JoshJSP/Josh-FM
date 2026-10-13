@@ -10,7 +10,7 @@ MAIR is een persoonlijke Nederlandse AI-radio boven op een Spotify Premium-accou
 - `queue-core.js` serialiseert queue-wijzigingen; Spotify blijft de bron voor wat daadwerkelijk als volgende klaarstaat.
 - `mair-dj-v2.js` plant en speelt DJ-breaks. `mair-dj-schedule-sync.js` levert één gededupliceerd fallback-signaal als een primair trackeinde-event ontbreekt.
 - `/api/dj-writer` genereert uitsluitend Nederlandse DJ-copy via Groq. Als de writer faalt, blijft de muziek spelen en gebruikt MAIR een korte lokale Nederlandse fallback.
-- `/api/tts` genereert MP3 via Fish Audio. Elke DJ heeft een eigen Nederlandse voice; ongeldige audio, timeouts en voicefouten blokkeren de muziek niet.
+- `/api/tts` genereert MP3 via Edge (Microsoft Read Aloud, gratis en zonder sleutel) met de nl-NL-stemmen Maarten (Josh; hoger en sneller voor Max; lager en trager voor Noah) en Fenna (Maya). Edge is onofficieel: faalt hij, dan neemt Fish Audio het over. Faalt die ook, dan slaat de DJ de break over en speelt de muziek door. In de browser krijgt elke stem dezelfde radiobewerking (EQ, compressie, vast niveau).
 - De diagnosekaart toont playback-, queue-, DJ-, writer-, voice-, TTS-, cache- en herstelstatus zonder secrets te tonen.
 - De service worker maakt de hoofdinterface installeerbaar als PWA en bewaakt release/cacheversies.
 
