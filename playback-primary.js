@@ -69,7 +69,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   // Ducking voor de DJ-overgang. Bewust géén setVolume(): de stand van Josh moet
   // ongemoeid blijven, dit is tijdelijk. DUCK_RATIO is een fractie van zijn
   // volume, niet een absolute waarde, anders wordt zachtluisteren juist harder.
-  const DUCK_RATIO=.18;
+  const DUCK_RATIO=.06;
   async function djDuck(){
     if(ducked)return true;
     if(!player()?.setVolume&&!deviceId())return false;
@@ -192,8 +192,8 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     // De jingle mag het starten van muziek nooit ophouden. Fish Audio kan traag of
     // onbereikbaar zijn en stond hier vóór de eerste play-call; een stille TTS
     // vertraagde daardoor de hele start. Nu vuurt hij los en loopt hij desnoods
-    // over de intro heen, precies zoals een radiojingle hoort te doen.
-    if($('jingles')?.checked&&typeof speakText==='function'){Promise.resolve(speakText('MAIRFM. Jouw muziek, jouw radio.',true)).catch(()=>false)}
+    // over de intro heen, met de muziek geduckt zodat hij niet door het nummer heen praat.
+    if($('jingles')?.checked&&typeof speakText==='function'){Promise.resolve().then(async()=>{await wait(700);await djDuck();try{await speakText('MAIRFM. Jouw muziek, jouw radio.',true)}finally{await djUnduck()}}).catch(()=>djUnduck())}
     info('Muziek wordt gestart…');await disableSpotifyShuffle(id);await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris,position_ms:0}});
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&!!x.item?.id);if(!s)throw Error('Spotify bevestigde het starten niet.');await nudgeSdkPlayback();
     try{session=[];lastTrackId=null;renderHistory();scheduleTalk();startPolling()}catch(e){window.MAIRRuntime?.caught?.('playback-primary.uris',e)};ingest(s,'primary-start');truth()?.setExpectedLive?.(true,'radio-live');recoveryFailures=0;recoveryCooldownUntil=0;info(`MAIRFM is live · ${queue.length} tracks klaar.`);return true
