@@ -28,7 +28,7 @@ try{
   assert.equal(res.statusCode,200);assert.equal(res.headers['X-JoshFM-TTS'],'edge');assert.equal(res.headers['X-JoshFM-Voice'],'nl-NL-ColetteNeural');assert.equal(res.headers['X-MAIR-DJ'],'max');assert.ok(Buffer.isBuffer(res.body)&&res.body[0]===0xff);
   assert.match(sent[0].url,/Sec-MS-GEC=[0-9A-F]{64}&Sec-MS-GEC-Version=/);assert.match(sent[0].opt.headers.Origin,/^chrome-extension:/);
   const ssml=sent[0].messages.find(m=>m.includes('Path:ssml'));assert.match(ssml,/pitch='\+2Hz' rate='\+8%'/);assert.match(ssml,/Dit is Mair met Simon &amp; Garfunkel &lt;live&gt;\./);
-  for(const[dj,voice]of[['josh','Maarten'],['maya','Fenna'],['max','Maarten']]){sent=[];globalThis.WebSocket=fakeEdge(sent);res=await call(tts,{method:'POST',body:{text:'Hoi.',djProfile:dj}});assert.equal(res.headers['X-JoshFM-Voice'],`nl-NL-${voice}Neural`)}
+  for(const[dj,voice]of[['josh','Maarten'],['maya','Fenna'],['max','Colette']]){sent=[];globalThis.WebSocket=fakeEdge(sent);res=await call(tts,{method:'POST',body:{text:'Hoi.',djProfile:dj}});assert.equal(res.headers['X-JoshFM-Voice'],`nl-NL-${voice}Neural`)}
   globalThis.WebSocket=DeadEdge;
 
   process.env.FISH_AUDIO_API_KEY='test-key';delete process.env.FISH_AUDIO_MODEL;
