@@ -79,7 +79,7 @@ async function testSuccessfulAutomaticBreak(){
   assert.equal(h.metrics.djDuck,1,`successful break ducks the music exactly once: ${JSON.stringify(h.state())}`);
   assert.equal(h.metrics.djPause,0,'ducking mag de muziek nooit stoppen');
   assert.equal(h.metrics.speak,1,'successful break speaks exactly once');
-  assert.equal(h.metrics.djRewind,0,'een geduckte break speelt door, dus er valt niets terug te spoelen');
+  assert.equal(h.metrics.djRewind,1,'na een geduckte break begint het nummer opnieuw, anders praat de DJ over het begin heen');
   assert.equal(h.metrics.djUnduck,1,'successful break restores the volume exactly once');assert.equal(h.metrics.djResume,0);
   assert.equal(h.metrics.genericPause,0,'generic pause must not own DJ handoff');
   assert.equal(h.metrics.genericResume,0,'generic resume must not own DJ handoff');
