@@ -69,3 +69,6 @@ export async function groqText({model,system,user,timeoutMs=9000,requestId='',te
     return{ok:true,provider:'groq',model,text,usage:d?.usage||null};
   }catch(e){const aborted=e?.name==='AbortError';return{ok:false,provider:'groq',model,status:aborted?504:500,error:aborted?'Groq timeout':clip(e?.message||e,500)}}
 }
+
+// AI-modellen zetten er soms markdown of een zin omheen; pak dan het JSON-object eruit.
+export function parseJson(text){try{return JSON.parse(text)}catch{}const cleaned=String(text||'').replace(/^```(?:json)?\s*/i,'').replace(/```$/,'').trim();try{return JSON.parse(cleaned)}catch{}const a=cleaned.indexOf('{'),b=cleaned.lastIndexOf('}');if(a>=0&&b>a){try{return JSON.parse(cleaned.slice(a,b+1))}catch{}}return null}
