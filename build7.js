@@ -1,10 +1,10 @@
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id),KEY='mair_build7',ANN='mair_request_announcements_v1';
-const defaults={dj:'mix',rotation:60,liveContext:true,personal:true,requestPriority:'balanced'};
+const defaults={dj:'mix',rotation:120,liveContext:true,personal:true,requestPriority:'balanced'};
 let prefs={...defaults,...read()},pendingRequest=null,previewToken=0;
-function read(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch{return{}}}
-function sync(){if(window.MAIR_PUBLIC_DJ_ENABLED===false)return;const live=window.MAIRLiveContext,profiles=window.MAIRDJProfiles;if(prefs.dj==='mix'){live?.setRotationMinutes?.(prefs.rotation);live?.setMode?.('show')}else{profiles?.select?.(prefs.dj);live?.setMode?.('fixed')}const w=$('weatherMention'),t=$('timeMention');if(w)w.checked=!!prefs.liveContext;if(t)t.checked=!!prefs.liveContext}
+function read(){try{const o=JSON.parse(localStorage.getItem(KEY)||'{}');if(o.rotation===60)o.rotation=120;return o}catch{return{}}}
+function sync(){if(window.MAIR_PUBLIC_DJ_ENABLED===false)return;const live=window.MAIRLiveContext,profiles=window.MAIRDJProfiles;if(prefs.dj==='mix'){live?.setRotationMinutes?.(prefs.rotation);live?.setMode?.('rotation')}else{profiles?.select?.(prefs.dj);live?.setMode?.('fixed')}const w=$('weatherMention'),t=$('timeMention');if(w)w.checked=!!prefs.liveContext;if(t)t.checked=!!prefs.liveContext}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(prefs))}catch{/* opslag geblokkeerd: dan zonder opslag */};sync();document.dispatchEvent(new CustomEvent('mair:prefs',{detail:{...prefs}}))}
 function scriptLoaded(src){const wanted=new URL(src,location.href).pathname;return[...document.scripts].some(s=>{try{return new URL(s.src,location.href).pathname===wanted}catch{return false}})}
 function loadScript(id,src){if(document.getElementById(id)||scriptLoaded(src))return;const s=document.createElement('script');s.id=id;s.src=src;s.async=false;document.body.appendChild(s)}
