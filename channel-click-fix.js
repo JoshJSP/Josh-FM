@@ -49,8 +49,9 @@
       if(!r.ok)return null;
       const d=await r.json().catch(()=>null),picks=(Array.isArray(d?.tracks)?d.tracks:[]).filter(p=>typeof p?.artist==='string'&&typeof p?.title==='string').slice(0,60);
       const found=[],errors=[];let next=0;
-      // Twee tegelijk: de guard zet ze toch achter elkaar, en zo kan een verzoeknummer van Josh er steeds tussendoor.
-      await Promise.all([0,1].map(async()=>{while(next<picks.length&&found.length<50){const t=await lookupPick(id,picks[next++],errors);if(t)found.push(t)}}));
+      // Eén tegelijk en pauze zodra er een station start: de guard laat één zoekopdracht per 1,5 s door, en met twee
+      // achtergrondzoekopdrachten ervoor duurde het opbouwen van het getikte station zo lang dat er niets nieuws kwam.
+      while(next<picks.length&&found.length<50){while(switching)await wait(500);const t=await lookupPick(id,picks[next++],errors);if(t)found.push(t)}
       const out=diversify(hardFilter(id,dedupe(found)));
       if(out.length<AI_MIN)return null;
       savePool(id,out,AI_SOURCE);return out;

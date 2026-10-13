@@ -1,6 +1,6 @@
 // e2e: de echte app tegen een nep-Spotify. Dekt starten, natuurlijke wissel, skip, pauze, DJ-break en storingen.
 //   node scripts/e2e/playback.e2e.mjs [scenario]
-import {launch,boot,mock,until,checker,sleep} from './harness.mjs';
+import {launch,boot,mock,until,checker,sleep,ORIGIN} from './harness.mjs';
 const c=checker();
 const only=process.argv[2];
 const tab=async(page,name)=>{await page.locator('nav button, [role=tab]',{hasText:name}).locator('visible=true').first().click();await page.waitForTimeout(500)};
@@ -360,7 +360,23 @@ async function scenarioRequestUi(){
   }finally{await h.close()}
 }
 
-const scenarios={requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// AI-selectie op de achtergrond mag het wisselen naar een ander station niet ophouden (13-10: tik op station gaf niets nieuws).
+async function scenarioAiPicksSwitch(){
+  const h=await launch({trackMs:20000});
+  try{
+    const picks=Array.from({length:60},(_,i)=>({title:`Testnummer ${i*7+3}`,artist:`Testartiest ${(i*7+3)%12}`}));
+    await h.page.route(ORIGIN+'/api/station-picks',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({tracks:picks})}));
+    await boot(h);
+    const tap=id=>h.page.evaluate(id=>document.querySelector(`[data-mair-station="${id}"],[data-jfm-channel="${id}"]`)?.click(),id);
+    await tap('party');await h.page.waitForTimeout(9000);
+    const before=await h.page.evaluate(()=>window.__mock.state().uri);
+    await tap('chill');
+    let ok=true;try{await until(h.page,b=>window.__mock.state().playing&&window.__mock.state().uri!==b&&!/gaat automatisch door/.test(document.getElementById('queueInfo')?.textContent||''),before,25000,'chill speelt')}catch{ok=false}
+    const q=await h.page.evaluate(()=>document.getElementById('queueInfo')?.textContent||'');
+    c.ok('AI-selectie bouwt op de achtergrond: wisselen naar een ander station start dat station',ok&&/CHILL/.test(q),q);
+  }finally{await h.close()}
+}
+const scenarios={aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
