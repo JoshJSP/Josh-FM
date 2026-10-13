@@ -20,7 +20,7 @@ Oudere JFM/DJ-bestanden blijven alleen staan waar ze nog als compatibility/fallb
 
 ## Deze release-candidate fixt
 - vaste Fish Audio-cast per DJ met expliciete voice-override opt-in
-- duidelijk verschillende presentatiestijlen voor Josh, Maya, Max en Noah
+- duidelijk verschillende presentatiestijlen voor Josh, Maya en Max
 - radio-clock-aware DJ-copy voor Morning, Daytime, Drive, Evening, Late Night en After Hours
 - minder voorspelbare “Dat was X, nu Y”-breaks
 - lokale Web Playback SDK-verificatie na reload, ook als Spotify remote al `is_playing=true` meldt

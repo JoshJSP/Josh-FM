@@ -17,8 +17,8 @@ try{
   assert.match(system,/energieke drive- en partyhost/i);assert.match(system,/geen geschreeuw/i);assert.match(system,/geen chatbot/i);assert.match(user,/CONTEXT:/);assert.match(user,/MAIR/);
 
   res=await call(makeBody('noah','late avond'),'198.51.100.32');
-  assert.equal(res.statusCode,200);assert.equal(res.body.persona,'noah');
-  system=bodies.at(-1).messages[0].content;assert.match(system,/rustige curator/i);assert.match(system,/minder woorden/i);
+  assert.equal(res.statusCode,200);assert.equal(res.body.persona,'josh','Noah bestaat niet meer: terugval op Josh');
+  system=bodies.at(-1).messages[0].content;assert.match(system,/natuurlijke hoofdpresentator/i);
 
   res=await call(makeBody('maya'),'198.51.100.33');
   assert.equal(res.statusCode,200);assert.equal(res.body.persona,'maya');assert.match(bodies.at(-1).messages[0].content,/warme storyteller/i);

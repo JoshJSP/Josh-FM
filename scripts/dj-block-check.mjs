@@ -28,6 +28,9 @@ const at=h=>{setClock(`2026-10-13T${String(h).padStart(2,'0')}:30:00`)};
 // vaste DJ blijft staan
 {at(1);const w=world();const live=w.ctx.MAIRLiveContext;w.profiles.current={id:'max',name:'max'};live.setMode('fixed');const n0=w.ev.length;for(const h of[1,3,5,9,23]){at(h);live.maybeRotate();live.applyRotation('x')}
  ok('fixed: DJ blijft max, geen overdracht',w.profiles.current.id==='max'&&w.ev.length===n0)}
+// opgeslagen Noah (bestaat niet meer): fixed valt terug op Josh, geen eindeloze overdrachten
+{at(1);const w=world({mair_dj_profile_v1:'noah'});const live=w.ctx.MAIRLiveContext;w.profiles.current={id:'josh',name:'Josh'};live.setMode('fixed');const n0=w.ev.length;live.applyRotation('x');live.applyRotation('x');
+ ok('opgeslagen noah: blijft Josh, opslag blijft staan',w.profiles.current.id==='josh'&&w.ev.length===n0&&w.store.mair_dj_profile_v1==='noah')}
 // 60 -> 120
 {const w=world({mair_rotation_minutes_v2:'60'});ok('opgeslagen 60 min wordt 120',w.ctx.MAIRLiveContext.rotationMinutes===120);ok('setRotationMinutes(60) wordt 120',w.ctx.MAIRLiveContext.setRotationMinutes(60)===120)}
 {const b=read('build7.js');ok('build7: standaard 120, oude 60 gemigreerd, mix gebruikt rotation',b.includes('rotation:120')&&b.includes('o.rotation===60')&&b.includes("setMode?.('rotation')"))}

@@ -34,7 +34,7 @@ const apiVersion=read('api/version.js');
 
 check('show clock v3 active',has(clock,"station-clock-v3-show-director","MAIR Morning","MAIR Drive","MAIR Late Night"));
 check('special shows exist',has(clock,"weekend-warmup","new-music","saturday-night","throwback-lunch","top40"));
-check('show clock assigns DJs',has(clock,"djId:'josh'","djId:'maya'","djId:'max'","djId:'noah'"));
+check('show clock assigns DJs',has(clock,"djId:'josh'","djId:'maya'","djId:'max'"));
 check('show clock exposes radio moments',has(clock,"Top of hour","Half-hour show ID","jfm:clock-moment","jfm:show-change"));
 
 check('MAIR Director horizon active',has(rotation,"mair-director-v3-horizon","HORIZON_TRACKS=10","cooldownPenalty","transitionPenalty","clockFit","momentum","modeScore"));
@@ -67,7 +67,7 @@ check('hourly news has deterministic fallback',has(bulletinWriter,'deterministic
 check('show-driven presenter mode active',has(liveContext,"mair-live-context-v3-show-mode","mode==='show'","jfm:show-change","showDJ"));
 check('weather/time context retained',has(liveContext,'weatherHint','timeHint','contextFor'));
 
-check('voice lab compares all four DJs',has(voiceLab,"DJS=['josh','maya','max','noah']",'exact dezelfde tekst','/api/tts'));
+check('voice lab compares all three DJs',has(voiceLab,"DJS=['josh','maya','max']",'exact dezelfde tekst','/api/tts'));
 check('voice lab uses central audio unlock',has(voiceLab,'JFMDJAudio?.unlock','active=id'));
 
 check('60 minute soak monitor active',has(soak,'60+ MINUTEN SOAK TEST','start(minutes=60)','trackChanges','djMissed','reloadRepairs'));

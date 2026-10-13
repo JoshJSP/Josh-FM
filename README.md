@@ -10,7 +10,7 @@ MAIR is een persoonlijke Nederlandse AI-radio boven op een Spotify Premium-accou
 - `queue-core.js` serialiseert queue-wijzigingen; Spotify blijft de bron voor wat daadwerkelijk als volgende klaarstaat.
 - `mair-dj-v2.js` plant en speelt DJ-breaks. `mair-dj-schedule-sync.js` levert één gededupliceerd fallback-signaal als een primair trackeinde-event ontbreekt.
 - `/api/dj-writer` genereert uitsluitend Nederlandse DJ-copy via Groq. Als de writer faalt, blijft de muziek spelen en gebruikt MAIR een korte lokale Nederlandse fallback.
-- `/api/tts` genereert MP3 via Edge (Microsoft Read Aloud, gratis en zonder sleutel) met de nl-NL-stemmen Maarten (Josh; hoger en sneller voor Max; lager en trager voor Noah) en Fenna (Maya). Edge is onofficieel: faalt hij, dan neemt Fish Audio het over. Faalt die ook, dan slaat de DJ de break over en speelt de muziek door. In de browser krijgt elke stem dezelfde radiobewerking (EQ, compressie, vast niveau).
+- `/api/tts` genereert MP3 via Edge (Microsoft Read Aloud, gratis en zonder sleutel) met de nl-NL-stemmen Maarten (Josh), Fenna (Maya) en Colette (Max). Edge is onofficieel: faalt hij, dan neemt Fish Audio het over. Faalt die ook, dan slaat de DJ de break over en speelt de muziek door. In de browser krijgt elke stem dezelfde radiobewerking (EQ, compressie, vast niveau).
 - De diagnosekaart toont playback-, queue-, DJ-, writer-, voice-, TTS-, cache- en herstelstatus zonder secrets te tonen.
 - De service worker maakt de hoofdinterface installeerbaar als PWA en bewaakt release/cacheversies.
 
@@ -35,7 +35,7 @@ Optioneel:
 De AI-routes (`/api/dj-writer`, `/api/discover`, `/api/category-filter`, `/api/news-bulletin`) en de routes die externe diensten of Fish Audio-tegoed gebruiken (`/api/tts`, `/api/fact`) eisen een eigen `Origin` en een Spotify-token (`api/_guard.js`; de client zet dat via `mair-ai-auth.js`). Daarboven staat in de Vercel Firewall de regel *AI-routes rate limit*: 30 verzoeken per minuut per IP, over alle instances heen.
 - `GROQ_DJ_MODEL`: expliciet ondersteund Groq-model. Zonder override probeert MAIR `openai/gpt-oss-120b` en daarna `openai/gpt-oss-20b`.
 - `FISH_AUDIO_MODEL`: expliciet Fish-model. Zonder override probeert MAIR `s2.1-pro-free` en daarna `s2-pro`.
-- `FISH_AUDIO_VOICE_JOSH`, `FISH_AUDIO_VOICE_MAYA`, `FISH_AUDIO_VOICE_MAX`, `FISH_AUDIO_VOICE_NOAH`: per-DJ voice override.
+- `FISH_AUDIO_VOICE_JOSH`, `FISH_AUDIO_VOICE_MAYA`, `FISH_AUDIO_VOICE_MAX`: per-DJ voice override.
 - `FISH_AUDIO_VOICE_ID`: algemene voice override als geen profieloverride bestaat.
 
 Een ontbrekende AI- of TTS-key mag playback niet stoppen. MAIR slaat de break over of gebruikt lokale copy en meldt de oorzaak in Diagnose.

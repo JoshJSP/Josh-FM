@@ -2,7 +2,7 @@
 (()=>{
 'use strict';
 if(window.MAIRVoiceLab)return;
-const $=id=>document.getElementById(id),DJS=['josh','maya','max','noah'];
+const $=id=>document.getElementById(id),DJS=['josh','maya','max'];
 const SAMPLE='Dit is MAIR. Je hoorde net een sterke plaat, straks heb ik nieuwe muziek voor je. Eerst gaan we door met een track die je waarschijnlijk vanaf de eerste seconde kent.';
 let active=null,lastError='',meta={};
 async function unlock(){try{return await window.JFMDJAudio?.unlock?.()}catch{return false}}

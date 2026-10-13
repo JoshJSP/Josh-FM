@@ -1,15 +1,15 @@
 (()=>{
  const MODE_KEY='mair_dj_mode_v1',LAST_SLOT='mair_rotation_slot_v2',CTX_KEY='mair_live_context_v1',MIN_KEY='mair_rotation_minutes_v2';
  const BLOCK=120;// een DJ presenteert een blok van 2 uur, aan de klok gekoppeld (00-02, 02-04, ...)
- const ORDER=['josh','maya','max','noah'];
+ const ORDER=['josh','maya','max'];
  const now=()=>Date.now(),minutes=()=>Number(localStorage.getItem(MIN_KEY))===30?30:BLOCK,off=()=>new Date().getTimezoneOffset()*60000,slot=()=>Math.floor((now()-off())/(minutes()*60000));
  const untilBlock=()=>new Date((slot()+1)*minutes()*60000+off());
  const getMode=()=>localStorage.getItem(MODE_KEY)||'show';
  const setMode=m=>{if(!['fixed','show','rotation','station'].includes(m))m='show';localStorage.setItem(MODE_KEY,m);render();return m};
  const setRotationMinutes=n=>{n=Number(n)===30?30:BLOCK;localStorage.setItem(MIN_KEY,String(n));localStorage.removeItem(LAST_SLOT);render();return n};
- const selected=()=>window.MAIRDJProfiles?.current?.id||localStorage.getItem('mair_dj_profile_v1')||'josh';
+ const selected=()=>{const id=window.MAIRDJProfiles?.current?.id||localStorage.getItem('mair_dj_profile_v1');return ORDER.includes(id)?id:'josh'};// opgeslagen oude DJ (Noah) valt terug op Josh, de opslag blijft staan
  function showDJ(){return window.JFMStationClock?.current?.()?.show?.djId||'josh'}
- function targetDJ(){const mode=getMode();if(mode==='fixed')return selected();if(mode==='show')return showDJ();if(mode==='station'){const c=window.JFMMusicChoice?.channel||'mix';return({party:'max',chill:'maya',new:'noah',throwback:'noah',hits:'josh',top40:'josh',mix:'josh'})[c]||'josh'}return ORDER[((slot()%ORDER.length)+ORDER.length)%ORDER.length]}
+ function targetDJ(){const mode=getMode();if(mode==='fixed')return selected();if(mode==='show')return showDJ();if(mode==='station'){const c=window.JFMMusicChoice?.channel||'mix';return({party:'max',chill:'maya',new:'max',throwback:'maya',hits:'josh',top40:'josh',mix:'josh'})[c]||'josh'}return ORDER[((slot()%ORDER.length)+ORDER.length)%ORDER.length]}
  function applyRotation(reason='trackchange'){const api=window.MAIRDJProfiles;if(!api?.select)return null;const target=targetDJ(),current=api.current?.id||selected();if(target!==current){api.select(target);window.dispatchEvent(new CustomEvent('mair:djhandover',{detail:{from:current,to:target,reason,at:now()}}))}localStorage.setItem(LAST_SLOT,String(slot()));render();return target}
  function onAir(){const mode=getMode(),dj=window.MAIRDJProfiles?.current?.name||selected();return{mode,dj,until:mode==='rotation'?untilBlock():null}}
  const untilText=()=>untilBlock().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});

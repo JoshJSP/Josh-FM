@@ -4,16 +4,15 @@ const DEFAULT_VOICE='b347db033a6549378b48d00acb0d06cd';
 const DEFAULT_VOICES={
   josh:'88e8f699776e4bacbf6ef55c2aecfb36',
   maya:'a8673b1ff5e640c8abb9d3af550a46e9',
-  max:'149694610a7449b6b2c5aef22859e2d3',
-  noah:'a5f24be3b55c45b7923c4d8ca02aba9a'
+  max:'a8673b1ff5e640c8abb9d3af550a46e9'
 };
 const DEFAULT_MODELS=['s2.1-pro-free','s2-pro'];
 const FISH='https://api.fish.audio';
 const RATE=new Map();
-const DJ_ENV={josh:'FISH_AUDIO_VOICE_JOSH',maya:'FISH_AUDIO_VOICE_MAYA',max:'FISH_AUDIO_VOICE_MAX',noah:'FISH_AUDIO_VOICE_NOAH'};
+const DJ_ENV={josh:'FISH_AUDIO_VOICE_JOSH',maya:'FISH_AUDIO_VOICE_MAYA',max:'FISH_AUDIO_VOICE_MAX'};
 const NON_DUTCH_VOICES=new Set(['802e3bc2b27e49c2995d23ef70e6ac89']);
 // Lower sampling randomness reduces metallic/grainy artifacts while preserving each DJ's pace.
-const DJ_STYLE={josh:{speed:1.0,temperature:.62,topP:.68},maya:{speed:.98,temperature:.64,topP:.69},max:{speed:1.07,temperature:.66,topP:.70},noah:{speed:.93,temperature:.58,topP:.65}};
+const DJ_STYLE={josh:{speed:1.0,temperature:.62,topP:.68},maya:{speed:.98,temperature:.64,topP:.69},max:{speed:1.07,temperature:.66,topP:.70}};
 const AUDIO_QUALITY='mp3-192-stable-v1';
 function normalizeProfile(profile='josh'){const id=String(profile||'josh').trim().toLowerCase();return Object.hasOwn(DJ_ENV,id)?id:'josh'}
 // x-real-ip wordt door het platform gezet en is niet door de client te kiezen.
@@ -28,8 +27,8 @@ function styleFor(profile='josh'){return DJ_STYLE[String(profile||'').toLowerCas
 function config(profile='josh'){const explicit=String(process.env.FISH_AUDIO_MODEL||'').trim();return{key:process.env.FISH_AUDIO_API_KEY||'',voiceId:voiceFor(profile),models:explicit?[explicit]:DEFAULT_MODELS,style:styleFor(profile)}}
 // Edge (Microsoft Read Aloud) is de eerste stem: gratis, zonder sleutel, echte nl-NL-stemmen.
 // Het is een onofficieel endpoint (handshake overgenomen uit edge-tts 7.2.8), dus Fish blijft de terugval.
-// Edge heeft maar een Nederlandse mannenstem: Max is Maarten hoger en sneller, Noah is Maarten lager en trager.
-const EDGE_VOICES={josh:{voice:'nl-NL-MaartenNeural',pitch:'+0Hz',rate:'+0%'},maya:{voice:'nl-NL-FennaNeural',pitch:'+0Hz',rate:'+0%'},max:{voice:'nl-NL-MaartenNeural',pitch:'+8Hz',rate:'+8%'},noah:{voice:'nl-NL-MaartenNeural',pitch:'-10Hz',rate:'-8%'}};
+// Max is een vrouw: Colette, iets sneller. Haar Fish-terugval is de vrouwenstem van Maya.
+const EDGE_VOICES={josh:{voice:'nl-NL-MaartenNeural',pitch:'+0Hz',rate:'+0%'},maya:{voice:'nl-NL-FennaNeural',pitch:'+0Hz',rate:'+0%'},max:{voice:'nl-NL-ColetteNeural',pitch:'+2Hz',rate:'+8%'}};
 const EDGE_TOKEN='6A5AA1D4EAFF4E9FB37E23D68491D6F4',EDGE_CHROME='143.0.3650.75',EDGE_MAJOR=EDGE_CHROME.split('.')[0];
 const EDGE_TIMEOUT_MS=7000;
 const edgeId=()=>randomUUID().replace(/-/g,'');

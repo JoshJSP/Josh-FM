@@ -2,18 +2,18 @@
 (()=>{
   const $=id=>document.getElementById(id),pad=n=>String(n).padStart(2,'0');
   const SHOWS=[
-    {id:'after-hours',name:'MAIR After Hours',start:0,end:6,mode:'late',djId:'noah',tone:'low-key overnight radio',format:'music-first, calm links',targetMomentum:.42,musicPattern:['Familiar','Throwback','Discovery','Familiar']},
+    {id:'after-hours',name:'MAIR After Hours',start:0,end:6,mode:'late',djId:'maya',tone:'low-key overnight radio',format:'music-first, calm links',targetMomentum:.42,musicPattern:['Familiar','Throwback','Discovery','Familiar']},
     {id:'morning',name:'MAIR Morning',start:6,end:10,mode:'morning',djId:'josh',tone:'bright morning radio',format:'fresh, concise, useful clock hits',targetMomentum:.72,musicPattern:['Power','Current','Familiar','Discovery','Power','Current']},
     {id:'daytime',name:'MAIR Daytime',start:10,end:16,mode:'normal',djId:'maya',tone:'music-first daytime radio',format:'warm, familiar, low interruption',targetMomentum:.65,musicPattern:['Familiar','Current','Power','Discovery','Familiar','Current']},
     {id:'drive',name:'MAIR Drive',start:16,end:20,mode:'normal',djId:'max',tone:'upbeat drive-time radio',format:'momentum, short punchy links',targetMomentum:.82,musicPattern:['Power','Current','Power','Familiar','Discovery','Current']},
     {id:'evening',name:'MAIR Evening',start:20,end:23,mode:'chill',djId:'maya',tone:'warm evening radio',format:'atmosphere, discovery and familiar songs',targetMomentum:.58,musicPattern:['Familiar','Discovery','Current','Throwback','Familiar']},
-    {id:'late-night',name:'MAIR Late Night',start:23,end:24,mode:'late',djId:'noah',tone:'calm late-night radio',format:'curated, sparse and confident',targetMomentum:.45,musicPattern:['Familiar','Throwback','Discovery','Familiar']}
+    {id:'late-night',name:'MAIR Late Night',start:23,end:24,mode:'late',djId:'josh',tone:'calm late-night radio',format:'curated, sparse and confident',targetMomentum:.45,musicPattern:['Familiar','Throwback','Discovery','Familiar']}
   ];
   const SPECIALS=[
     {id:'weekend-warmup',name:'MAIR Weekend Warm-up',days:[5],start:20,end:23,mode:'party',djId:'max',tone:'weekend energy',format:'fast, celebratory, music-forward',targetMomentum:.86,preferredStation:'party',musicPattern:['Power','Current','Power','Familiar','Current']},
-    {id:'new-music',name:'MAIR New Music',days:[6],start:10,end:12,mode:'normal',djId:'noah',tone:'curious and informed',format:'new music with concise context',targetMomentum:.68,preferredStation:'new',musicPattern:['Current','Discovery','Current','Discovery','Power']},
+    {id:'new-music',name:'MAIR New Music',days:[6],start:10,end:12,mode:'normal',djId:'max',tone:'curious and informed',format:'new music with concise context',targetMomentum:.68,preferredStation:'new',musicPattern:['Current','Discovery','Current','Discovery','Power']},
     {id:'saturday-night',name:'MAIR Saturday Night',days:[6],start:20,end:24,mode:'party',djId:'max',tone:'high-energy Saturday radio',format:'party momentum and very short links',targetMomentum:.9,preferredStation:'party',musicPattern:['Power','Current','Power','Current','Familiar']},
-    {id:'throwback-lunch',name:'MAIR Throwback Lunch',days:[0],start:12,end:14,mode:'throwback',djId:'noah',tone:'nostalgic but modern',format:'recognition, stories only when grounded',targetMomentum:.58,preferredStation:'throwback',musicPattern:['Throwback','Familiar','Throwback','Power']},
+    {id:'throwback-lunch',name:'MAIR Throwback Lunch',days:[0],start:12,end:14,mode:'throwback',djId:'josh',tone:'nostalgic but modern',format:'recognition, stories only when grounded',targetMomentum:.58,preferredStation:'throwback',musicPattern:['Throwback','Familiar','Throwback','Power']},
     {id:'top40',name:'MAIR Top 40',days:[0],start:16,end:18,mode:'normal',djId:'josh',tone:'confident chart radio',format:'chart pace, clean IDs, strong openers',targetMomentum:.8,preferredStation:'top40',musicPattern:['Power','Current','Power','Current','Familiar']}
   ];
   const MOMENTS=[{minute:0,type:'top',label:'Top of hour'},{minute:15,type:'quarter',label:'Quarter-hour ID'},{minute:30,type:'half',label:'Half-hour show ID'},{minute:45,type:'quarter',label:'Quarter-hour ID'}];
