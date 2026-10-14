@@ -30,7 +30,13 @@ const empty=(s=204)=>new Response(null,{status:s});
 const nativeFetch=window.fetch.bind(window);
 window.fetch=async function(input,init){
   const url=new URL(typeof input==='string'?input:String(input?.url||input),location.href),method=String(init?.method||(input?.method)||'GET').toUpperCase();
-  if(url.hostname==='accounts.spotify.com'){S.calls.push({m:method,p:url.pathname});return json({access_token:'mock-token-'+now(),token_type:'Bearer',expires_in:3600,refresh_token:'mock-refresh',scope:'streaming'})}
+  if(url.hostname==='accounts.spotify.com'){S.calls.push({m:method,p:url.pathname});
+    // Token-endpoint-gedrag per test: localStorage.__mock_token_mode = ok | neterr | 503 | invalid_grant; __mock_valid_refresh = enige geldige refresh-token (rest krijgt invalid_grant).
+    const mode=localStorage.getItem('__mock_token_mode')||'ok',valid=localStorage.getItem('__mock_valid_refresh'),sent=new URLSearchParams(String(init?.body||'')).get('refresh_token');
+    if(mode==='neterr')throw new TypeError('Failed to fetch');
+    if(mode==='503')return json({error:'server_error'},503);
+    if(mode==='invalid_grant'||(valid&&sent!==valid))return json({error:'invalid_grant',error_description:'Refresh token revoked'},400);
+    return json({access_token:'mock-token-'+now(),token_type:'Bearer',expires_in:3600,refresh_token:'mock-refresh',scope:'streaming'})}
   if(url.hostname!=='api.spotify.com')return nativeFetch(input,init);
   const p=url.pathname.replace(/^\/v1/,''),q=url.searchParams;let body=null;try{body=init?.body?JSON.parse(init.body):null}catch{}
   S.calls.push({m:method,p:p+(url.search||'')});

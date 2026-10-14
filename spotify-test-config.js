@@ -14,13 +14,20 @@
     try{
       if(typeof ensure!=='function'||typeof timedFetch!=='function'||typeof saveToken!=='function')return false;
       const hardenedEnsure=async function(){
+        adoptStoredSession();
         if(token&&Date.now()<expiresAt)return token;
         if(!refreshToken)return null;
         if(tokenRefreshPromise)return tokenRefreshPromise;
         const id=spotifyClientId||localStorage.getItem(CLIENT_KEY);if(!id)return null;
         tokenRefreshCount++;lastAuthRefreshAt=Date.now();authRefreshError='';authRefreshStatus=0;authReauthRequired=false;
-        tokenRefreshPromise=(async()=>{
-          const body=new URLSearchParams({grant_type:'refresh_token',refresh_token:refreshToken,client_id:id});
+        // Eén verversing tegelijk over alle tabs: Spotify kan de refresh-token bij elke verversing
+        // vervangen, en twee tabs met dezelfde oude token maken de ene ongeldig.
+        const locked=fn=>navigator.locks?.request?navigator.locks.request('jfm-token-refresh',fn):fn();
+        tokenRefreshPromise=locked(async()=>{
+          adoptStoredSession();
+          if(token&&Date.now()<expiresAt)return token;
+          const sent=refreshToken;
+          const body=new URLSearchParams({grant_type:'refresh_token',refresh_token:sent,client_id:id});
           let r;
           try{r=await timedFetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body})}
           catch(e){authRefreshFailures++;authRefreshError=String(e?.message||e||'Netwerkfout').slice(0,240);const err=new Error('Spotify-token vernieuwen is tijdelijk niet gelukt. MAIR probeert het later opnieuw.');err.code='AUTH_REFRESH_RECOVERABLE';throw err}
@@ -28,13 +35,14 @@
             let detail={};try{detail=await r.json()}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}
             const code=String(detail?.error||''),description=String(detail?.error_description||'');authRefreshStatus=r.status;authRefreshError=(description||code||`HTTP ${r.status}`).slice(0,240);authRefreshFailures++;
             if(code==='invalid_grant'){
-              authReauthRequired=true;clearSpotifySession();
+              if(!clearSpotifySession(sent)){const err=new Error('Spotify-token vernieuwen is tijdelijk niet gelukt. MAIR probeert het later opnieuw.');err.code='AUTH_REFRESH_RECOVERABLE';throw err}
+              authReauthRequired=true;
               const err=new Error('Spotify-sessie is verlopen. Koppel Spotify opnieuw.');err.code='AUTH_REAUTH_REQUIRED';throw err
             }
             const err=new Error(`Spotify-token vernieuwen is tijdelijk niet gelukt (${r.status}). MAIR probeert het later opnieuw.`);err.code='AUTH_REFRESH_RECOVERABLE';err.status=r.status;throw err
           }
           const data=await r.json();saveToken(data);authRefreshError='';authRefreshStatus=r.status;authRefreshFailures=0;authReauthRequired=false;return token
-        })().finally(()=>{tokenRefreshPromise=null});
+        }).finally(()=>{tokenRefreshPromise=null});
         return tokenRefreshPromise
       };
       ensure=hardenedEnsure;window.ensure=hardenedEnsure;

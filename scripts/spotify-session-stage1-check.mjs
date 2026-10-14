@@ -10,4 +10,8 @@ assert.ok(src.includes('sdk.ensureDevice')&&src.includes('sdk.reconnect'),'devic
 assert.ok(!src.includes('MutationObserver'),'stage one must not install a DOM-wide observer');
 assert.ok(!src.includes("document.addEventListener('click'"),'stage one must not capture global clicks');
 assert.ok(!src.includes('stopImmediatePropagation'),'stage one must not interfere with existing control ownership');
+assert.ok(src.includes("navigator.locks")&&src.includes('adoptStoredSession()'),'refresh must be serialised across tabs and adopt a refresh token another tab stored');
+assert.ok(src.includes('clearSpotifySession(sent)'),'invalid_grant may only wipe the refresh token that was actually sent');
+const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
+assert.ok(app.includes('connectSession()')&&!app.includes('const ok=!!(await ensure());setConnected(ok)'),'boot must retry a transient refresh failure instead of staying on the login screen');
 console.log('Spotify session stage 1: PASS');

@@ -376,7 +376,63 @@ async function scenarioAiPicksSwitch(){
     c.ok('AI-selectie bouwt op de achtergrond: wisselen naar een ander station start dat station',ok&&/CHILL/.test(q),q);
   }finally{await h.close()}
 }
-const scenarios={aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// Inlog blijft bestaan (14-10-2026): app heropenen met verlopen access-token, verversen dat tijdelijk mislukt, en een refresh-token die een ander tabblad al vernieuwd heeft.
+const sess=page=>page.evaluate(()=>({refresh:localStorage.getItem('jfm_refresh'),token:localStorage.getItem('jfm_token'),status:document.getElementById('status')?.textContent,setupHidden:document.getElementById('setup')?.classList.contains('hidden'),url:location.href,tokenCalls:window.__mock.callLog().filter(x=>x.includes('/api/token')).length}));
+const expire=async page=>{await page.evaluate(()=>{localStorage.jfm_exp=String(Date.now()-5000)})};
+const reopen=async page=>{await page.reload({waitUntil:'load'});await page.waitForFunction(()=>window.JFMAuth&&window.__mock,null,{timeout:15000})};
+async function scenarioSessionReopen(){
+  const h=await launch({trackMs:30000});
+  try{
+    await boot(h);await expire(h.page);await reopen(h.page);
+    await until(h.page,()=>document.getElementById('status')?.textContent==='Spotify gekoppeld',null,15000,'gekoppeld na heropenen met verlopen token');
+    const r=await sess(h.page);
+    c.ok('sessie: heropenen met verlopen access-token ververst en blijft gekoppeld',r.refresh&&r.token.startsWith('mock-token-')&&r.setupHidden&&r.tokenCalls>=1,JSON.stringify(r));
+  }finally{await h.close()}
+}
+async function scenarioSessionNetworkError(){
+  const h=await launch({trackMs:30000});
+  try{
+    await boot(h);await expire(h.page);
+    const refresh=await h.page.evaluate(()=>{localStorage.__mock_token_mode='neterr';return localStorage.jfm_refresh});
+    await reopen(h.page);await sleep(3500);
+    let r=await sess(h.page);
+    c.ok('sessie: netwerkfout bij verversen wist de refresh-token niet',r.refresh===refresh,JSON.stringify(r));
+    c.ok('sessie: tijdens de storing geen inlogscherm',r.setupHidden&&!/accounts\.spotify\.com/.test(r.url)&&r.status!=='offline',JSON.stringify(r));
+    await h.page.evaluate(()=>{localStorage.__mock_token_mode='ok'});
+    await until(h.page,()=>document.getElementById('status')?.textContent==='Spotify gekoppeld',null,30000,'gekoppeld nadat het netwerk terug is (alleen via de automatische nieuwe poging)');
+    await until(h.page,()=>!!window.JFMSpotifySDK?.deviceId,null,20000,'speler is gestart na herstel');
+    r=await sess(h.page);
+    c.ok('sessie: na herstel van het netwerk vanzelf weer gekoppeld, zonder opnieuw inloggen',r.refresh&&r.token.startsWith('mock-token-'),JSON.stringify(r));
+    // Tijdelijke serverfout (503) idem
+    await expire(h.page);await h.page.evaluate(()=>{localStorage.__mock_token_mode='503'});await reopen(h.page);await sleep(3000);
+    r=await sess(h.page);
+    c.ok('sessie: 503 van Spotify wist de refresh-token niet',!!r.refresh,JSON.stringify(r));
+    noErrors('sessie: geen page errors bij netwerkfout',h);
+  }finally{await h.close()}
+}
+async function scenarioSessionInvalidGrant(){
+  const h=await launch({trackMs:30000});
+  try{
+    await boot(h);await expire(h.page);await h.page.evaluate(()=>{localStorage.__mock_token_mode='invalid_grant'});await reopen(h.page);await sleep(3500);
+    const r=await sess(h.page);
+    c.ok('sessie: invalid_grant is wél een echte uitlog (refresh-token weg, inlogscherm terug)',!r.refresh&&!r.setupHidden,JSON.stringify(r));
+  }finally{await h.close()}
+}
+async function scenarioSessionOtherTab(){
+  const h=await launch({trackMs:30000});
+  try{
+    await boot(h);
+    // Dit tabblad kent R1 (in geheugen); een ander tabblad heeft verversd en R2 + geldig token opgeslagen. Spotify accepteert alleen nog R2.
+    await h.page.evaluate(()=>{localStorage.jfm_exp=String(Date.now()-5000);localStorage.__mock_valid_refresh='mock-refresh-R2'});
+    await h.page.evaluate(()=>{localStorage.jfm_refresh='mock-refresh-R2'});
+    const out=await h.page.evaluate(async()=>{try{return{ok:!!(await window.JFMAuth.ensure()),refresh:localStorage.getItem('jfm_refresh')}}catch(e){return{err:e.message,refresh:localStorage.getItem('jfm_refresh')}}});
+    c.ok('sessie: ander tabblad heeft de refresh-token vernieuwd: die wordt gebruikt, niet de oude uit het geheugen',out.ok&&out.refresh==='mock-refresh-R2',JSON.stringify(out));
+    // Oude token in het geheugen, opslag al door een ander tabblad vernieuwd: invalid_grant op de oude mag de nieuwe niet wissen.
+    const out2=await h.page.evaluate(()=>{window.JFMAuth.invalidateAccessToken();localStorage.jfm_refresh='mock-refresh-R3';const wiped=window.clearSpotifySession?.('mock-refresh-R2');return{wiped,refresh:localStorage.getItem('jfm_refresh')}});
+    c.ok('sessie: invalid_grant op een oude refresh-token wist de nieuwe uit een ander tabblad niet',out2.wiped===false&&out2.refresh==='mock-refresh-R3',JSON.stringify(out2));
+  }finally{await h.close()}
+}
+const scenarios={sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
