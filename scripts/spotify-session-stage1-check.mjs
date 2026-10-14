@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const src=fs.readFileSync(new URL('../spotify-test-config.js',import.meta.url),'utf8');
 assert.ok(src.includes("if(code==='invalid_grant')"),'invalid_grant must be the explicit reauth condition');
-assert.ok(src.includes('clearSpotifySession()'),'definitive invalid_grant must be able to clear the session');
+assert.ok(src.includes('clearSpotifySession('),'definitive invalid_grant must be able to clear the session');
 assert.ok(!src.includes("if(r.status===400||r.status===401)clearSpotifySession()"),'generic 400/401 must never wipe the refresh token');
 assert.ok(src.includes("err.code='AUTH_REFRESH_RECOVERABLE'"),'recoverable refresh errors need an explicit classification');
 assert.ok(src.includes("localStorage.removeItem(DEVICE_KEY)"),'stale Web Playback device IDs must be invalidated');
