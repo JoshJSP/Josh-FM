@@ -59,9 +59,11 @@ async function scenarioDjBreak(){
   try{
     await startStation(h);
     await h.page.evaluate(()=>window.MAIRDJ.armManual());
+    await h.page.evaluate(()=>{window.__speakPlaying=[];const t=setInterval(()=>{if(window.MAIRDJ.state().phase==='SPEAKING')window.__speakPlaying.push(window.__mock.state().playing)},150);setTimeout(()=>clearInterval(t),40000)});
     await h.page.evaluate(()=>window.__mock.finishTrack(2500));
     await until(h.page,()=>{const t=window.MAIRDJ.state().terminalBreaks||[];return t.length&&['COMPLETED','FAILED','SKIPPED'].includes(t[t.length-1].status)},null,40000,'DJ-break afgerond');
-    const b=await lastBreak(h.page);
+    const b=await lastBreak(h.page),sp=await h.page.evaluate(()=>window.__speakPlaying);
+    c.ok('DJ: muziek staat stil zolang de DJ praat',sp.length>0&&sp.every(x=>x===false),JSON.stringify(sp));
     c.ok('DJ: handmatige break wordt afgespeeld',b?.status==='COMPLETED',JSON.stringify(b));
     c.ok('DJ: writer en TTS zijn aangeroepen',h.log.api.writer>=1&&h.log.api.tts>=1,JSON.stringify(h.log.api));
     await sleep(2500);
@@ -69,8 +71,7 @@ async function scenarioDjBreak(){
     c.ok('DJ: muziek speelt door na de break',st.playing===true,JSON.stringify(st));
     c.ok('DJ: volgend nummer is gestart',st.idx>=1);
     c.ok('DJ: volume staat terug op de luisteraarstand (0,5)',Math.abs(st.volume-0.5)<0.02,'volume '+st.volume+' log '+v.join(','));
-    c.ok('DJ: er is geduckt tijdens de break',v.some(x=>x<0.4),'log '+v.join(','));
-    c.ok('DJ: muziek zakt diep weg onder de stem',v.some(x=>x<=0.05),'log '+v.join(','));
+    c.ok('DJ: volume is niet weggedraaid (geen DJ over muziek)',v.every(x=>x>=0.4),'log '+v.join(','));
     noErrors('DJ: geen page errors',h);
   }finally{await h.close()}
 }
@@ -283,22 +284,6 @@ async function scenarioSkipThenBreak(){
   }finally{await h.close()}
 }
 
-// De stap-voor-stap volumeherstel na een break faalt één keer (SDK-hapering): de muziek mag niet op de tussenstand blijven hangen.
-async function scenarioUnduckFails(){
-  const h=await launch({trackMs:16000});
-  try{
-    await startStation(h);
-    await h.page.evaluate(()=>window.MAIRDJ.armManual());
-    await h.page.evaluate(()=>window.__mock.finishTrack(2500));
-    await until(h.page,()=>(window.__mock.volLog||[]).some(x=>x[1]<0.2),null,40000,'muziek is geduckt');
-    await h.page.evaluate(()=>{window.__mock.failVolume=1});
-    await sleep(9000);
-    const st=await mock(h.page),v=await vols(h.page);
-    c.ok('unduck faalt één keer: volume komt toch terug op 0,5',Math.abs(st.volume-0.5)<0.02,'volume '+st.volume+' log '+v.join(','));
-    c.ok('unduck faalt één keer: muziek speelt door',st.playing===true,JSON.stringify(st));
-    noErrors('unduck: geen page errors',h);
-  }finally{await h.close()}
-}
 
 // Pagina herladen terwijl er muziek speelt (iOS doet dit bij terugkomen in de PWA): het SDK-device is weg, de Spotify-kant blijft.
 async function scenarioReload(){
@@ -505,7 +490,7 @@ async function scenarioBackgroundNativeMusicFirst(){
     c.ok('achtergrond native: volgende nummer speelt zonder DJ-pauze',st.playing===true&&st.idx>=1,JSON.stringify(st));
   }finally{await h.close()}
 }
- const scenarios={rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+ const scenarios={rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
