@@ -17,7 +17,10 @@
   // Is dat zo, dan hoeft deze wacht een DJ-break niet meer af te breken zodra het
   // scherm uitgaat - dat was juist wat de DJ deed zwijgen. Overal anders blijft
   // het oude gedrag staan: muziek wint.
-  const backgroundVoiceAllowed=()=>{try{const a=window.JFMDJAudio?.status;return !!a?.nativeShell&&!!a?.keepAlive?.running}catch{return false}};
+  // 15-10-2026: uit. Een DJ-break pauzeert Spotify en hervat via JS-timers; die lopen in de achtergrond vast,
+// en dan speelt het volgende nummer niet meer af (auto, scherm uit). Muziek gaat vóór de DJ.
+const BACKGROUND_DJ=false;
+const backgroundVoiceAllowed=()=>{try{if(!BACKGROUND_DJ)return false;const a=window.JFMDJAudio?.status;return !!a?.nativeShell&&!!a?.keepAlive?.running}catch{return false}};
   function snapshot(reason='snapshot'){
     const s=state();
     wasPlaying=!!s.isPlaying||!!s.expectedLive;

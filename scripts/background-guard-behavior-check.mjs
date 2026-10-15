@@ -85,6 +85,7 @@ function backgroundVoiceIsFailClosed(){
   for(const[name,src]of[['mair-background-guard.js',guard],['mair-dj-v2.js',dj]]){
     assert.ok(src.includes('a?.nativeShell')&&src.includes('a?.keepAlive?.running'),`${name} moet de achtergronduitzondering aan een lopende keep-alive in de native shell koppelen`);
     assert.ok(/catch\{return false\}/.test(src.slice(src.indexOf('backgroundVoiceAllowed'))),`${name} moet bij twijfel false teruggeven`);
+    assert.ok(src.includes('const BACKGROUND_DJ=false'),`${name}: DJ in de achtergrond moet uit staan (muziek gaat vóór de DJ)`);
   }
   assert.ok(guard.includes("if(backgroundVoiceAllowed())emit('hidden-dj-allowed'"),'de wacht moet vastleggen wanneer hij een break laat staan');
 }
