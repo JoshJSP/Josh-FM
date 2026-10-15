@@ -471,6 +471,30 @@ async function scenarioSessionOtherTab(){
     c.ok('sessie: invalid_grant op een oude refresh-token wist de nieuwe uit een ander tabblad niet',out2.wiped===false&&out2.refresh==='mock-refresh-R3',JSON.stringify(out2));
   }finally{await h.close()}
 }
+// MAIR STUDEREN: station staat in het overzicht, de cover laadt, hij speelt, en de DJ praat er niet.
+async function scenarioStudyStation(){
+  const h=await launch({trackMs:12000});
+  try{
+    await boot(h);
+    await tab(h.page,'Stations');
+    const card=h.page.locator('[data-mair-station="study"]').locator('visible=true').first();
+    c.ok('studeren: stationstegel staat in het overzicht',await card.count()===1);
+    const cover=await h.page.evaluate(()=>new Promise(r=>{const src=window.MAIRStationPolicy?.cover?.('study')||'';const im=new Image();im.onload=()=>r({src,w:im.naturalWidth});im.onerror=()=>r({src,w:0});im.src=src}));
+    c.ok('studeren: cover laadt (mair-study.svg)',/mair-study.svg$/.test(cover.src)&&cover.w>0,JSON.stringify(cover));
+    const art=await card.evaluate(e=>getComputedStyle(e.querySelector('.mair-station-art')||e).backgroundImage);
+    c.ok('studeren: tegel gebruikt de eigen cover',/mair-study.svg/.test(art),art);
+    c.ok('studeren: beleid markeert de zender als stil',await h.page.evaluate(()=>window.MAIRStationPolicy.quiet('study')===true&&window.MAIRStationPolicy.quiet('hits')===false));
+    await card.click();
+    await until(h.page,()=>window.__mock.state().playing,null,25000,'studeren speelt');
+    await tab(h.page,'Radio');
+    const before=await h.page.evaluate(()=>(window.MAIRDJ.state().terminalBreaks||[]).length);
+    await h.page.evaluate(()=>window.MAIRDJ.armManual());
+    await h.page.evaluate(()=>window.__mock.finishTrack(2500));
+    await sleep(9000);
+    const after=await h.page.evaluate(()=>(window.MAIRDJ.state().terminalBreaks||[]).length);
+    const tb=await h.page.evaluate(()=>(window.MAIRDJ.state().terminalBreaks||[]).map(b=>b.status+':'+(b.reason||'')));c.ok('studeren: DJ praat niet op dit station',h.log.api.writer===0&&h.log.api.tts===0,'writer '+h.log.api.writer+', tts '+h.log.api.tts+', '+tb.join(','));
+  }finally{await h.close()}
+}
 // Native shell + lopende keep-alive + scherm uit: de DJ mag de muziek niet pauzeren (JS-timers lopen dan vast, volgende nummer speelt niet).
 async function scenarioBackgroundNativeMusicFirst(){
   const h=await launch({trackMs:16000});
@@ -486,7 +510,7 @@ async function scenarioBackgroundNativeMusicFirst(){
     c.ok('achtergrond native: volgende nummer speelt zonder DJ-pauze',st.playing===true&&st.idx>=1,JSON.stringify(st));
   }finally{await h.close()}
 }
- const scenarios={backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+ const scenarios={studyStation:scenarioStudyStation,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);

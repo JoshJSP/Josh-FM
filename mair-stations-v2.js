@@ -12,12 +12,13 @@ const fallback={
   party:{label:'MAIR PARTY',tagline:'Energy. Dance. Repeat.',desc:'Energieke tracks met echte feestflow.',cover:'./assets/stations/mair-party.webp'},
   chill:{label:'MAIR CHILL',tagline:'Relax & unwind',desc:'Warme rustige songs om bij te ontspannen.',cover:'./assets/stations/mair-chill.webp'},
   sleep:{label:'MAIR SLEEP',tagline:'Slow down. Stay asleep.',desc:'Zeer rustige echte songs zonder slaapgeluiden.',cover:'./assets/stations/mair-sleep.svg'},
+  study:{label:'MAIR STUDEREN',tagline:'Focus. Rustig. Door.',desc:'Instrumentale muziek om bij te concentreren, zonder DJ.',cover:'./assets/stations/mair-study.svg'},
   summer:{label:'MAIR SUMMER',tagline:'Sun out. MAIR on.',desc:'Zonnige feelgood, tropical, latin-pop en dance.',cover:'./assets/stations/mair-summer.webp'},
   throwback:{label:'MAIR THROWBACK',tagline:'The songs you love',desc:'Grote classics uit de 80s, 90s en vroege 00s.',cover:'./assets/stations/mair-throwback.webp'},
   '00s':{label:'MAIR 00s',tagline:'Back to the 00s',desc:'Alleen 2000–2009.',cover:'./assets/stations/mair-00s.webp'},
   '10s':{label:'MAIR 10s',tagline:'The decade that still hits',desc:'Alleen 2010–2019.',cover:'./assets/stations/mair-10s.webp'}
 };
-const order=['mix','hits','top40','new','nl','party','chill','sleep','summer','throwback','00s','10s'];
+const order=['mix','hits','top40','new','nl','party','chill','sleep','study','summer','throwback','00s','10s'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function catalog(){const p=window.MAIRStationPolicy;return order.map(id=>{const x=p?.get?.(id)||fallback[id];return{id,label:x.label||fallback[id].label,tagline:x.tagline||fallback[id].tagline,desc:x.desc||fallback[id].desc,cover:x.cover||fallback[id].cover}})}
 function syncChoiceMetadata(){const channels=window.JFMMusicChoice?.channels;if(!channels)return;for(const x of catalog()){if(!channels[x.id])continue;channels[x.id].label=x.label;channels[x.id].desc=x.desc;channels[x.id].cover=x.cover;channels[x.id].tagline=x.tagline}}
