@@ -18,7 +18,6 @@
     return true;
   }
   function history(){return load(HISTORY,[])}
-  function remember(t){if(!t?.id)return;const h=history().filter(x=>x.id!==t.id);h.unshift({id:t.id,artist:artist(t),at:Date.now()});save(HISTORY,h.slice(0,120))}
   function recentPenalty(t){const h=history(),a=artist(t);let p=0;h.slice(0,28).forEach((x,i)=>{if(x.id===t.id)p+=90-Math.min(68,i*3);if(a&&x.artist===a)p+=28-Math.min(21,i)});return p}
   function tasteWeight(id=channel()){const p=window.MAIRStationPolicy;return p?.personalization?Number(p.personalization(id)||0):id==='mix'?1:.2}
   function baseScore(t,id=channel()){const pop=Number(t?.popularity||0),fresh=year(t)>=new Date().getFullYear()-1?4:0,taste=Number(window.JFMTasteModel?.score?.(t)||0)*tasteWeight(id);return pop*.12+fresh+taste-recentPenalty(t)}
@@ -31,10 +30,10 @@
     const spread=[],artistWindow=[];for(const t of rest){const a=artist(t);if(a&&artistWindow.slice(-4).includes(a))continue;spread.push(t);artistWindow.push(a);if(spread.length>=49)break}
     const out=head?[head,...spread]:spread;if(id==='top40')return out.slice(0,40);return out.slice(0,50)
   }
-  let lastSig='',applying=false;
-  function reconcile(){if(applying||!Array.isArray(window.queue)||window.queue.length<2||window.JFMProgramDirector?.directWithContext)return;const id=channel(),s=id+'|'+window.queue.map(t=>t?.id).join(',');if(s===lastSig)return;lastSig=s;const next=optimize(window.queue,id);if(next.length<Math.min(5,window.queue.length))return;const changed=next.map(t=>t.id).join(',')!==window.queue.map(t=>t?.id).join(',');if(!changed)return;applying=true;window.queue=next;try{window.__jfmStationQueueSig='';window.jfmRenderNext?.()}finally{applying=false}}
-  function rerank(){lastSig='';reconcile()}
-  window.addEventListener('jfm:trackchange',e=>{const id=e?.detail?.trackId;const t=(window.queue||[]).find(x=>x?.id===id);if(t)remember(t);setTimeout(reconcile,100)});
-  setInterval(reconcile,900);setTimeout(reconcile,800);
+  // 15-10-2026: bewust uit. Dit herschikte window.queue, maar dat bestaat niet (de wachtrij zit in JFMQueue) en de
+  // programmadirector (window.JFMProgramDirector?.directWithContext) bepaalt de volgorde al. Het draaide wel elke 0,9 s voor niets.
+  // Aanzetten verandert wat de zender speelt, dus dat is een eigen keuze. optimize/pure/score blijven bruikbaar.
+  function reconcile(){return false}
+  function rerank(){return false}
   window.JFMMusicIntelligence={version:'music-intelligence-v4-policy-driven',optimize,pure,score:baseScore,recent:history,reconcile,rerank,tasteWeight};
 })();
