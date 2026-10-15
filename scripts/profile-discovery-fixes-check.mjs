@@ -160,8 +160,8 @@ function profileRenderRuntime({recapData={topArtist:'Artiest',topTrack:'Nummer',
 
 const weekRender=profileRenderRuntime();
 assert.ok(weekRender.html.includes('Jouw week op MAIR'),'De weekkaart moet nog steeds "Jouw week op MAIR" tonen');
-assert.ok(weekRender.html.includes('mair-profile-week-grid'),'Het weekraster met TOP ARTIST/TRACKS moet blijven bestaan');
-assert.ok(weekRender.html.includes('TOP ARTIST')&&weekRender.html.includes('ONTDEKKINGEN'),'De weekcijfers moeten blijven staan');
+assert.ok(weekRender.html.includes('mair-profile-week-grid'),'Het weekraster met TOP ARTIEST/NUMMERS moet blijven bestaan');
+assert.ok(weekRender.html.includes('TOP ARTIEST')&&weekRender.html.includes('ONTDEKKINGEN'),'De weekcijfers moeten blijven staan');
 assert.ok(weekRender.html.includes('Artiest')&&weekRender.html.includes('Nummer'),'De weekdata uit recap() moet nog worden gerenderd');
 assert.ok(!/Your (Month|Year) on MAIR/.test(weekRender.html),'Month en Year mogen niet meer als kop verschijnen');
 assert.ok(!weekRender.html.includes('data-profile-period'),'De periodeschakelaar mag niet terugkomen');
