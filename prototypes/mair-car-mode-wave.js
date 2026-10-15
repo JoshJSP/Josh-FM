@@ -138,9 +138,18 @@ function toast(text,ms=6000){
 // tot de eindbestemming. 50 meter, bevestigd over drie geaccepteerde metingen, zodat
 // een uitschieter geen aankomst meldt.
 const ARRIVE_M=50,ARRIVE_CONFIRM=3;
-let arriveHits=0,arrivedLegs=new Set(),routeDone=false;
+let arriveHits=0,arrivedLegs=new Set(),routeDone=false,dropping=false;
+// Een gehaalde of gepasseerde tussenstop gaat uit de lijst en de route wordt opnieuw berekend vanaf hier.
+// Anders blijft hij staan en stuurt elke herberekening je er weer naartoe.
+function dropStop(index,text){
+  if(!s.stops[index])return;dropping=true;s.stops.splice(index,1);arriveHits=0;arrivedLegs=new Set();
+  if(s.pos)s.origin={name:'Huidige locatie',latitude:s.pos.latitude,longitude:s.pos.longitude};
+  toast(text,7000);publish();render();recalcAfterStops().finally(()=>{dropping=false;publish();render()});
+}
 function checkArrival(){
-  if(!s.proj||!legAlong.length)return;
+  if(dropping||!s.proj||!legAlong.length)return;
+  const passed=legAlong.findIndex((end,i)=>i<legAlong.length-1&&i<s.stops.length&&s.proj.along>end+ARRIVE_M);
+  if(passed>=0){dropStop(passed,`${s.stops[passed]?.name||'Tussenstop'} ligt achter je. Route gaat verder.`);return}
   const k=legAlong.findIndex((end,i)=>!arrivedLegs.has(i)&&s.proj.along<end+ARRIVE_M);
   const index=k<0?legAlong.length-1:k;
   if(arrivedLegs.has(index))return;
@@ -151,7 +160,7 @@ function checkArrival(){
   const last=index>=legAlong.length-1;
   const name=last?(s.destination?.name||'je bestemming'):(s.stops[index]?.name||('stop '+(index+1)));
   if(last){routeDone=true;s.routeActive=false;s.near=false;toast(`Je bent bij ${name}. Route klaar.`,9000);unwatch();stopRefresh()}
-  else toast(`Je bent bij ${name}. Volgende stop wordt gevolgd.`,7000);
+  else{dropStop(index,`Je bent bij ${name}. Volgende stop wordt gevolgd.`);return}
   publish();render();
 }
 // --- Afwijken van de route --------------------------------------------------

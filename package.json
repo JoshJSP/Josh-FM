@@ -24,7 +24,7 @@
     "stabilization-check": "node scripts/product-beta-stabilization-check.mjs",
     "category-purity": "node --check channel-click-fix.js && node --check music-intelligence-v3.js && node --check api/category-filter.js && node scripts/category-purity-check.mjs",
     "mair-hardening": "node --check mair-ui-hardening.js && node --check mair-pwa-polish.js && node scripts/mair-hardening-check.mjs",
-    "car-mode-cache": "node --check sw.js && node --check mair-car-sleep-integration.js && node scripts/car-mode-cache-boot-check.mjs",
+    "car-mode-cache": "node --check sw.js && node --check mair-car-sleep-integration.js && node scripts/car-mode-cache-boot-check.mjs && node scripts/car-stops-check.mjs",
     "backend-cleanup": "node --check build7.js && node scripts/backend-cleanup-check.mjs",
     "dj-v2": "node --check mair-dj-v2.js && node --check mair-voice-check.js && node --check api/dj-writer.js && node scripts/dj-v2-regression.mjs",
     "dj-behavior": "node scripts/dj-v3-behavior-check.mjs && node scripts/dj-schedule-sync-behavior-check.mjs",
