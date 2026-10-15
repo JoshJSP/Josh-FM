@@ -471,7 +471,22 @@ async function scenarioSessionOtherTab(){
     c.ok('sessie: invalid_grant op een oude refresh-token wist de nieuwe uit een ander tabblad niet',out2.wiped===false&&out2.refresh==='mock-refresh-R3',JSON.stringify(out2));
   }finally{await h.close()}
 }
-const scenarios={nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// Native shell + lopende keep-alive + scherm uit: de DJ mag de muziek niet pauzeren (JS-timers lopen dan vast, volgende nummer speelt niet).
+async function scenarioBackgroundNativeMusicFirst(){
+  const h=await launch({trackMs:16000});
+  try{
+    await startStation(h);
+    await h.page.evaluate(()=>{window.__bgEvents=[];window.addEventListener('mair:background-state',e=>window.__bgEvents.push(e.detail.reason));const a=window.JFMDJAudio,old=Object.getOwnPropertyDescriptor(a,'status');Object.defineProperty(a,'status',{configurable:true,get:()=>({...(old?.get?old.get.call(a):old?.value||{}),nativeShell:true,keepAlive:{running:true}})})});
+    await h.page.evaluate(x=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>x});Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>'hidden'});document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('pagehide'))},true);
+    await h.page.evaluate(()=>window.MAIRDJ.armManual());
+    await h.page.evaluate(()=>window.__mock.finishTrack(2500));
+    await sleep(12000);
+    const st=await mock(h.page),ev=await h.page.evaluate(()=>window.__bgEvents);
+    c.ok('achtergrond native: DJ-uitzondering staat uit',!ev.includes('hidden-dj-allowed'),JSON.stringify(ev));
+    c.ok('achtergrond native: volgende nummer speelt zonder DJ-pauze',st.playing===true&&st.idx>=1,JSON.stringify(st));
+  }finally{await h.close()}
+}
+ const scenarios={backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
