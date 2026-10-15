@@ -50,6 +50,7 @@
     try{window.jfmSpotifyPlayer?.disconnect?.()}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
     for(const k of ['jfm_token','jfm_refresh','jfm_exp','jfm_spotify_device_id','jfm_streaming_ready_v2','jfm_auth_requested_streaming','jfm_pkce_verifier_v2','jfm_pkce_state_v2'])try{localStorage.removeItem(k)}catch{/* opslag geblokkeerd: dan zonder opslag */}
     for(const k of ['jfm_verifier','jfm_state'])try{sessionStorage.removeItem(k)}catch{/* opslag geblokkeerd: dan zonder opslag */}
+    try{window.JFMNativeSession?.clear?.()}catch{/* native opslag niet beschikbaar: web/PWA */}
     try{token=null;refreshToken=null;expiresAt=0;clearInterval(poll)}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}
     try{window.JFMPlaybackState?.reset?.()}catch(e){window.MAIRRuntime?.caught?.('integration-guards.reset',e)}
     try{setConnected(false)}catch(e){window.MAIRRuntime?.caught?.('integration-guards.setConnected',e)}

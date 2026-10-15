@@ -14,7 +14,7 @@
     try{
       if(typeof ensure!=='function'||typeof timedFetch!=='function'||typeof saveToken!=='function')return false;
       const hardenedEnsure=async function(){
-        adoptStoredSession();
+        await window.__jfmNativeReady;adoptStoredSession();
         if(token&&Date.now()<expiresAt)return token;
         if(!refreshToken)return null;
         if(tokenRefreshPromise)return tokenRefreshPromise;

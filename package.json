@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@capacitor/preferences": "^8.0.1",
     "@vercel/functions": "latest"
   },
   "scripts": {

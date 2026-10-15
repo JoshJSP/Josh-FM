@@ -380,6 +380,45 @@ async function scenarioAiPicksSwitch(){
 const sess=page=>page.evaluate(()=>({refresh:localStorage.getItem('jfm_refresh'),token:localStorage.getItem('jfm_token'),status:document.getElementById('status')?.textContent,setupHidden:document.getElementById('setup')?.classList.contains('hidden'),url:location.href,tokenCalls:window.__mock.callLog().filter(x=>x.includes('/api/token')).length}));
 const expire=async page=>{await page.evaluate(()=>{localStorage.jfm_exp=String(Date.now()-5000)})};
 const reopen=async page=>{await page.reload({waitUntil:'load'});await page.waitForFunction(()=>window.JFMAuth&&window.__mock,null,{timeout:15000})};
+// Native bewaarplek (iOS-shell, 15-10-2026): nep-Capacitor met Preferences, opgeslagen in sessionStorage (overleeft een reload, staat los van localStorage).
+const nativeMock=()=>{const K='__native_prefs',g=()=>JSON.parse(sessionStorage.getItem(K)||'{}'),w=d=>sessionStorage.setItem(K,JSON.stringify(d));window.Capacitor={isNativePlatform:()=>true,PluginHeaders:[{name:'Preferences'}],nativePromise:async(p,m,o)=>{const d=g();if(m==='get')return{value:d[o.key]??null};if(m==='set'){d[o.key]=o.value;w(d);return{}}if(m==='remove'){delete d[o.key];w(d);return{}}throw Error('onbekende methode '+m)}}};
+const nativeBlob=page=>page.evaluate(()=>{const v=JSON.parse(sessionStorage.getItem('__native_prefs')||'{}').jfm_session_native_v1;return v?JSON.parse(v):null});
+const setNative=(page,o)=>page.evaluate(o=>{const d=JSON.parse(sessionStorage.getItem('__native_prefs')||'{}');d.jfm_session_native_v1=JSON.stringify(o);sessionStorage.setItem('__native_prefs',JSON.stringify(d))},o);
+async function scenarioNativeSession(){
+  const h=await launch({trackMs:30000});
+  try{
+    await h.page.addInitScript(nativeMock);
+    await boot(h);
+    let b=await nativeBlob(h.page);
+    c.ok('native: bestaande sessie wordt bij opstart naar de native opslag gekopieerd',!!b&&b.r==='mock-refresh-'+'y'.repeat(30),JSON.stringify(b));
+    // Oude refresh-token in localStorage, nieuwe in native: moet ingelogd blijven met de nieuwe.
+    await h.page.evaluate(()=>{localStorage.__mock_valid_refresh='mock-refresh-NEW'});
+    await setNative(h.page,{t:'mock-token-native',r:'mock-refresh-NEW',e:Date.now()+3600e3});
+    await expire(h.page);await reopen(h.page);
+    await until(h.page,()=>document.getElementById('status')?.textContent==='Spotify gekoppeld',null,15000,'gekoppeld met native refresh-token');
+    let r=await sess(h.page);
+    c.ok('native: nieuwe refresh-token uit native wint van de oude in localStorage',r.refresh==='mock-refresh-NEW'&&r.setupHidden,JSON.stringify(r));
+    // Refresh schrijft de nieuwe token ook native weg.
+    await h.page.evaluate(()=>{localStorage.__mock_valid_refresh='mock-refresh-NEW'});
+    await expire(h.page);await reopen(h.page);
+    await until(h.page,()=>document.getElementById('status')?.textContent==='Spotify gekoppeld',null,15000,'gekoppeld na refresh');
+    b=await nativeBlob(h.page);
+    c.ok('native: een refresh schrijft de nieuwe tokens meteen native weg',!!b&&b.r==='mock-refresh'&&b.t.startsWith('mock-token-')&&b.e>Date.now(),JSON.stringify(b));
+    // Na meer dan 24 uur stilte (verlopen exp in beide opslagen) blijft de sessie bestaan.
+    await h.page.evaluate(()=>{localStorage.__mock_valid_refresh='mock-refresh'});
+    await setNative(h.page,{t:'mock-token-oud',r:'mock-refresh',e:Date.now()-25*3600e3});
+    await h.page.evaluate(()=>{localStorage.jfm_exp=String(Date.now()-25*3600e3)});
+    await reopen(h.page);
+    await until(h.page,()=>document.getElementById('status')?.textContent==='Spotify gekoppeld',null,15000,'gekoppeld na 25 uur');
+    r=await sess(h.page);
+    c.ok('native: refresh na meer dan 24 uur blijft ingelogd',r.refresh&&r.token.startsWith('mock-token-')&&r.setupHidden,JSON.stringify(r));
+    // invalid_grant op de actuele token is een echte uitlog en wist ook native.
+    await expire(h.page);await h.page.evaluate(()=>{localStorage.__mock_token_mode='invalid_grant'});await reopen(h.page);await sleep(3500);
+    r=await sess(h.page);b=await nativeBlob(h.page);
+    c.ok('native: invalid_grant wist de sessie ook in de native opslag',!r.refresh&&!b,JSON.stringify({r,b}));
+    noErrors('native: geen page errors',h);
+  }finally{await h.close()}
+}
 async function scenarioSessionReopen(){
   const h=await launch({trackMs:30000});
   try{
@@ -432,7 +471,7 @@ async function scenarioSessionOtherTab(){
     c.ok('sessie: invalid_grant op een oude refresh-token wist de nieuwe uit een ander tabblad niet',out2.wiped===false&&out2.refresh==='mock-refresh-R3',JSON.stringify(out2));
   }finally{await h.close()}
 }
-const scenarios={sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+const scenarios={nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);

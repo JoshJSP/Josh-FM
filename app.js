@@ -38,13 +38,38 @@ async function callback(){
   })();
   try{await window.__jfmAuthCodeExchange}finally{setTimeout(()=>{window.__jfmAuthCodeExchange=null},5000)}
 }
-function saveToken(d){token=d.access_token;refreshToken=d.refresh_token||refreshToken;expiresAt=Date.now()+(d.expires_in||3600)*1000-30000;localStorage.setItem('jfm_token',token);if(refreshToken)localStorage.setItem('jfm_refresh',refreshToken);localStorage.setItem('jfm_exp',String(expiresAt))}
+// Native bewaarplek voor de iOS-shell (Capacitor, server.url): WKWebView schrijft localStorage lui naar
+// schijf, dus een app-kill kort na een refresh liet de oude (door Spotify al geroteerde) refresh-token staan.
+// UserDefaults via @capacitor/preferences overleeft dat. Op web/PWA is dit overal een no-op.
+// Bij opstart wint de nieuwste kant (jfm_exp groeit alleen bij een echte refresh); ensure() wacht erop.
+const NATIVE_KEY='jfm_session_native_v1';
+function nativeBridge(){const c=window.Capacitor;return c?.isNativePlatform?.()&&typeof c.nativePromise==='function'&&(c.PluginHeaders||[]).some(h=>h.name==='Preferences')?c:null}
+function nativeCall(m,o){const c=nativeBridge();return c?Promise.race([c.nativePromise('Preferences',m,o),new Promise((_,no)=>setTimeout(()=>no(Error('native timeout')),1500))]):Promise.resolve(null)}
+function nativeSave(){if(!refreshToken)return;nativeCall('set',{key:NATIVE_KEY,value:JSON.stringify({t:token,r:refreshToken,e:expiresAt})}).catch(e=>window.MAIRRuntime?.caught?.('app.nativeSave',e))}
+function nativeClear(){nativeCall('remove',{key:NATIVE_KEY}).catch(e=>window.MAIRRuntime?.caught?.('app.nativeClear',e))}
+async function nativeRestore(){
+  if(!nativeBridge())return;
+  try{
+    const raw=(await nativeCall('get',{key:NATIVE_KEY}))?.value,n=raw?JSON.parse(raw):null,lr=localStorage.getItem('jfm_refresh'),le=Number(localStorage.getItem('jfm_exp')||0);
+    if(n?.r&&n.r!==lr&&!(lr&&le>Number(n.e||0))){
+      localStorage.setItem('jfm_refresh',n.r);
+      if(n.t&&Number(n.e)>Date.now()){localStorage.setItem('jfm_token',n.t);localStorage.setItem('jfm_exp',String(n.e))}
+      else{localStorage.removeItem('jfm_token');localStorage.setItem('jfm_exp','0')}
+    }else if(lr&&(!n||n.r!==lr)){
+      token=localStorage.getItem('jfm_token');refreshToken=lr;expiresAt=le;nativeSave()
+    }
+    restore()
+  }catch(e){window.MAIRRuntime?.caught?.('app.nativeRestore',e)}
+}
+window.JFMNativeSession={clear:nativeClear,save:nativeSave};
+window.__jfmNativeReady=nativeRestore();
+function saveToken(d){token=d.access_token;refreshToken=d.refresh_token||refreshToken;expiresAt=Date.now()+(d.expires_in||3600)*1000-30000;localStorage.setItem('jfm_token',token);if(refreshToken)localStorage.setItem('jfm_refresh',refreshToken);localStorage.setItem('jfm_exp',String(expiresAt));nativeSave()}
 function restore(){token=localStorage.getItem('jfm_token');refreshToken=localStorage.getItem('jfm_refresh');expiresAt=Number(localStorage.getItem('jfm_exp')||0)}
-function invalidateAccessToken(){token=null;expiresAt=0;localStorage.removeItem('jfm_token');localStorage.setItem('jfm_exp','0')}
+function invalidateAccessToken(){token=null;expiresAt=0;localStorage.removeItem('jfm_token');localStorage.setItem('jfm_exp','0');if(refreshToken)nativeSave()}
 // Een ander tabblad kan de refresh-token al vernieuwd hebben: alleen wissen als in de opslag nog
 // dezelfde token staat als die waarmee Spotify net invalid_grant zei (sent), anders de nieuwe overnemen.
 function adoptStoredSession(){const r=localStorage.getItem('jfm_refresh'),t=localStorage.getItem('jfm_token'),e=Number(localStorage.getItem('jfm_exp')||0);if(r)refreshToken=r;if(t&&e>Date.now()&&t!==token){token=t;expiresAt=e}}
-function clearSpotifySession(sent){const stored=localStorage.getItem('jfm_refresh');if(sent&&stored&&stored!==sent){adoptStoredSession();return false}invalidateAccessToken();refreshToken=null;localStorage.removeItem('jfm_refresh');return true}
+function clearSpotifySession(sent){const stored=localStorage.getItem('jfm_refresh');if(sent&&stored&&stored!==sent){adoptStoredSession();return false}refreshToken=null;invalidateAccessToken();localStorage.removeItem('jfm_refresh');nativeClear();return true}
 async function ensure(){if(token&&Date.now()<expiresAt)return token;if(!refreshToken)return null;if(tokenRefreshPromise)return tokenRefreshPromise;const id=spotifyClientId||localStorage.getItem('jfm_client_id');if(!id)return null;tokenRefreshCount++;tokenRefreshPromise=(async()=>{const body=new URLSearchParams({grant_type:'refresh_token',refresh_token:refreshToken,client_id:id}),r=await timedFetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});if(!r.ok){let code='';try{code=(await r.json())?.error||''}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}if(code==='invalid_grant')clearSpotifySession(refreshToken);else invalidateAccessToken();throw Error(code==='invalid_grant'?'Spotify-sessie is verlopen. Koppel Spotify opnieuw.':`Spotify-token vernieuwen is tijdelijk niet gelukt (${r.status}). MAIR probeert het later opnieuw.`)}saveToken(await r.json());return token})().finally(()=>{tokenRefreshPromise=null});return tokenRefreshPromise}
 async function api(path,opt={},retry401=true){const t=await ensure();if(!t)throw Error('Spotify is niet gekoppeld.');const headers={...(opt.headers||{}),Authorization:`Bearer ${t}`},body=opt.body&&typeof opt.body!=='string'?JSON.stringify(opt.body):opt.body;if(opt.body&&typeof opt.body!=='string')headers['Content-Type']='application/json';const r=await timedFetch(API+path,{...opt,body,headers});if(r.status===401&&retry401&&refreshToken){invalidateAccessToken();await ensure();return api(path,opt,false)}if(r.status===204)return null;if(r.status===429){const wait=Math.max(1,Number(r.headers?.get?.('Retry-After'))||1);throw Error(`Spotify vraagt ons even rustiger aan te doen. Probeer over ${wait} sec opnieuw.`)}if(!r.ok){let m=`Spotify fout ${r.status}`;try{m=(await r.json())?.error?.message||m}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}throw Error(m)}
 // Spotify's stuurcommando's - seek, shuffle, repeat, volume - antwoorden met 200 en een
@@ -86,7 +111,7 @@ async function searchSpotify(){const q=$('searchInput').value.trim();if(!q)retur
    wachtrij; die omzeilde beide en was alleen onzichtbaar omdat request-manager de klik
    eerder afvangt. Zonder die module was het een stille bypass. */}
 function setConnected(ok){$('status').textContent=ok?'Spotify gekoppeld':'offline';$('status').classList.toggle('on',ok);$('status').classList.toggle('off',!ok);['prev','play','next','start','djNow','skipTalk','searchBtn','rebuild'].forEach(id=>{const control=$(id);if(control)control.disabled=!ok});$('setup').classList.toggle('hidden',ok);$('logout').classList.toggle('hidden',!ok)}
-function logout(){['jfm_token','jfm_refresh','jfm_exp'].forEach(k=>localStorage.removeItem(k));token=refreshToken=null;expiresAt=0;clearInterval(poll);setConnected(false)}
+function logout(){['jfm_token','jfm_refresh','jfm_exp'].forEach(k=>localStorage.removeItem(k));nativeClear();token=refreshToken=null;expiresAt=0;clearInterval(poll);setConnected(false)}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab,.tabpane').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('tab-'+b.dataset.tab).classList.add('active')});document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));$('talk').oninput=()=>{updateTalkLabel();saveSettings();scheduleTalk()};['facts','timeMention','weatherMention','jingles'].forEach(id=>$(id).onchange=saveSettings);$('voiceMode').onchange=saveSettings;$('source').onchange=()=>{$('playlist').classList.toggle('hidden',$('source').value!=='playlist');queue=[];saveSettings()};$('connect').onclick=()=>connect().catch(e=>notifyUserError('auth',e));$('start').onclick=()=>startRadio().catch(e=>notifyUserError('station',e));$('rebuild').onclick=()=>buildSet().catch(e=>notifyUserError('station',e));$('prev').onclick=()=>control('prev').catch(e=>notifyUserError('playback',e));$('play').onclick=()=>control('play').catch(e=>notifyUserError('playback',e));$('next').onclick=()=>control('next').catch(e=>notifyUserError('playback',e));$('djNow').onclick=()=>window.MAIRDJ?.armManual?.();$('skipTalk')?.addEventListener('click',()=>window.MAIRDJ?.skipNext?.());$('searchBtn').onclick=()=>searchSpotify().catch(e=>notifyUserError('request',e));$('searchInput').onkeydown=e=>{if(e.key==='Enter')searchSpotify().catch(x=>notifyUserError('request',x))};$('testVoice').onclick=()=>speakText('Dit is MAIRFM. Je luistert naar jouw persoonlijke Nederlandse radioshow.');$('logout').onclick=logout;$('clearHistory').onclick=()=>{localStorage.removeItem('jfm_skips');session=[];renderHistory();window.dispatchEvent(new CustomEvent('mair:settings-feedback',{detail:{message:'Lokaal luistergeheugen is gewist.'}}))};
 // Bij het openen (of terugkomen in de app) kan verversen tijdelijk mislukken, bijvoorbeeld iOS zonder
 // netwerk net na het wakker worden. Zolang er een refresh-token is blijft de sessie bestaan: we
@@ -95,5 +120,5 @@ let sessionRetryTimer=null,sessionRetries=0;
 async function connectSession(){clearTimeout(sessionRetryTimer);let ok=false;try{ok=!!(await ensure())}catch(e){if(sessionRetries===0)notifyUserError('auth',e)}if(ok){if(sessionRetries>0)window.dispatchEvent(new Event('mair:session-restored'));sessionRetries=0;setConnected(true);refresh().catch(()=>{});startPolling();return true}if(refreshToken){sessionRetries++;$('status').textContent='Verbinding herstellen…';$('setup').classList.add('hidden');sessionRetryTimer=setTimeout(connectSession,Math.min(30000,2000*2**Math.min(sessionRetries,4)))}else setConnected(false);return false}
 const sessionWake=()=>{if(!document.hidden&&refreshToken&&!(token&&Date.now()<expiresAt&&poll))connectSession()};
 window.addEventListener('online',sessionWake);document.addEventListener('visibilitychange',sessionWake);window.addEventListener('pageshow',sessionWake);
-async function boot(){loadSettings();await loadPublicConfig();const tick=()=>$('clock').textContent=new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});tick();setInterval(tick,1000);try{await callback()}catch(e){notifyUserError('auth',e)}connectSession();if('speechSynthesis'in window){speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices()}}
+async function boot(){await window.__jfmNativeReady;loadSettings();await loadPublicConfig();const tick=()=>$('clock').textContent=new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});tick();setInterval(tick,1000);try{await callback()}catch(e){notifyUserError('auth',e)}connectSession();if('speechSynthesis'in window){speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices()}}
 boot();if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
