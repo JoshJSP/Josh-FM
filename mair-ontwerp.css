@@ -1,0 +1,113 @@
+/* MAIR ontwerp: rust en ruimte (richting 1) met grote hoes, kleur uit de hoes en tegels (richting 2).
+   Alleen uiterlijk, alleen telefoon. Laptop-layout (mair-desktop.css) blijft zoals het was.
+   --mair-cover wordt gezet door mair-ontwerp.js; zonder hoes blijft het oranje. */
+:root{--mair-cover:#ff6a00;--mair-glass:rgba(255,255,255,.07);--mair-glass-line:rgba(255,255,255,.1)}
+
+@media(max-width:760px){
+/* ---- achtergrond: zacht de kleur van de hoes ---- */
+html:root{background:#0b0b0d!important}
+html body.mairfm-ux-v1{background:transparent!important}
+html::before,html::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none}
+html::before{background:var(--mair-cover);opacity:.78;transition:background-color 1.2s ease}
+html::after{background:linear-gradient(180deg,rgba(11,11,13,0) 0%,rgba(11,11,13,.6) 42%,#0b0b0d 85%)}
+
+/* ---- geen lege balk bovenaan: de zwarte vlak van mair-pwa-polish wordt een zachte rand ---- */
+html body.mairfm-ux-v1::after{height:calc(env(safe-area-inset-top,0px) + 6px)!important;background:linear-gradient(180deg,rgba(11,11,13,.55),rgba(11,11,13,0))!important}
+html body.mairfm-ux-v1 .shell{padding:calc(env(safe-area-inset-top,0px) + 14px) 18px calc(112px + env(safe-area-inset-bottom,0px))!important}
+
+/* ---- zwevende tabbalk ---- */
+html body.mairfm-ux-v1 .mair-bottom-nav{left:14px!important;right:14px!important;bottom:calc(10px + env(safe-area-inset-bottom,0px))!important;width:auto!important;max-width:none!important;transform:none!important;height:64px!important;padding:6px!important;border:1px solid var(--mair-glass-line)!important;border-radius:32px!important;background:rgba(24,24,28,.62)!important;-webkit-backdrop-filter:blur(24px) saturate(1.4);backdrop-filter:blur(24px) saturate(1.4);box-shadow:0 14px 40px rgba(0,0,0,.4)!important}
+html body.mairfm-ux-v1 .mair-bottom-nav .mair-nav-btn{min-height:50px!important;border-radius:26px;color:rgba(255,255,255,.62);transition:background-color .2s,color .2s}
+html body.mairfm-ux-v1 .mair-bottom-nav .mair-nav-btn.active{color:#fff;background:rgba(255,255,255,.12)}
+html body.mairfm-ux-v1 .mair-bottom-nav .mair-nav-btn.active .ico,html body.mairfm-ux-v1 .mair-bottom-nav .mair-nav-btn.active span:last-child{color:var(--mair-orange)}
+
+/* ---- Radio ---- */
+html body.mairfm-ux-v1 .mairfm-radio-header{padding:0 0 14px}
+html body.mairfm-ux-v1 .mairfm-radio-header strong{font-size:13px;letter-spacing:.2em;font-weight:900;color:#fff}
+html body.mairfm-ux-v1 .mairfm-radio-header span{color:var(--mair-orange);font-size:11px;letter-spacing:.16em}
+html body.mairfm-ux-v1 .mairfm-now .art{border-radius:26px!important;background:rgba(255,255,255,.06)!important;box-shadow:0 30px 70px rgba(0,0,0,.45)!important;margin-bottom:22px!important}
+html body.mairfm-ux-v1 .mairfm-now .mair-track-title{font-size:26px!important;letter-spacing:-.02em;margin:0 0 4px}
+html body.mairfm-ux-v1 .mairfm-now .mair-track-artist{font-size:15px!important;color:rgba(255,255,255,.7)!important;margin:0 0 16px}
+html body.mairfm-ux-v1 .mairfm-now .bar{background:rgba(255,255,255,.2)!important}
+html body.mairfm-ux-v1 .mairfm-now .bar>div{background:#fff!important}
+html body.mairfm-ux-v1 .mairfm-now .times{color:rgba(255,255,255,.6)!important}
+html body.mairfm-ux-v1 .mairfm-now .transport{justify-content:center!important;gap:30px!important;margin:18px 0 10px!important}
+html body.mairfm-ux-v1 .mairfm-now .transport .circle{border:0!important;background:rgba(255,255,255,.1)!important;color:#fff!important}
+html body.mairfm-ux-v1 .mairfm-now .transport .circle.play{background:var(--mair-orange)!important;color:#fff!important;box-shadow:0 10px 30px rgba(255,106,0,.35)}
+html body.mairfm-ux-v1 .mairfm-now .mairfm-playback-status{color:rgba(255,255,255,.6)!important}
+/* Meer / Minder van dit: ronde zachte knoppen */
+html body.mairfm-ux-v1 .mairfm-now .mairfm-taste button{border:0!important;border-radius:999px!important;background:rgba(255,255,255,.12)!important;color:#fff!important;min-height:50px!important;font-size:13px!important;font-weight:800!important}
+/* rest van Radio: geen kaders, alleen zachte vlakken */
+html body.mairfm-ux-v1 .mairfm-radio .card:not(.mairfm-now),html body.mairfm-ux-v1 .mairfm-dj-public,html body.mairfm-ux-v1 .mairfm-up-next{border:0!important;background:var(--mair-glass)!important;border-radius:22px!important;box-shadow:none!important}
+html body.mairfm-ux-v1 .mairfm-secondary-actions button{border:0!important;background:var(--mair-glass)!important;border-radius:18px!important}
+
+/* logo op de lege speler: golf links, tekst rechts, niets over elkaar (zie ook mair-logo.svg) */
+html body.mairfm-ux-v1 #artFallback{display:grid;place-items:center;background:transparent!important}
+html body.mairfm-ux-v1 #artFallback img{width:46%;height:auto;aspect-ratio:1;border-radius:22%;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+
+/* ---- Stations: tegels in twee kolommen ---- */
+html body.mairfm-ux-v1 #tab-stations-mair.active{padding-top:4px!important}
+html body.mairfm-ux-v1 .mair-page-title h2{font-size:30px;letter-spacing:-.03em;margin:0 0 6px}
+html body.mairfm-ux-v1 .mair-stations-intro{color:rgba(255,255,255,.65)!important;font-size:13px!important;margin:0 0 18px!important}
+html body.mairfm-ux-v1 .mair-station-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:12px!important}
+html body.mairfm-ux-v1 .mair-station-card{position:relative;display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:space-between!important;gap:14px!important;min-height:150px;padding:14px!important;border:0!important;border-radius:24px!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)!important;overflow:hidden;text-align:left!important;background:linear-gradient(150deg,var(--tile-a,#ff6a00),var(--tile-b,#c03a00))!important}
+html body.mairfm-ux-v1 .mair-station-card.active{box-shadow:inset 0 0 0 2.5px #fff!important}
+html body.mairfm-ux-v1 .mair-station-card .mair-station-art{width:58px!important;height:58px!important;min-width:58px;border-radius:16px!important;box-shadow:0 8px 20px rgba(0,0,0,.3)}
+html body.mairfm-ux-v1 .mair-station-card .mair-station-copy{width:100%;min-width:0}
+html body.mairfm-ux-v1 .mair-station-card .mair-station-copy b{display:block;color:#fff!important;font-size:14px!important;letter-spacing:0!important;line-height:1.15;white-space:normal!important;text-transform:none}
+html body.mairfm-ux-v1 .mair-station-card .mair-station-copy small{display:block;color:rgba(255,255,255,.82)!important;font-size:11px!important;line-height:1.3;margin-top:3px;white-space:normal!important;overflow:visible!important}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="hits"]{--tile-a:#ff4d6d;--tile-b:#ff8a3d}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="top40"]{--tile-a:#2f5bff;--tile-b:#1b2f8f}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="new"]{--tile-a:#9b5cff;--tile-b:#3ec9c0}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="nl"]{--tile-a:#ff7a12;--tile-b:#c23a00}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="party"]{--tile-a:#ff4fd8;--tile-b:#8a2be2}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="chill"]{--tile-a:#33d1c4;--tile-b:#2a6fb0}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="sleep"]{--tile-a:#5a5fc4;--tile-b:#26275f}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="summer"]{--tile-a:#ffc933;--tile-b:#ff8a3d}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="throwback"]{--tile-a:#2fa6d6;--tile-b:#14455e}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="00s"]{--tile-a:#e0457b;--tile-b:#5b2a86}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="10s"]{--tile-a:#38c172;--tile-b:#146b5a}
+html body.mairfm-ux-v1 .mair-station-card[data-mair-station="mix"]{--tile-a:#ff8a1a;--tile-b:#5a2a0a}
+
+/* ---- Profiel: lijnen en witruimte in plaats van kaartjes ---- */
+html body.mairfm-ux-v1 #tab-settings.mair-profile-tab{padding:4px 0 0!important}
+html body.mairfm-ux-v1 .mair-profile-top h1{font-size:30px;letter-spacing:-.03em}
+html body.mairfm-ux-v1 .mair-profile-card{border:0!important;border-top:1px solid rgba(255,255,255,.12)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:20px 2px!important;margin:0!important;overflow:visible}
+html body.mairfm-ux-v1 .mair-profile-hero{border-top:0!important;padding-top:6px!important}
+html body.mairfm-ux-v1 .mair-profile-edit{border:0;background:rgba(255,255,255,.12);color:#fff}
+html body.mairfm-ux-v1 .mair-profile-name{font-size:26px}
+html body.mairfm-ux-v1 .mair-profile-role{font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+html body.mairfm-ux-v1 .mair-profile-tagline{color:rgba(255,255,255,.65)}
+html body.mairfm-ux-v1 .mair-profile-section-title{margin-bottom:14px}
+html body.mairfm-ux-v1 .mair-profile-section-title i{display:none}
+html body.mairfm-ux-v1 .mair-profile-section-title small{color:rgba(255,255,255,.6)}
+/* cijfers: grote getallen, dunne lijnen ertussen */
+html body.mairfm-ux-v1 .mair-profile-metrics{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid rgba(255,255,255,.1)}
+html body.mairfm-ux-v1 .mair-profile-metric{padding:16px 0 14px;border-bottom:1px solid rgba(255,255,255,.1);min-width:0}
+html body.mairfm-ux-v1 .mair-profile-metric:nth-child(odd){border-right:1px solid rgba(255,255,255,.1);padding-right:14px}
+html body.mairfm-ux-v1 .mair-profile-metric:nth-child(even){padding-left:16px}
+html body.mairfm-ux-v1 .mair-profile-metric-v{font-size:30px;font-weight:900;letter-spacing:-.03em;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body.mairfm-ux-v1 .mair-profile-metric-l{margin-top:6px;color:rgba(255,255,255,.6);font-size:12px}
+/* Discovery: de kader uit mair-profile-discovery-bridge.js gaat weg */
+html body.mairfm-ux-v1 #mairProfileDiscoveryCard>div:last-child{border:0!important;background:transparent!important;padding:0!important}
+html body.mairfm-ux-v1 .mair-profile-goal{border:0;background:transparent;padding:0}
+/* Jouw week */
+html body.mairfm-ux-v1 .mair-profile-week-grid>div{border:0;background:transparent;padding:0}
+html body.mairfm-ux-v1 .mair-profile-week-grid span{color:rgba(255,255,255,.55)}
+html body.mairfm-ux-v1 .mair-profile-week-insight{color:rgba(255,255,255,.65)}
+/* lijsten: alleen lijnen */
+html body.mairfm-ux-v1 .mair-profile-list{border:0;border-radius:0}
+html body.mairfm-ux-v1 .mair-profile-row{padding:13px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+html body.mairfm-ux-v1 .mair-profile-row-icon{background:rgba(255,255,255,.1);color:var(--mair-orange)}
+html body.mairfm-ux-v1 .mair-profile-row small{color:rgba(255,255,255,.6)}
+html body.mairfm-ux-v1 .mair-profile-row small[data-mair-dj-hint]{white-space:normal}
+/* Live DJ: de schakelaar valt niet meer van het scherm */
+html body.mairfm-ux-v1 .mair-profile-row-action:has([data-mair-dj-state]){grid-template-columns:38px minmax(0,1fr) auto}
+html body.mairfm-ux-v1 [data-mair-dj-state]{font-size:11px!important;font-weight:900;letter-spacing:.08em;line-height:1;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff!important;white-space:nowrap}
+html body.mairfm-ux-v1 .mair-profile-row-action em{color:rgba(255,255,255,.5)}
+/* Recente activiteit */
+html body.mairfm-ux-v1 .mair-profile-cover{border:0;border-radius:14px}
+html body.mairfm-ux-v1 .mair-profile-track b{font-size:12px}
+html body.mairfm-ux-v1 .mair-profile-track small{color:rgba(255,255,255,.6);font-size:11px}
+html body.mairfm-ux-v1 .mair-profile-version,html body.mairfm-ux-v1 .mair-profile-footer-note{color:rgba(255,255,255,.45)}
+}

@@ -4,7 +4,7 @@
 // werkende modus meer over en is in zijn geheel verdwenen.
 //
 // mair-modes.js blijft wél bestaan: die levert de recap- en analytics-laag waar
-// "Your Week on MAIR" op draait. Deze poort bewaakt precies dat deel, plus de belofte dat
+// "Jouw week op MAIR" op draait. Deze poort bewaakt precies dat deel, plus de belofte dat
 // de verwijderde modi niet stilletjes terugkomen.
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -37,7 +37,7 @@ function runtime(initial = {}, analytics = { events: [], sessions: [] }) {
   return { api: context.MAIRModeManager, window: context, store };
 }
 
-/* ---------------- recap: de motor onder Your Week on MAIR ---------------- */
+/* ---------------- recap: de motor onder Jouw week op MAIR ---------------- */
 
 const now = Date.now();
 const recapRuntime = runtime({}, {
@@ -71,9 +71,9 @@ assert.equal(clearRuntime.store.has('mair_mode_analytics_v1'), false, 'Wis lokal
 assert.ok(src.lastIndexOf("record('listen_minute'") < src.lastIndexOf("if(state.mode==='normal')return"),
   'normale MAIR-playback telt mee voor Weekly');
 
-/* ---------------- Your Week on MAIR blijft in het profiel ---------------- */
+/* ---------------- Jouw week op MAIR blijft in het profiel ---------------- */
 
-assert.ok(profile.includes('Your Week on MAIR') && profile.includes('mair-profile-week-grid'), 'Profiel mist de weekrecap');
+assert.ok(profile.includes('Jouw week op MAIR') && profile.includes('mair-profile-week-grid'), 'Profiel mist de weekrecap');
 assert.ok(!/periodButton|data-profile-period|monthly|yearly/.test(profile), 'Maand- en jaarrecap mogen niet terugkomen');
 
 /* ---------------- de drie verwijderde modi komen niet terug ---------------- */

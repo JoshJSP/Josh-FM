@@ -159,9 +159,9 @@ function profileRenderRuntime({recapData={topArtist:'Artiest',topTrack:'Nummer',
 }
 
 const weekRender=profileRenderRuntime();
-assert.ok(weekRender.html.includes('Your Week on MAIR'),'De weekkaart moet nog steeds "Your Week on MAIR" tonen');
-assert.ok(weekRender.html.includes('mair-profile-week-grid'),'Het weekraster met TOP ARTIST/TRACKS moet blijven bestaan');
-assert.ok(weekRender.html.includes('TOP ARTIST')&&weekRender.html.includes('ONTDEKKINGEN'),'De weekcijfers moeten blijven staan');
+assert.ok(weekRender.html.includes('Jouw week op MAIR'),'De weekkaart moet nog steeds "Jouw week op MAIR" tonen');
+assert.ok(weekRender.html.includes('mair-profile-week-grid'),'Het weekraster met TOP ARTIEST/NUMMERS moet blijven bestaan');
+assert.ok(weekRender.html.includes('TOP ARTIEST')&&weekRender.html.includes('ONTDEKKINGEN'),'De weekcijfers moeten blijven staan');
 assert.ok(weekRender.html.includes('Artiest')&&weekRender.html.includes('Nummer'),'De weekdata uit recap() moet nog worden gerenderd');
 assert.ok(!/Your (Month|Year) on MAIR/.test(weekRender.html),'Month en Year mogen niet meer als kop verschijnen');
 assert.ok(!weekRender.html.includes('data-profile-period'),'De periodeschakelaar mag niet terugkomen');
@@ -171,7 +171,7 @@ assert.ok(!/monthly|yearly/.test(profileSource),'Er mag geen maand- of jaarl
 // De opgeslagen periodekeuze is nu betekenisloos en moet bij een profiel-reset worden opgeruimd.
 assert.ok(profileSource.includes("'mair_profile_recap_period_v1'"),'De oude periodesleutel moet nog wel worden gewist bij een reset');
 
-console.log('PASS Your Week on MAIR intact, Month en Year verwijderd');
+console.log('PASS Jouw week op MAIR intact, Month en Year verwijderd');
 console.log('PASS release consistency');
 console.log('PASS profile cleanup and Spotify status');
 console.log('PASS isolated advanced diagnostics and retired-control safety');
