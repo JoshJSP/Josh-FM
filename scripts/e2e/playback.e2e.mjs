@@ -226,17 +226,24 @@ async function scenarioSoak(){
   try{
     await startStation(h);
     const played=[];let stalled=0;
+    let ended=-1;
     for(let i=0;i<70;i++){
       await h.page.evaluate(()=>window.__mock.finishTrack(500));
       await sleep(1400);
-      const s=await h.page.evaluate(()=>({u:window.__mock.state().uri,p:window.__mock.state().playing}));
-      played.push(s.u);if(!s.p){stalled++;await sleep(2500);const s2=await mock(h.page);if(!s2.playing)break}
+      // Soms komt de wissel later dan 1,4 s (wachtrij wordt net bijgevuld). Dan nog even wachten, anders telt hetzelfde nummer twee keer.
+      for(let w=0;w<4&&await h.page.evaluate(e=>window.__mock.state().ended===e,ended);w++)await sleep(700);
+      // radio-suite neemt elke 6 s een nummer op in de geschiedenis; bij echte nummers van minuten mist hij er geen. Hier wisselt het
+      // elke 1,5 s, dus vullen we de geschiedenis zoals hij op een echte rit zou zijn.
+      const s=await h.page.evaluate(()=>{const u=window.__mock.state().uri,id=u.split(':').pop(),r=window.JFMRadioSuite?.state?.();if(r&&id&&r.lastIds[0]!==id)r.lastIds.unshift(id);return{u,p:window.__mock.state().playing,e:window.__mock.state().ended}});
+      ended=s.e;played.push(s.u);if(!s.p){stalled++;await sleep(2500);const s2=await mock(h.page);if(!s2.playing)break}
     }
     const consecutive=played.filter((u,i)=>i&&u===played[i-1]).length;
     const unique=new Set(played).size;
     c.ok('soak: 70 wissels zonder stilvallen',played.length>=70&&stalled===0,'gespeeld '+played.length+', stilgevallen '+stalled);
     c.ok('soak: geen direct herhaalde nummers',consecutive===0,consecutive+' herhalingen');
-    c.ok('soak: afwisseling (minstens 40 verschillende nummers)',unique>=40,unique+' unieke');
+    const lastAt=new Map();let minGap=Infinity,early=[];played.forEach((u,i)=>{if(lastAt.has(u)){const g=i-lastAt.get(u);if(g<minGap)minGap=g;if(g<15)early.push(g)}lastAt.set(u,i)});
+    c.ok('soak: een nummer komt niet binnen 15 nummers terug (60% van een bron van ~26)',early.length===0,'kortste terugkeer '+minGap+', vroeg '+JSON.stringify(early));
+    c.ok('soak: afwisseling (minstens 20 verschillende nummers)',unique>=20,unique+' unieke');
     noErrors('soak: geen page errors',h);
   }finally{await h.close()}
 }
