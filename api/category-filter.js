@@ -16,9 +16,10 @@ const RULES={
   party:'Accepteer alleen als dit duidelijk een energieke, dansbare feesttrack is die logisch werkt op een feestje of dansvloer. Ballads, rustige akoestische tracks, ambient en andere lage-energie tracks afwijzen.',
   chill:'Accepteer alleen als dit duidelijk rustig, ontspannen en warm/soft is. Harde dance, agressieve rock/rap, zeer hoge energie en uitgesproken feesttracks afwijzen.',
   sleep:'Accepteer alleen als dit overtuigend geschikt is om bij in slaap te vallen EN een echt liedje of duidelijke song-arrangement is. Voorkeur: rustige akoestische covers, unplugged pop, zachte singer-songwriter, kalme piano/vocal-covers, slow indie en zeer zachte vocalen. Een herkenbare instrumentale piano- of akoestische cover mag ook. Wijs ALTIJD af: white noise, brown noise, pink noise, regen/oceaan/natuurgeluiden, ASMR, binaural beats, delta/theta waves, meditatie-audio, drones, ambient soundscapes, generieke sleep music en lange sfeertracks zonder normale songstructuur. Ook gewone midtempo pop, chill-dance, harde drums, drops, schreeuwerige vocalen en feestelijke drive afwijzen. Dit kanaal moet klinken als een rustige akoestische radio-playlist, niet als een noise- of meditatie-app.',
+  study:'Accepteer alleen als dit een instrumentaal of vrijwel tekstloos nummer is dat rustig, gelijkmatig en niet afleidend is om bij te studeren: lo-fi beats, rustige ambient, zachte piano, neoklassiek, filmische rust of kalme klassieke stukken. Wijs af: nummers met duidelijke zang of rap, harde drops, plotselinge energiepieken, dance, rock, feestmuziek, white noise, regengeluid, ASMR en meditatiegeluiden.',
   summer:'Accepteer alleen als dit duidelijk een zonnige, feelgood of zomerse sfeer heeft. Een gewone poptrack zonder duidelijke zomer/feelgood-associatie bij twijfel afwijzen.'
 };
-const MIN_CONFIDENCE={nl:.95,party:.90,chill:.90,sleep:.94,summer:.90};
+const MIN_CONFIDENCE={nl:.95,party:.90,chill:.90,sleep:.94,study:.92,summer:.90};
 const SLEEP_NOISE=/\b(white noise|brown noise|pink noise|rain sounds?|ocean sounds?|nature sounds?|sleep sounds?|asmr|binaural|delta waves?|theta waves?|meditation|soundscape|drone|ambient sleep|deep sleep)\b/i;
 
 export default async function handler(req,res){
@@ -36,7 +37,7 @@ export default async function handler(req,res){
     album:String(t?.album||'').slice(0,180),
     release:String(t?.release||'').slice(0,30),
     popularity:Math.max(0,Math.min(100,Number(t?.popularity)||0))
-  })).filter(t=>t.id&&t.title&&t.artists.length).filter(t=>channel!=='sleep'||!SLEEP_NOISE.test(`${t.title} ${t.artists.join(' ')} ${t.album}`));
+  })).filter(t=>t.id&&t.title&&t.artists.length).filter(t=>(channel!=='sleep'&&channel!=='study')||!SLEEP_NOISE.test(`${t.title} ${t.artists.join(' ')} ${t.album}`));
   if(!tracks.length)return res.status(200).json({accepted:[],threshold});
 
   const instructions=`Je bent een extreem strenge muziekclassificator voor een radiokanaal. ${RULES[channel]} Gebruik je kennis van het specifieke nummer, niet alleen artiest, land, genre of titel. Als je het nummer niet betrouwbaar kent of twijfelt, accepteer het NIET. Geef per invoer exact één oordeel. Confidence is 0.00-1.00 en moet >=${threshold.toFixed(2)} zijn om accept=true te mogen geven. Antwoord uitsluitend met geldig JSON: {"items":[{"i":0,"accept":true,"confidence":0.97,"reason":"kort"}]}. Geen markdown of extra tekst.`;

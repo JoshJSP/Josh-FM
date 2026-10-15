@@ -5,7 +5,8 @@ if(window.MAIRNewsBulletin)return;
 const ENABLED='mair_news_enabled_v1',LAST_SLOT='mair_news_bulletin_last_slot_v1',LAST_TEXT='mair_news_bulletin_last_text_v1',GRACE_MINUTE=12,PREP_RETRY_MS=45000;
 let prepared=null,preparing=null,airing=false,lastError='',lastAirAt=0,lastProvider='',attempts=0,lastPrepareAt=0,lastPartial=false;
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-const enabled=()=>localStorage.getItem(ENABLED)==='1';
+const quiet=()=>{try{return !!window.MAIRStationPolicy?.quiet?.(localStorage.getItem('jfm_music_channel_v1')||'mix')}catch{return false}};
+const enabled=()=>localStorage.getItem(ENABLED)==='1'&&!quiet();
 const currentProfileId=()=>String(window.MAIRDJProfiles?.current?.id||window.MAIRCurrentDJ?.id||localStorage.getItem('mair_dj_profile_v1')||'josh');
 const truth=()=>window.JFMPlaybackState?.get?.()||null;
 // Het uurjournaal volgt de Nederlandse klok, ook als het toestel op een andere tijdzone staat.

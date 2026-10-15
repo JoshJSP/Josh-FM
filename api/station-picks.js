@@ -11,7 +11,7 @@ import {claudeText,groqText,hasClaude,hasGroq,parseJson} from './_ai.js';
 
 const GROQ_MODELS=['openai/gpt-oss-120b','openai/gpt-oss-20b'];
 // Top 40 volgt de echte hitlijst en MY MAIR is Josh' eigen mix: die kiezen hier niet.
-const STATIONS=new Set(['hits','new','nl','party','chill','sleep','summer','throwback','00s','10s']);
+const STATIONS=new Set(['hits','new','nl','party','chill','sleep','study','summer','throwback','00s','10s']);
 const WANT=60,PER_ARTIST=2,MIN_VALID=15,RATE=new Map();
 const safe=(v,n)=>String(v??'').replace(/[\u0000-\u001f\u007f]+/g,' ').replace(/\s+/g,' ').trim().slice(0,n);
 const key=v=>safe(v,200).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();

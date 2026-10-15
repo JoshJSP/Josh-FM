@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const $=id=>document.getElementById(id),LABELS={hits:'MAIR HITS',top40:'MAIR TOP 40',new:'MAIR DISCOVERY',nl:'MAIR NEDERLANDSTALIG',party:'MAIR PARTY',chill:'MAIR CHILL',sleep:'MAIR SLEEP',summer:'MAIR SUMMER',throwback:'MAIR THROWBACK','00s':'MAIR 00s','10s':'MAIR 10s',mix:'MY MAIR'};
+const $=id=>document.getElementById(id),LABELS={hits:'MAIR HITS',top40:'MAIR TOP 40',new:'MAIR DISCOVERY',nl:'MAIR NEDERLANDSTALIG',party:'MAIR PARTY',chill:'MAIR CHILL',sleep:'MAIR SLEEP',study:'MAIR STUDEREN',summer:'MAIR SUMMER',throwback:'MAIR THROWBACK','00s':'MAIR 00s','10s':'MAIR 10s',mix:'MY MAIR'};
 function findCard(id){return $(id)?.closest('article.card')||null}function radio(){return $('tab-radio')}
 function activeId(){return window.MAIRStationController?.channel||window.JFMMusicChoice?.channel||localStorage.getItem('jfm_music_channel_v1')||'mix'}
 function activeLabel(){const id=activeId();return window.MAIRStationPolicy?.label?.(id)||LABELS[id]||String(id||'MAIR').toUpperCase()}

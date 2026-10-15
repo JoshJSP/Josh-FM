@@ -2,7 +2,7 @@
 'use strict';
 if(window.__mairUIHardening)return;window.__mairUIHardening=true;
 const stations=[
- ['hits','MAIR HITS','De grootste hits van nu'],['top40','MAIR TOP 40','De populairste tracks van dit moment'],['new','MAIR DISCOVERY','Nieuwe releases en nieuwe vondsten'],['nl','MAIR NEDERLANDSTALIG','Alleen echt Nederlandstalige nummers'],['party','MAIR PARTY','Energieke muziek voor een feestje'],['chill','MAIR CHILL','Rustig, warm en ontspannen'],['sleep','MAIR SLEEP','Zachte muziek om rustig bij in slaap te vallen'],['summer','MAIR SUMMER','Zonnige feelgood en zomertracks'],['throwback','MAIR THROWBACK','Bekende muziek van vóór 2017'],['00s','MAIR 00s','Hits uit 2000–2009'],['10s','MAIR 10s','Hits uit 2010–2019'],['mix','MY MAIR','Jouw persoonlijke mix']
+ ['hits','MAIR HITS','De grootste hits van nu'],['top40','MAIR TOP 40','De populairste tracks van dit moment'],['new','MAIR DISCOVERY','Nieuwe releases en nieuwe vondsten'],['nl','MAIR NEDERLANDSTALIG','Alleen echt Nederlandstalige nummers'],['party','MAIR PARTY','Energieke muziek voor een feestje'],['chill','MAIR CHILL','Rustig, warm en ontspannen'],['sleep','MAIR SLEEP','Zachte muziek om rustig bij in slaap te vallen'],['study','MAIR STUDEREN','Instrumentale focusmuziek, zonder DJ'],['summer','MAIR SUMMER','Zonnige feelgood en zomertracks'],['throwback','MAIR THROWBACK','Bekende muziek van vóór 2017'],['00s','MAIR 00s','Hits uit 2000–2009'],['10s','MAIR 10s','Hits uit 2010–2019'],['mix','MY MAIR','Jouw persoonlijke mix']
 ];
 const art=id=>`<span class="mair-station-art art-${id}" aria-hidden="true"><span class="mair-art-word">${id==='nl'?'NL':id.toUpperCase()}</span><span class="mair-art-wave">▥▦▥</span></span>`;
 function sync(){
