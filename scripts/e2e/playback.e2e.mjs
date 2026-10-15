@@ -149,6 +149,25 @@ async function scenarioRateLimit(){
   }finally{await h.close()}
 }
 
+async function scenarioRateLimitBackoff(){
+  const h=await launch({trackMs:30000});
+  try{
+    await startStation(h);
+    await h.page.evaluate(()=>{window.__mock.failNext=Object.assign(/GET \/me\/player$/,{status:429,retryAfter:20})});
+    const first=await h.page.evaluate(()=>api('/me/player').then(()=>'ok',e=>e.message));
+    c.ok('429: Retry-After 20 sec komt terug in de melding',/20 sec/.test(first),first);
+    const before=(await h.page.evaluate(()=>window.__mock.callLog())).length;
+    const reads=await h.page.evaluate(async()=>{const out=[];for(let i=0;i<5;i++)out.push(await api('/me/top/tracks?limit=5').then(()=>'ok',e=>e.message));return out});
+    const after=(await h.page.evaluate(()=>window.__mock.callLog())).length;
+    c.ok('429: tijdens de wachttijd gaan leesverzoeken niet het netwerk op',after===before&&reads.every(x=>/rustiger/.test(x)),JSON.stringify({before,after,reads}));
+    const uri0=(await mock(h.page)).uri;
+    await h.page.evaluate(()=>document.getElementById('next').click());
+    await sleep(6000);
+    const st=await mock(h.page);
+    c.ok('429: volgende-knop (schrijfopdracht) werkt tijdens de wachttijd en muziek speelt door',st.playing===true&&st.uri!==uri0,JSON.stringify(st));
+    noErrors('429 backoff: geen page errors',h);
+  }finally{await h.close()}
+}
 async function scenarioSleepTimer(){
   const h=await launch({trackMs:60000});
   try{
@@ -486,7 +505,7 @@ async function scenarioBackgroundNativeMusicFirst(){
     c.ok('achtergrond native: volgende nummer speelt zonder DJ-pauze',st.playing===true&&st.idx>=1,JSON.stringify(st));
   }finally{await h.close()}
 }
- const scenarios={backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+ const scenarios={rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,unduckFails:scenarioUnduckFails,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);

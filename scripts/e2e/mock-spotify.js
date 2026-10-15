@@ -25,7 +25,7 @@ S.state=()=>({disconnects:S.disconnects||0,active:S.active,playing:S.playing,idx
 S.callLog=()=>S.calls.map(c=>c.m+' '+c.p);
 function startPlay(body,q){const uris=Array.isArray(body?.uris)?body.uris:null;if(uris){S.uris=uris.slice();S.idx=Math.max(0,Number.isInteger(body?.offset?.position)?body.offset.position:0);if(body?.offset?.uri){const k=S.uris.indexOf(body.offset.uri);if(k>=0)S.idx=k}}else if(body?.context_uri){S.uris=CAT.slice(0,30).map(c=>'spotify:track:'+c.id);S.idx=0}
   setPos(Number(body?.position_ms)||0);S.playing=true;S.active=true;schedule();emit()}
-const json=(o,s=200)=>new Response(JSON.stringify(o),{status:s,headers:{'content-type':'application/json'}});
+const json=(o,s=200,extra={})=>new Response(JSON.stringify(o),{status:s,headers:{'content-type':'application/json',...extra}});
 const empty=(s=204)=>new Response(null,{status:s});
 const nativeFetch=window.fetch.bind(window);
 window.fetch=async function(input,init){
@@ -41,7 +41,7 @@ window.fetch=async function(input,init){
   const p=url.pathname.replace(/^\/v1/,''),q=url.searchParams;let body=null;try{body=init?.body?JSON.parse(init.body):null}catch{}
   S.calls.push({m:method,p:p+(url.search||'')});
   if(S.delayMs)await new Promise(r=>setTimeout(r,S.delayMs));
-  if(S.failNext&&S.failNext.test(method+' '+p)){const f=S.failNext;S.failNext=null;return json({error:{status:f.status||429,message:f.message||'mock failure'}},f.status||429)}
+  if(S.failNext&&S.failNext.test(method+' '+p)){const f=S.failNext;S.failNext=null;return json({error:{status:f.status||429,message:f.message||'mock failure'}},f.status||429,f.retryAfter?{'Retry-After':String(f.retryAfter)}:{})}
   if(p==='/me'&&method==='GET')return json({id:'mock-user',display_name:'Test',product:'premium',country:'NL',email:'test@example.invalid'});
   if(p==='/me/player/devices')return json({devices:S.deviceId&&S.registered?[{id:S.deviceId,name:S.deviceName,type:'Computer',is_active:S.active,is_restricted:false,volume_percent:Math.round(S.volume*100)}]:[]});
   if(p==='/me/player'&&method==='GET'){const t=cur();if(!S.active||!t)return empty();return json({device:{id:S.deviceId,name:S.deviceName,type:'Computer',is_active:true,volume_percent:Math.round(S.volume*100)},is_playing:S.playing,progress_ms:Math.round(position()),item:t,shuffle_state:S.shuffle,repeat_state:S.repeat,timestamp:now(),currently_playing_type:'track',actions:{}})}
