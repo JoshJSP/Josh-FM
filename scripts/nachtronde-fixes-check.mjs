@@ -20,4 +20,9 @@ const read=f=>fs.readFileSync(new URL('../'+f,import.meta.url),'utf8');
 {for(const f of ['mair-runtime.js','mair-observability.js'])ok(`${f}: sanitizer wist e-mail en ?code=`,read(f).includes(String.raw`refresh_token)=[^&\s]+`)&&read(f).includes(String.raw`[\w.+-]+@`));
  ok('sw: navigatie met ?code= of ?state= wordt niet gecachet',read('sw.js').includes('!/[?&](code|state)=/.test(request.url)'));
  ok('version.js: updatelus maximaal 1 keer per minuut',read('version.js').includes('Date.now()-lastUpdateForce>60000'))}
+// uurjournaal: Nederlandse klok, ook als het toestel op UTC staat (15-10-2026)
+{const s=read('mair-news-bulletin.js'),m=s.match(/const AMS=[^\n]*\n[^\n]*\n[^\n]*\n[^\n]*/);ok('nieuws: AMS-klok aanwezig',!!m);
+ if(m){const ctx={Intl,Date,Object,Number,GRACE_MINUTE:12};vm.runInNewContext(m[0].replace(/^const /gm,'var '),ctx);
+  ok('nieuws: 13:05 UTC in oktober is het uur van 15:00 in NL',ctx.hourSlot(new Date('2026-10-15T13:05:00Z'))==='2026-10-15T15'&&ctx.withinWindow(new Date('2026-10-15T13:05:00Z')));
+  ok('nieuws: 23:30 UTC op oudjaar is 00 uur NL op 1 januari',ctx.hourSlot(new Date('2026-12-31T23:30:00Z'))==='2027-01-01T00')}}
 console.log(`MAIR nachtronde fixes: ${fail?'FAIL':'PASS'}`);process.exit(fail?1:0);
