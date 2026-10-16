@@ -497,6 +497,7 @@ async function scenarioMap2(){
     let ms=await page.evaluate(()=>window.MAIRCarMap.status());
     c.ok('kaart wegschuiven kan (vegen komt door het scherm heen bij de kaart)',ms.free&&(await carAt())>40,JSON.stringify({free:ms.free,d:await carAt()}));
     c.ok('na wegschuiven: knop "Terug" zichtbaar',await page.locator('#carMap .car-map-back').isVisible());
+    if(outDir)await page.screenshot({path:outDir+'/carmode-c2-terug.png'});
     await t.at(2100,{jump:false});await sleep(600);
     c.ok('weggeschoven: een nieuwe GPS-fix trekt de kaart niet meteen terug',(await carAt())>40,String(await carAt()));
     await page.locator('#carMap .car-map-back').click();await sleep(1500);
@@ -538,6 +539,7 @@ async function scenarioSearch(){
     let r=await find('Albert Heijn');
     c.ok('keten: dichtbij eerst, dubbele eruit (Dichtbij, Vleuten, Amsterdam)',r.length===3&&/Dichtbij/.test(r[0])&&/Vleuten/.test(r[1])&&/Amsterdam/.test(r[2]),JSON.stringify(r));
     c.ok('resultaat toont de afstand',/2\.0 km/.test(r[0]),r[0]);
+    if(outDir)await page.screenshot({path:outDir+'/carmode-zoeken-albert-heijn.png'});
     const ah=mb.box.filter(x=>/albert/i.test(x.q));
     const bb=(ah.find(x=>x.bbox)?.bbox||'').split(',').map(Number);
     c.ok('Search Box: één aanvraag met proximity en één binnen ~20 km (bbox)',ah.some(x=>x.prox&&!x.bbox)&&bb.length===4&&Math.abs((bb[3]-bb[1])/2*110.54-20)<2&&Math.abs((bb[2]-bb[0])/2*MX(LAT0)/1000-20)<2,JSON.stringify(ah));
@@ -598,6 +600,7 @@ async function scenarioSnap(){
     c.ok('Map Matching vraagt maxspeed, radiuses en timestamps',mb.matching.length>=1&&/maxspeed/.test(mb.matching[0].annotations||'')&&!!mb.matching[0].radiuses&&!!mb.matching[0].timestamps,JSON.stringify(mb.matching[0]));
     await sleep(300);
     c.ok('zonder route: bordje maximumsnelheid uit Map Matching (50)',(await txt(page,'.car-limit'))==='50',await txt(page,'.car-limit'));
+    if(outDir){await sleep(1200);await page.screenshot({path:outDir+'/carmode-zonder-route-bordje.png'})}
     await sleep(1200);
     const mbear=(await status(page)).map?.bearing;
     c.ok('zonder route: kaart draait mee in de rijrichting (oosten ≈ 90°)',mbear!=null&&Math.abs(mbear-90)<8,String(mbear));
