@@ -8,7 +8,7 @@
 (()=>{
 'use strict';
 if(window.MAIRCarMap)return;
-const BASE='vendor/mapbox-gl/',STYLE='mapbox://styles/mapbox/navigation-night-v1',PITCH=55,FREE_MS=6000,LOST_MS=3000;
+const BASE='vendor/mapbox-gl/',STYLE='mapbox://styles/mapbox/navigation-night-v1',PITCH=55,FREE_MS=6000,LOST_MS=3000,MIN_ZOOM=3;
 let libP=null,creating=null,map=null,host=null,puck=null,back=null,ready=false,failed='',loads=0,route=null,cam=null,shown=false,tok='';
 let free=false,freeTimer=null,lost=false,lostTimer=null,rebuilds=0,tileReloads=0,reloadTimer=null,reloadAt=0,hiddenAt=0;
 function loadLib(){
@@ -23,11 +23,27 @@ function loadLib(){
   }).catch(e=>{libP=null;throw e});
   return libP
 }
-// De pijl staat vast op het punt waar de camera naartoe kijkt (padding), de kaart draait eromheen.
+// In volgmodus staat de pijl vast op het punt waar de camera naartoe kijkt (padding), de kaart draait eromheen.
 const PUCK='<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6 54 54 32 44 10 54z" fill="#fff" stroke="#9b4dff" stroke-width="4" stroke-linejoin="round"/></svg>';
-// De pijl staat vast midden onder in het kaartvak (75% van de hoogte), zodat je vooral de weg vóór je ziet.
+// Volgt de kaart, dan staat de pijl vast midden onder in het kaartvak (75% van de hoogte), zodat je vooral de weg vóór je ziet.
+// Schuift of zoomt Josh zelf, dan staat de pijl op de echte positie (en draait mee met de rijrichting), of is hij weg als die buiten beeld is.
 const pad=()=>{const h=host.clientHeight;return{left:0,top:Math.round(h*.55),bottom:Math.round(h*.05),right:0}};
-function placePuck(){if(!host||!puck)return;const w=host.clientWidth,h=host.clientHeight,p=pad();puck.style.left=(p.left+(w-p.left-p.right)/2)+'px';puck.style.top=(p.top+(h-p.top-p.bottom)/2)+'px'}
+function placePuck(){
+  if(!host||!puck)return;const w=host.clientWidth,h=host.clientHeight;let x,y,turn=0;
+  if(free&&cam&&map&&ready){const q=map.project([cam.lon,cam.lat]);x=q.x;y=q.y;if(Number.isFinite(cam.bearing))turn=cam.bearing-map.getBearing()}
+  else{const p=pad();x=p.left+(w-p.left-p.right)/2;y=p.top+(h-p.top-p.bottom)/2}
+  puck.hidden=!(x>=0&&y>=0&&x<=w&&y<=h);puck.style.left=x+'px';puck.style.top=y+'px';puck.style.transform=turn?`rotate(${turn}deg)`:''
+}
+// De kaart tekent alleen de wereld zelf (Mercator, tot 85° noord). Schuin bekeken en ver uitgezoomd kijk je voorbij die rand
+// en blijft een stuk zwart. Daarom wordt de kaart bij uitzoomen platter (zoom 11 schuin, zoom 6 en verder plat).
+const pitchFor=z=>Math.max(0,Math.min(PITCH,(z-6)/5*PITCH));
+// setPitch stopt een lopende wiel- of knijpzoom (jumpTo -> _stop), dus tijdens het zoomen de kanteling direct op de camera zetten.
+// ponytail: interne transform van mapbox-gl 3.33 (vendored); bestaat hij na een update niet meer, dan setPitch als terugval.
+function flatten(){
+  if(!free||!map)return;const p=pitchFor(map.getZoom());if(Math.abs(map.getPitch()-p)<=.5)return;
+  const tr=map.transform;if(tr&&'pitch' in tr){tr.pitch=p;map.triggerRepaint()}else map.setPitch(p);
+  placePuck()
+}
 // De route ligt boven alle wegen, ook bruggen en kruisingen; alleen tekst en iconen mogen erboven. De stijl heeft
 // al vroeg symbol-lagen (eenrichtingspijlen) met daarna nog weg- en bruglagen, dus: na de laatste niet-symbol-laag.
 function labelsFrom(){
@@ -59,20 +75,21 @@ async function show({el,token,center,coords}){
   return creating
 }
 // Wegschuiven en zoomen mag. Dan volgt de kaart even niet, verschijnt "Terug" en na FREE_MS gaat hij vanzelf terug.
-function release(e){if(!e?.originalEvent)return;free=true;if(back)back.hidden=false;clearTimeout(freeTimer);freeTimer=setTimeout(recenter,FREE_MS)}
-function recenter(){clearTimeout(freeTimer);free=false;if(back)back.hidden=true;if(cam)follow(cam)}
+function release(e){if(!e?.originalEvent)return;free=true;if(back)back.hidden=false;clearTimeout(freeTimer);freeTimer=setTimeout(recenter,FREE_MS);placePuck()}
+function recenter(){clearTimeout(freeTimer);free=false;if(back)back.hidden=true;placePuck();if(cam)follow(cam)}
 async function create(el,token,center){
   try{
     const gl=await loadLib();if(!shown)return false;
     if(map)return true;
     gl.accessToken=token;loads++;
-    map=new gl.Map({container:el,style:STYLE,center:center||[5.1,52.1],zoom:15,pitch:PITCH,bearing:0,interactive:true,dragRotate:false,pitchWithRotate:false,keyboard:false,doubleClickZoom:false,touchPitch:false,attributionControl:false,fadeDuration:0,maxPitch:60,localIdeographFontFamily:false});
+    map=new gl.Map({container:el,style:STYLE,center:center||[5.1,52.1],zoom:15,pitch:PITCH,bearing:0,interactive:true,dragRotate:false,pitchWithRotate:false,keyboard:false,doubleClickZoom:false,touchPitch:false,attributionControl:false,fadeDuration:0,maxPitch:60,minZoom:MIN_ZOOM,localIdeographFontFamily:false});
     map.touchZoomRotate.disableRotation();
     map.addControl(new gl.AttributionControl({compact:true}),'bottom-right');
     puck=document.createElement('div');puck.className='car-map-puck';puck.innerHTML=PUCK;el.appendChild(puck);placePuck();
     back=document.createElement('button');back.type='button';back.className='car-map-back';back.hidden=true;back.textContent='⌖ Terug';back.setAttribute('aria-label','Kaart terug naar je positie');
     back.addEventListener('click',e=>{e.stopPropagation();recenter()});el.appendChild(back);
-    for(const n of ['dragstart','drag','zoomstart','dragend','zoomend'])map.on(n,release);
+    for(const n of ['dragstart','drag','zoomstart','zoom','dragend','zoomend'])map.on(n,release);
+    map.on('zoom',flatten);map.on('move',()=>{if(free)placePuck()});
     map.on('style.load',()=>{ready=true;map.resize();addLayers();if(cam)follow(cam);placePuck()});
     map.on('error',e=>{const m=String(e?.error?.message||e?.message||'');if(!ready&&/style|401|403|access token|webgl/i.test(m))failed=m.slice(0,120)||'kaartfout';else if(ready&&e?.sourceId&&!/^car-/.test(e.sourceId))reloadTiles()});
     // Mapbox herstelt een teruggegeven context zelf. Komt hij niet terug, dan blijft de kaart zwart: opnieuw opbouwen.
@@ -124,10 +141,11 @@ function setRoute(coords){
 const zoomFor=kmh=>!Number.isFinite(kmh)||kmh<25?16.2:kmh<60?15.6:kmh<95?15:14.4;
 function follow({lon,lat,bearing,kmh}){
   cam={lon,lat,bearing,kmh};
+  if(free)placePuck();
   if(free||!map||!ready||!shown||!Number.isFinite(lon)||!Number.isFinite(lat))return;
   map.easeTo({center:[lon,lat],bearing:Number.isFinite(bearing)?bearing:map.getBearing(),zoom:zoomFor(kmh),pitch:PITCH,padding:pad(),duration:900,easing:t=>t,essential:true})
 }
 function hide(){shown=false;try{map?.stop?.()}catch{/* kaart al weg: onschuldig */}}
 function destroy(){shown=false;progressNow=0;ready=false;cam=null;route=null;free=false;lost=false;clearTimeout(freeTimer);clearTimeout(lostTimer);clearTimeout(reloadTimer);reloadTimer=null;try{map?.remove?.()}catch{/* kaart al weg: onschuldig */}map=null;puck=null;back=null;if(host)host.textContent='';host=null}
-window.MAIRCarMap={show,hide,destroy,follow,setRoute,setProgress,recenter,project:(lon,lat)=>{try{return map&&ready?map.project([lon,lat]):null}catch{return null}},puckAt:()=>puck?{x:puck.offsetLeft+puck.offsetWidth/2,y:puck.offsetTop+puck.offsetHeight/2}:null,status:()=>({created:!!map,ready,shown,failed,loads,free,lost,rebuilds,tileReloads,tilesLoaded:map&&ready?map.areTilesLoaded():null,bearing:map&&ready?map.getBearing():null,zoom:map&&ready?map.getZoom():null,hasRoute:!!(route&&route.length),layers:map&&ready?(map.getStyle().layers||[]).map(l=>l.id):[],routeLayers:map&&ready?['car-route-done','car-route-glow','car-route-casing','car-route-line'].filter(id=>map.getLayer(id)).length:0})};
+window.MAIRCarMap={show,hide,destroy,follow,setRoute,setProgress,recenter,project:(lon,lat)=>{try{return map&&ready?map.project([lon,lat]):null}catch{return null}},puckAt:()=>puck?{x:puck.offsetLeft+puck.offsetWidth/2,y:puck.offsetTop+puck.offsetHeight/2}:null,status:()=>({created:!!map,ready,shown,failed,loads,free,lost,rebuilds,tileReloads,tilesLoaded:map&&ready?map.areTilesLoaded():null,bearing:map&&ready?map.getBearing():null,zoom:map&&ready?map.getZoom():null,pitch:map&&ready?map.getPitch():null,hasRoute:!!(route&&route.length),layers:map&&ready?(map.getStyle().layers||[]).map(l=>l.id):[],routeLayers:map&&ready?['car-route-done','car-route-glow','car-route-casing','car-route-line'].filter(id=>map.getLayer(id)).length:0})};
 })();

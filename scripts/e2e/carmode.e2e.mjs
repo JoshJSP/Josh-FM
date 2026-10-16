@@ -1,5 +1,5 @@
 // Car Mode (ontwerp C2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
-//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe)
+//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout)
 // Route: rechte lijn naar het oosten, rotonde op 1,5 km (2e afslag), afrit rechts op 25 km (met rijstroken-banner op
 // 800 m ervoor), 25,5 km in totaal. Maximumsnelheid: 100 tot 5 km, 130 tot 8 km, onbekend tot 9 km, daarna 80.
 // Het GPS-filter weigert sprongen sneller dan 110 m/s; Date.now() krijgt daarom een instelbare voorsprong
@@ -511,15 +511,17 @@ async function scenarioMap2(){
     c.ok('autopijl staat vast midden onder in de kaart (x 50%, y ~75%)',Math.abs(pk.x-.5)<.02&&pk.y>.7&&pk.y<.8,JSON.stringify(pk));
     const carAt=()=>page.evaluate(()=>{const st=window.MAIRCarModePrototype.status().display,p=st&&window.MAIRCarMap.project(st.longitude,st.latitude),q=window.MAIRCarMap.puckAt();return p&&q?Math.round(Math.hypot(p.x-q.x,p.y-q.y)):999});
     c.ok('kaart volgt: de auto staat onder de pijl',(await carAt())<5,String(await carAt()));
-    // wegschuiven, knop Terug, vanzelf terug
+    // wegschuiven, knop Terug, vanzelf terug. Weggeschoven staat de pijl op de auto zelf, dus meten hoe ver de auto van zijn volgplek (midden, 75%) is
+    const carOff=()=>page.evaluate(()=>{const st=window.MAIRCarModePrototype.status().display,p=window.MAIRCarMap.project(st.longitude,st.latitude),m=document.getElementById('carMap');return Math.round(Math.hypot(p.x-m.clientWidth/2,p.y-m.clientHeight*.75))});
     const mr=await rect(page,'.car-map-slot'),drag=async dx=>{await page.mouse.move(mr.x+mr.w/2,mr.y+mr.h/2);await page.mouse.down();for(let i=1;i<=10;i++)await page.mouse.move(mr.x+mr.w/2+i*dx,mr.y+mr.h/2-i*8);await page.mouse.up();await sleep(400)};
     await drag(15);
     let ms=await page.evaluate(()=>window.MAIRCarMap.status());
-    c.ok('kaart wegschuiven kan (vegen komt door het scherm heen bij de kaart)',ms.free&&(await carAt())>40,JSON.stringify({free:ms.free,d:await carAt()}));
+    c.ok('kaart wegschuiven kan (vegen komt door het scherm heen bij de kaart)',ms.free&&(await carOff())>40,JSON.stringify({free:ms.free,d:await carOff()}));
+    c.ok('weggeschoven: pijl schuift mee en staat op de echte positie',(await carAt())<5,String(await carAt()));
     c.ok('na wegschuiven: knop "Terug" zichtbaar',await page.locator('#carMap .car-map-back').isVisible());
     if(outDir)await page.screenshot({path:outDir+'/carmode-c2-terug.png'});
     await t.at(2100,{jump:false});await sleep(600);
-    c.ok('weggeschoven: een nieuwe GPS-fix trekt de kaart niet meteen terug',(await carAt())>40,String(await carAt()));
+    c.ok('weggeschoven: een nieuwe GPS-fix trekt de kaart niet meteen terug, pijl gaat mee naar de nieuwe plek',(await carOff())>40&&(await carAt())<5,`${await carOff()} ${await carAt()}`);
     await page.locator('#carMap .car-map-back').click();await sleep(1500);
     c.ok('knop Terug: kaart meteen terug op de auto, knop weg',!(await page.evaluate(()=>window.MAIRCarMap.status().free))&&(await carAt())<5&&!(await page.locator('#carMap .car-map-back').isVisible()),String(await carAt()));
     await drag(-15);await sleep(2600);
@@ -759,7 +761,52 @@ async function scenarioVibe(){
   }finally{await h.close()}
 }
 
-const scenarios={nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe};
+// ---- scenario 14: ver uitzoomen en zelf schuiven ----------------------------
+// Josh' foto: uitgezoomd tot Europa was het bovenste kwart zwart en wees de pijl naar Marokko terwijl hij in IJsselstein reed.
+async function scenarioZoomOut(){
+  const t=await setup(),{page,h}=t;
+  try{
+    await page.evaluate(()=>window.MAIRCarModePrototype.open());await sleep(300);
+    await page.locator('#mairCarWaveOverlay [data-act="music"]').first().click();await sleep(300);
+    await page.evaluate(()=>{window.__speed=25;window.__heading=90});
+    for(let m=1000;m<1300;m+=25){await t.at(m,{acc:6,jump:false});await page.evaluate(()=>{window.__skew+=1000})}
+    await until(page,()=>window.MAIRCarMap.status().ready&&window.MAIRCarModePrototype.status().display,null,25000,'kaart klaar');await sleep(1500);
+    // leeg = waar de kaart niets tekent; de kaartbak is daarvoor fel magenta gemaakt (uitlezen op een lege pagina: de app-CSP weigert data:)
+    await page.addStyleTag({content:'#carMap{background:#ff00ff!important}'});
+    const empty=async()=>{const r=await rect(page,'.car-map-slot'),png=await page.screenshot({clip:{x:r.x+2,y:r.y+2,width:r.w-4,height:Math.round(r.h*.25)}});
+      const pg=await h.ctx.newPage();try{return await pg.evaluate(async b64=>{const img=await createImageBitmap(await (await fetch('data:image/png;base64,'+b64)).blob()),cv=new OffscreenCanvas(img.width,img.height),g=cv.getContext('2d');g.drawImage(img,0,0);const d=g.getImageData(0,0,img.width,img.height).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i]>200&&d[i+1]<60&&d[i+2]>200)n++;return Math.round(n/(d.length/4)*100)},png.toString('base64'))}finally{await pg.close()}};
+    const carAt=()=>page.evaluate(()=>{const st=window.MAIRCarModePrototype.status().display,p=st&&window.MAIRCarMap.project(st.longitude,st.latitude),q=window.MAIRCarMap.puckAt();return p&&q?Math.round(Math.hypot(p.x-q.x,p.y-q.y)):999});
+    const puckOn=()=>page.locator('#carMap .car-map-puck').isVisible();
+    c.ok('volgmodus: geen leeg stuk boven in de kaart',(await empty())===0,String(await empty()));
+    c.ok('volgmodus: auto onder de pijl',(await carAt())<5,String(await carAt()));
+    const mr=await rect(page,'.car-map-slot');
+    await page.mouse.move(mr.x+mr.w*.3,mr.y+mr.h*.7);
+    for(let i=0;i<40;i++){await page.mouse.wheel(0,400);await sleep(60)}
+    await sleep(2500);
+    const {zoom:z,pitch:pz}=await page.evaluate(()=>window.MAIRCarMap.status());
+    if(outDir)await page.screenshot({path:outDir+'/carmode-uitgezoomd.png'});
+    const e1=await empty();
+    c.ok('ver uitgezoomd: bovenste kwart van de kaart is niet leeg (zwart)',e1<=1,`leeg ${e1}% zoom ${z}`);
+    // de foto keek naar het noorden (geen route): ook dan geen zwart, want plat bekeken past de wereld altijd in beeld
+    c.ok('ver uitgezoomd: kaart ligt plat en zoomt niet verder uit dan Europa',pz<1&&z>=2.9,`pitch ${pz} zoom ${z}`);
+    const d1=await carAt();
+    c.ok('ver uitgezoomd: pijl staat op de echte gps-positie',(await puckOn())&&d1<8,`afstand ${d1}px`);
+    // schuif de kaart ver weg: de auto valt buiten beeld, de pijl moet dan weg zijn
+    for(let k=0;k<3;k++){await page.mouse.move(mr.x+mr.w*.2,mr.y+mr.h*.5);await page.mouse.down();for(let i=1;i<=10;i++)await page.mouse.move(mr.x+mr.w*.2+i*40,mr.y+mr.h*.5+i*4);await page.mouse.up();await sleep(300)}
+    await sleep(800);
+    const off=await page.evaluate(()=>{const st=window.MAIRCarModePrototype.status().display,p=window.MAIRCarMap.project(st.longitude,st.latitude),m=document.getElementById('carMap');return p.x<0||p.y<0||p.x>m.clientWidth||p.y>m.clientHeight});
+    c.ok('auto buiten beeld geschoven: pijl is weg',off&&!(await puckOn()),JSON.stringify({off,puck:await puckOn()}));
+    await t.at(1325,{acc:6,jump:false});await sleep(600);
+    c.ok('weggeschoven: nieuwe gps-fix trekt de kaart niet terug',(await page.evaluate(()=>window.MAIRCarMap.status().free))&&!(await puckOn()));
+    await page.locator('#carMap .car-map-back').click();await sleep(1800);
+    const pk=await page.evaluate(()=>{const p=window.MAIRCarMap.puckAt(),m=document.getElementById('carMap');return{x:p.x/m.clientWidth,y:p.y/m.clientHeight,z:window.MAIRCarMap.status().zoom}});
+    c.ok('knop Terug: pijl weer vast midden onder (75%) op de auto, ingezoomd',(await puckOn())&&Math.abs(pk.x-.5)<.02&&pk.y>.7&&pk.y<.8&&(await carAt())<5&&pk.z>14,JSON.stringify(pk));
+    c.ok('na Terug: geen leeg stuk boven in de kaart',(await empty())===0,String(await empty()));
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+}
+
+const scenarios={nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);
