@@ -6,7 +6,7 @@ const ROOT='#mairCarWaveOverlay';
 const targets=[
   ['.car-track-copy h1',22,42,null],
   ['.car-track-copy p',13,20,null],
-  ['.car-next b',11,17,1],
+  ['.car-next b',12,19,2],
   ['.car-next span',10,15,1],
   ['.car-nav-maneuver strong',12,18,4],
   ['.car-stop-chip',9,13,1],
@@ -18,7 +18,7 @@ const targets=[
   ['.car-turn-focus header span',9,13,1]
 ];
 let queued=false,observedRoot=null;
-function lineCount(el){const cs=getComputedStyle(el),lh=parseFloat(cs.lineHeight)||parseFloat(cs.fontSize)*1.2;return lh>0?Math.ceil(el.scrollHeight/lh):1}
+function lineCount(el){const cs=getComputedStyle(el),lh=parseFloat(cs.lineHeight)||parseFloat(cs.fontSize)*1.5;return lh>0?Math.ceil(el.scrollHeight/lh):1}
 function fit(el,min,max,maxLines){
   if(!el||!el.isConnected)return;
   el.style.fontSize='';
