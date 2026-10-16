@@ -1,5 +1,5 @@
 // Car Mode (ontwerp C2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
-//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap)
+//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe)
 // Route: rechte lijn naar het oosten, rotonde op 1,5 km (2e afslag), afrit rechts op 25 km (met rijstroken-banner op
 // 800 m ervoor), 25,5 km in totaal. Maximumsnelheid: 100 tot 5 km, 130 tot 8 km, onbekend tot 9 km, daarna 80.
 // Het GPS-filter weigert sprongen sneller dan 110 m/s; Date.now() krijgt daarom een instelbare voorsprong
@@ -692,7 +692,73 @@ async function scenarioNoRoute(){
   }finally{await h.close()}
 }
 
-const scenarios={nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute};
+// ---- scenario 13: vibe kiezen -------------------------------------------------
+// Josh kiest met één tik een vibe (stemming van de programmering). De keuze blijft na herladen staan, de wachtrij wordt meteen
+// opnieuw gepland (huidige nummer speelt door, Spotify krijgt de nieuwe volgorde, geen dubbel nummer) en met route schuift de
+// journey-director zijn boog mee.
+async function scenarioVibe(){
+  const t=await setup(),{page,h}=t;
+  const remote=()=>page.evaluate(()=>{const m=window.__mock;return{uri:m.uris[m.idx],next:m.uris.slice(m.idx+1),pos:m.state().position,playing:m.playing}});
+  const inBar=()=>page.evaluate(()=>{const b=document.querySelector('#mairCarWaveOverlay .car-music-bar').getBoundingClientRect();return[...document.querySelectorAll('#mairCarWaveOverlay .car-music-bar button')].every(x=>{const q=x.getBoundingClientRect();return q.top>=b.top-1&&q.bottom<=b.bottom+1})});
+  try{
+    await page.locator('nav button, [role=tab]',{hasText:'Stations'}).locator('visible=true').first().click();await sleep(500);
+    await page.locator('[data-mair-station]').locator('visible=true').first().click();
+    await until(page,()=>window.__mock.state().playing&&window.__mock.state().uris>=10&&queue.length>=10,null,25000,'station speelt');
+    await sleep(1500);
+    // nep-nummers zijn allemaal even populair; geef ze verschillende energie zodat een andere vibe een andere volgorde geeft
+    await page.evaluate(()=>queue.forEach((x,i)=>{x.popularity=[15,95,40,85,25,70,10,90,55,30][i%10]}));
+    const before=await remote();
+    await page.evaluate(()=>window.MAIRCarModePrototype.open());await sleep(300);
+    await page.locator('#mairCarWaveOverlay [data-act="music"]').first().click();await sleep(400);
+    c.ok('vibe: knop in het muziekblok toont de huidige vibe (MAIR)',/MAIR/.test(await txt(page,'.car-music-bar .car-vibe')),await txt(page,'.car-music-bar .car-vibe'));
+    c.ok('vibe: vibe-knop en muziekknoppen passen in het muziekblok',await inBar());
+    await page.locator('#mairCarWaveOverlay .car-music-bar [data-act="vibe"]').click();
+    const n=await count(page,'.car-vibes [data-vibe]'),on=await txt(page,'.car-vibes .on');
+    c.ok('vibe: blad met 7 knoppen, de huidige staat aan',n===7&&on==='MAIR',n+' '+on);
+    const big=await rect(page,'.car-vibes [data-vibe="chill"]');
+    c.ok('vibe: knoppen zijn groot genoeg voor in de auto (>=64 px hoog)',!!big&&big.h>=64,JSON.stringify(big));
+    if(outDir)await page.screenshot({path:outDir+'/carmode-vibe-blad.png'});
+    await page.locator('#mairCarWaveOverlay [data-vibe="chill"]').click();
+    await until(page,n=>{const m=window.__mock;return m.uris.slice(m.idx+1).join()!==n},before.next.join(),10000,'Spotify krijgt nieuwe volgorde').catch(()=>{});
+    const after=await remote(),local=await page.evaluate(()=>queue.map(x=>x.uri));
+    c.ok('vibe: keuze opgeslagen (JFMRotation en localStorage)',await page.evaluate(()=>window.JFMRotation.state().mode==='chill'&&JSON.parse(localStorage.getItem('mair_director_state_v3')).mode==='chill'));
+    c.ok('vibe: blad dicht, muziekblok toont Chill',!(await has(page,'.car-vibes'))&&/Chill/.test(await txt(page,'.car-music-bar .car-vibe')),await txt(page,'.car-music-bar .car-vibe'));
+    c.ok('vibe: wachtrij is meteen opnieuw gepland (andere volgorde bij Spotify)',after.next.join()!==before.next.join(),after.next.slice(0,4).join(' '));
+    c.ok('vibe: huidige nummer speelt door zonder gat (zelfde nummer, niet terug naar 0)',after.uri===before.uri&&after.playing&&after.pos>=before.pos,`${before.uri}@${before.pos} -> ${after.uri}@${after.pos} playing=${after.playing}`);
+    c.ok('vibe: Spotify speelt hierna precies de nieuwe wachtrij',local[0]===after.uri&&after.next.slice(0,5).join()===local.slice(1,6).join(),`${after.next.slice(0,3)} | ${local.slice(1,4)}`);
+    c.ok('vibe: geen dubbel nummer in wat Spotify gaat spelen',new Set([after.uri,...after.next]).size===after.next.length+1);
+    c.ok('vibe: geen Volgende-nummer in beeld',!/volgende|hierna|next up/i.test(await page.evaluate(()=>document.getElementById('mairCarWaveOverlay').innerText)));
+    if(outDir)await page.screenshot({path:outDir+'/carmode-vibe-muziek.png'});
+    // volgende rit: herladen, route kiezen
+    await page.reload({waitUntil:'load'});
+    await until(page,()=>window.MAIRCarModePrototype&&window.JFMRotation&&window.MAIRCarMenuSticky,null,15000,'herladen');await sleep(1500);
+    c.ok('vibe: na herladen nog steeds Chill',await page.evaluate(()=>window.JFMRotation.state().mode)==='chill');
+    await page.evaluate(()=>window.MAIRCarModePrototype.open());
+    await page.locator('[data-act="search"]').first().click();
+    await page.fill('#carSearchInput','test');await page.locator('[data-result-index="0"]').first().waitFor({timeout:8000});await page.locator('[data-result-index="0"]').first().click();
+    await page.locator('[data-act="start"]').waitFor({timeout:8000});
+    c.ok('vibe: bij het starten van een route staat de vibe-knop er, met Chill',/Chill/.test(await txt(page,'.car-preview .car-vibe')),await txt(page,'.car-preview .car-vibe'));
+    if(outDir)await page.screenshot({path:outDir+'/carmode-vibe-route.png'});
+    await page.locator('[data-act="start"]').click();
+    await until(page,()=>window.MAIRCarModePrototype.status().screen==='drive'&&window.MAIRJourneyDirector?.state?.().active,null,10000,'rit actief');
+    t.last=0;await t.at(300);await sleep(500);
+    await layoutChecks(t,'vibe rijscherm');
+    c.ok('vibe: vibe-knop en muziekknoppen passen in het muziekblok (rijscherm)',await inBar());
+    const j1=await page.evaluate(()=>window.MAIRJourneyDirector.state());
+    await page.locator('#mairCarWaveOverlay [data-act="menu"]').click();await sleep(300);
+    c.ok('vibe: menu in de bovenbalk toont de vibe',/Vibe: Chill/.test(await txt(page,'.car-menu')),await txt(page,'.car-menu'));
+    await page.locator('#mairCarWaveOverlay .car-menu [data-act="vibe"]').click();await sleep(300);
+    c.ok('vibe: menu dicht en het vibe-blad open (menu komt niet terug)',(await count(page,'.car-menu-backdrop'))===1&&(await has(page,'.car-vibes')));
+    await page.locator('#mairCarWaveOverlay [data-vibe="energy"]').click();await sleep(800);
+    const j2=await page.evaluate(()=>window.MAIRJourneyDirector.state());
+    c.ok('vibe met route: journey-director houdt het verloop (zelfde fase), binnen de vibe (Energie mikt hoger dan Chill)',j2.active&&j2.phase===j1.phase&&j2.targetMomentum>j1.targetMomentum,`${j1.phase}:${j1.targetMomentum} -> ${j2.phase}:${j2.targetMomentum}`);
+    c.ok('vibe met route: geen menu of blad meer open',(await count(page,'.car-menu-backdrop'))===0);
+    if(outDir)await page.screenshot({path:outDir+'/carmode-vibe-rijscherm.png'});
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+}
+
+const scenarios={nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);

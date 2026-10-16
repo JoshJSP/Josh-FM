@@ -28,7 +28,7 @@
    Geen kop en zo weinig mogelijk rand: de kaart krijgt alles wat over is. Eén stylesheet voor heel Car Mode: statisch
    gelinkt in index.html. --car-layout laat de JS controleren dat dit de goede versie is. Maten ontworpen op 844x390,
    ze schalen mee met de schermhoogte (--u = 1/390 van de hoogte). */
-:root{--car-layout:"c2-20261016b"}
+:root{--car-layout:"c2-20261016c"}
 .mair-car-wave-overlay{--u:calc(100dvh/390);--safe-l:max(0px,env(safe-area-inset-left));--safe-r:max(0px,env(safe-area-inset-right));--g:calc(var(--u)*8);--side:max(calc(var(--u)*222),30vw);--el:calc(var(--g) + var(--safe-l));--er:calc(var(--g) + var(--safe-r));--mapw:calc(100% - var(--el) - var(--er) - var(--side) - var(--g));--top:var(--g);--head-h:calc(var(--u)*52);--speed-h:calc(var(--u)*100)}
 /* --mapw met 100% (breedte van de overlay), niet 100vw: in de iOS-app is 100vw het hele scherm en liep de kaart onder de kolom door */
 /* in de iOS-app laat de webview de zijkanten al vrij (zie insetByShell in de JS) */
@@ -119,3 +119,14 @@
 /* de verkeersmelding (mair-traffic-journey-toast.js) viel over de rijstroken in de bovenbalk */
 #mairCarWaveOverlay:is([data-screen="drive"],[data-screen="music"]) .mair-traffic-journey-toast{top:calc(var(--top) + var(--u)*10);left:calc(var(--el) + var(--mapw)/2);max-width:calc(var(--mapw) - var(--u)*24)}
 @media(max-width:760px){.car-lane-head{display:none}}
+/* Vibe: knop in het muziekblok en bij de route, keuze in een blad met grote knoppen (één tik, niet typen). */
+.car-music-bar{grid-template-rows:auto auto 1fr}
+.car-vibe{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:calc(var(--u,1px)*8);min-height:calc(var(--u,1px)*42);margin-top:calc(var(--u,1px)*8);padding:0 calc(var(--u,1px)*14);border:1px solid var(--car-line);border-radius:calc(var(--u,1px)*13);background:#15121d;color:#fff;font:inherit;pointer-events:auto}
+.car-vibe small{color:var(--car-soft);font-size:calc(var(--u,1px)*10);font-weight:900;letter-spacing:.12em}
+.car-vibe b{font-size:calc(var(--u,1px)*15);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.car-preview-go{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:9px}.car-preview-go .car-route-start:only-child{grid-column:1/-1}
+.car-preview .car-vibe{grid-column:auto;min-height:60px;margin:0;padding:0 18px;border-radius:18px}.car-preview .car-vibe b{font-size:18px}
+.car-menu.car-vibes{width:min(660px,92vw)}
+.car-vibe-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.car-menu .car-vibe-grid button{min-height:72px;padding:0 8px;text-align:center;font-size:17px;font-weight:800;line-height:1.15}
+.car-menu .car-vibe-grid button.on{background:var(--car-purple);color:#fff}

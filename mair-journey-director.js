@@ -3,7 +3,7 @@
 'use strict';
 if(window.__mairJourneyDirector)return;
 window.__mairJourneyDirector=true;
-const clamp=(n,a=0,b=1)=>Math.max(a,Math.min(b,n));
+const clamp=(n,a=0,b=1)=>Math.max(a,Math.min(b,n)),VIBE_SHIFT={chill:-.2,energy:.1,party:.12};
 let installed=false,lastKey='',lastReplanAt=0,replanTimer=null;
 
 function journey(){
@@ -22,7 +22,9 @@ function phase(j=journey()){
 }
 function targetMomentum(j=journey()){
   const ph=phase(j);
-  return({start:.54,cruise:.66,build:.78,final:.74,arrival:.86})[ph]??.66;
+  // De gekozen vibe (Car Mode) schuift de hele boog op of neer; het verloop van de rit blijft.
+  let mode='';try{mode=window.JFMRotation?.state?.().mode||''}catch{/* geen rotatie: geen verschuiving */}
+  return clamp((({start:.54,cruise:.66,build:.78,final:.74,arrival:.86})[ph]??.66)+(VIBE_SHIFT[mode]||0),.3,.95);
 }
 function category(t){try{return window.JFMRotation?.category?.(t)||''}catch{return''}}
 function familiarity(t){try{return Number(window.JFMRotation?.familiarity?.(t))||.5}catch{return.5}}
