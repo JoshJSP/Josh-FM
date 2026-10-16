@@ -16,12 +16,14 @@
     while(pool.length){const recent=[...prefix,...out].slice(-2).map(artist).filter(Boolean);let index=pool.findIndex(t=>{const a=artist(t);return!a||!recent.includes(a)});if(index<0)index=0;out.push(pool.splice(index,1)[0])}
     return out
   }
+  // Love/ban (personal-learning): geband = niet in nieuwe wachtrijen. Faalt dit of blijft er te weinig over, dan de lijst ongewijzigd (muziek gaat voor).
+  function dropBanned(list){try{const f=window.JFMTasteModel?.filterBanned;if(typeof f!=='function'||!Array.isArray(list))return list;const out=f(list,{keepId:String(window.JFMPlaybackState?.get?.()?.trackId||'')});return Array.isArray(out)&&out.length?out:list}catch{return list}}
   function current(){try{return normalize(Array.isArray(queue)?queue:[])}catch{return[]}}
   function loadActive(){try{const x=JSON.parse(sessionStorage.getItem(ACTIVE_KEY)||'{}');if(Date.now()-Number(x.at||0)>6*60*60*1000||x.station!==(localStorage.getItem('jfm_music_channel_v1')||'mix'))return[];return normalize(x.tracks)}catch{return[]}}
   function persistActive(list,stationId=station){try{sessionStorage.setItem(ACTIVE_KEY,JSON.stringify({at:Date.now(),station:stationId||localStorage.getItem('jfm_music_channel_v1')||'mix',tracks:normalize(list).slice(0,60)}))}catch{/* opslag geblokkeerd: dan maar zonder opslag */}}
   function emit(reason){try{window.dispatchEvent(new CustomEvent('jfm:queue-change',{detail:{revision,reason,station,tracks:current().length}}))}catch{/* event-listener gooide: onschuldig */}}
   function commit(list,meta={}){
-    const next=normalize(list);if(!next.length)throw Error('De radioset bevat geen geldige Spotify-tracks.');
+    const next=normalize(dropBanned(list));if(!next.length)throw Error('De radioset bevat geen geldige Spotify-tracks.');
     queue=next;revision++;source=String(meta.source||source||'unknown');station=String(meta.station||localStorage.getItem('jfm_music_channel_v1')||'mix');lastReason=String(meta.reason||'commit');lastError='';
     persistActive(next,station);try{window.__jfmStationQueueSig=''}catch{/* optionele cache-sleutel */};trace('commit',{revision,source,station,reason:lastReason,tracks:next.length});emit(lastReason);return next
   }
@@ -36,11 +38,11 @@
     return build(reason,async()=>{
       const id=localStorage.getItem('jfm_music_channel_v1')||'mix';
       if(id==='mix'){
-        if(window.MAIRPersonalSourceSync?.buildPersonal)return window.MAIRPersonalSourceSync.buildPersonal({commit:false,announce:false,activate:false});
-        if(typeof window.buildSet==='function'){const before=current();const made=await window.buildSet();const result=normalize(Array.isArray(made)?made:current());queue=before;return result}
+        if(window.MAIRPersonalSourceSync?.buildPersonal)return dropBanned(await window.MAIRPersonalSourceSync.buildPersonal({commit:false,announce:false,activate:false}));
+        if(typeof window.buildSet==='function'){const before=current();const made=await window.buildSet();const result=normalize(dropBanned(Array.isArray(made)?made:current()));queue=before;return result}
         throw Error('Persoonlijke muziekbron is nog niet beschikbaar.');
       }
-      const built=await window.MAIRStationController?.buildPool?.(id);if(!built?.tracks?.length)throw Error('Het actieve station leverde geen nieuwe tracks.');return normalize(built.tracks)
+      const built=await window.MAIRStationController?.buildPool?.(id);if(!built?.tracks?.length)throw Error('Het actieve station leverde geen nieuwe tracks.');return normalize(dropBanned(built.tracks))
     })
   }
   function authoredAfter(uri){const q=current(),i=q.findIndex(t=>t.uri===uri);return i>=0?q.slice(i+1):q}
