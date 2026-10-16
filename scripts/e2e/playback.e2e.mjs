@@ -521,7 +521,112 @@ async function scenarioBackgroundNativeMusicFirst(){
     c.ok('achtergrond native: volgende nummer speelt zonder DJ-pauze',st.playing===true&&st.idx>=1,JSON.stringify(st));
   }finally{await h.close()}
 }
- const scenarios={studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// Love/ban (personal-learning): een geband nummer/artiest komt niet meer in nieuwe wachtrijen, een love telt mee in de volgorde,
+// en bans laten de zender nooit leeglopen. Zonder love/ban verandert er niets.
+const learnPool=page=>page.evaluate(async()=>{const seen=new Map();for(let i=0;i<8;i++){try{for(const t of await window.JFMQueue.buildActive('learn-'+i))seen.set(t.id,t)}catch{/* volgende poging */}}for(const t of window.JFMQueue.current())seen.set(t.id,t);return[...seen.values()].map(t=>({id:t.id,uri:t.uri,name:t.name,artists:t.artists.map(a=>a?.name||a),popularity:t.popularity||50,release:t.release||'2024-01-01'}))});
+async function scenarioLearnBan(){
+  const h=await launch({trackMs:20000});
+  await h.page.addInitScript(()=>{window.__mock.rolling=true;localStorage.setItem('mair_dj_enabled_v1','0')});
+  try{
+    await startStation(h);
+    await until(h.page,()=>!!window.JFMTasteModel&&!!window.JFMTasteModel.filterBanned,null,15000,'personal-learning geladen');
+    // (d) zonder love/ban: niets verandert
+    const none=await h.page.evaluate(async()=>{const m=window.JFMTasteModel,list=window.JFMQueue.current(),before=JSON.stringify(list.map(t=>t.id)),filtered=m.filterBanned(list);return{same:filtered===list,boost:list.map(t=>m.rotationBoost(t)).some(Boolean),profile:Object.keys(m.profile.bans).length+Object.keys(m.profile.loves).length,stable:before===JSON.stringify(window.JFMQueue.normalize(list).map(t=>t.id))}});
+    c.ok('leren: zonder love/ban blijft alles gelijk (lijst, gewicht, profiel)',none.same&&!none.boost&&none.profile===0&&none.stable,JSON.stringify(none));
+    // Ban via de echte knop op het spelende nummer
+    const first=(await mock(h.page)).uri.split(':').pop();
+    await h.page.evaluate(()=>document.getElementById('banTrack').click());
+    await until(h.page,id=>window.__mock.state().uri.split(':').pop()!==id,first,10000,'volgende nummer na ban');
+    const prof=await h.page.evaluate(()=>window.JFMTasteModel.profile);
+    const stored=await h.page.evaluate(id=>!!JSON.parse(localStorage.getItem('jfm_taste_model_v4')).bans[id],first);
+    c.ok('leren: ban-knop slaat het spelende nummer op (bestaande sleutel jfm_taste_model_v4)',!!prof.bans[first]&&stored,JSON.stringify(Object.keys(prof.bans)));
+    const st=await mock(h.page);c.ok('leren: na de ban speelt de zender door',st.playing===true,JSON.stringify(st));
+    // Nog drie nummers van dezelfde artiest bannen: dan valt de hele artiest weg
+    const pool=await learnPool(h.page);
+    const bannedArtist=pool.find(t=>t.id!==first)?.artists[0];
+    const mates=pool.filter(t=>t.artists[0]===bannedArtist&&t.id!==first).slice(0,3);
+    await h.page.evaluate(ms=>ms.forEach(t=>window.JFMTasteModel.event('ban',t,-12)),mates);
+    const playingNow=(await mock(h.page)).uri.split(':').pop();
+    const builds=await h.page.evaluate(async()=>{const out=[];for(let i=0;i<10;i++){try{out.push((await window.JFMQueue.buildActive('learn-ban-'+i)).map(t=>({id:t.id,a:t.artists[0]?.name||t.artists[0]})))}catch(e){out.push([])}}return out});
+    const bannedIds=new Set([first,...mates.map(t=>t.id)]);
+    const leaked=builds.flat().filter(t=>bannedIds.has(t.id)||t.a===bannedArtist&&t.id!==playingNow);
+    c.ok('leren: 10 nieuwe keuzes van de zender bevatten geen geband nummer en geen geband artiest',builds.every(b=>b.length>0)&&leaked.length===0,'gelekt '+JSON.stringify(leaked.slice(0,2))+' van '+leaked.length+', playing '+playingNow+', first '+first+', mates '+mates.map(t=>t.id.slice(-3))+', lengtes '+builds.map(b=>b.length).join(','));
+    // En in de lopende reeks: na de eerste 30 (al naar Spotify gestuurd) komt niets geband meer langs
+    const played=[];
+    for(let i=0;i<52;i++){
+      await h.page.evaluate(()=>window.__mock.finishTrack(500));
+      await sleep(1400);
+      for(let w=0;w<4&&!(await h.page.evaluate(()=>window.__mock.state().playing));w++)await sleep(700);
+      const s=await h.page.evaluate(()=>{const u=window.__mock.state().uri,id=u.split(':').pop(),r=window.JFMRadioSuite?.state?.();if(r&&id&&r.lastIds[0]!==id)r.lastIds.unshift(id);return{id,idx:window.__mock.state().idx,p:window.__mock.state().playing}});
+      played.push(s);if(!s.p){await sleep(2500);if(!(await mock(h.page)).playing)break}
+    }
+    const bannedAfterFirst30=await h.page.evaluate(async({played,bannedIds,bannedArtist})=>{const names=new Map(window.JFMQueue.current().map(t=>[t.id,t.artists[0]?.name||t.artists[0]]));return played.filter(p=>p.idx>=31&&(bannedIds.includes(p.id)||names.get(p.id)===bannedArtist)).length},{played,bannedIds:[...bannedIds],bannedArtist});
+    c.ok('leren: reeks van '+played.length+' wissels zonder stilvallen',played.length>=52&&played.every(p=>p.p),played.filter(p=>!p.p).length+' stil');
+    const late=played.filter(p=>p.idx>=31).length;
+    c.ok('leren: geband nummer/artiest komt in de reeks na de eerste 30 niet meer voor ('+late+' nummers na de eerste 30 bekeken)',late>=8&&bannedAfterFirst30===0,bannedAfterFirst30+' keer, '+late+' bekeken');
+    noErrors('leren ban: geen page errors',h);
+  }finally{await h.close()}
+}
+async function scenarioLearnLove(){
+  const h=await launch({trackMs:20000});
+  try{
+    await startStation(h);
+    await until(h.page,()=>!!window.JFMTasteModel&&!!window.JFMTasteModel.rotationBoost,null,15000,'personal-learning geladen');
+    const pool=await learnPool(h.page);
+    c.ok('leren: love-test heeft een pool van minstens 30 nummers',pool.length>=30&&new Set(pool.map(t=>t.artists[0])).size>=6,pool.length+' nummers');
+    const measure=(pool,loved)=>h.page.evaluate(({pool,loved})=>{const hs=window.JFMRadioSuite.state();hs.lastIds.length=0;hs.lastArtists.length=0;/* de artiest van het spelende nummer staat anders (terecht) op slot */let x=777;const rnd=()=>(x=(x*1664525+1013904223)>>>0)/4294967296;let top=0,mine=0,tot=0,maxRun=0,pos=0;const subsets=Array.from({length:40},()=>{const s=pool.filter(()=>rnd()<.6);return s.length>=12?s:pool});
+      for(const p of subsets){const out=window.JFMRotation.plan(p,[]).slice(0,30);let r=0,last='';out.forEach((t,i)=>{const a=t.artists[0];if(a===loved){mine++;if(i<4)top++;pos+=i}tot++;if(a===last)r++;else r=0;last=a;maxRun=Math.max(maxRun,r)})}return{top,share:mine/tot,avgPos:mine?pos/mine:99,maxRun}},{pool,loved});
+    // De artiest van het spelende nummer wordt geliefd via de echte knop
+    const playingId=(await mock(h.page)).uri.split(':').pop();
+    const loved=pool.find(t=>t.id===playingId)?.artists[0];
+    const a1=await measure(pool,loved),a2=await measure(pool,loved);
+    c.ok('leren: zonder love zijn twee metingen identiek (deterministisch)',JSON.stringify(a1)===JSON.stringify(a2),JSON.stringify([a1,a2]));
+    await h.page.evaluate(()=>document.getElementById('loveTrack').click());
+    await h.page.evaluate(()=>{const t=window.JFMQueue.current().find(x=>x.id===(window.__mock.state().uri.split(':').pop()));window.JFMTasteModel.event('love',{id:t.id,artists:t.artists.map(a=>a?.name||a)},8)});
+    const prof=await h.page.evaluate(()=>window.JFMTasteModel.profile);
+    c.ok('leren: love-knop slaat nummer en artiest op (jfm_taste_model_v4)',!!prof.loves[playingId]&&Object.keys(prof.loveArtists).length>=1,JSON.stringify(Object.keys(prof.loves)));
+    const b=await measure(pool,loved);
+    c.ok('leren: geliefde artiest staat vaker vooraan (eerste 4 plekken: '+a1.top+' naar '+b.top+' van 40)',b.top>a1.top,JSON.stringify({a1,b}));
+    c.ok('leren: gemiddelde plek van de geliefde artiest schuift naar voren ('+a1.avgPos.toFixed(1)+' naar '+b.avgPos.toFixed(1)+') maar het aandeel blijft gelijk (alles blijft in de lijst)',b.avgPos<a1.avgPos&&b.share<=a1.share*1.5,JSON.stringify({a1,b}));
+    c.ok('leren: love geeft geen artiest-na-artiest',b.maxRun<=a1.maxRun,JSON.stringify({a1,b}));
+    // Een nummer dat net is gespeeld blijft op slot: herhaalvenster wint van love
+    const recent=await h.page.evaluate(({pool,playingId})=>{const r=window.JFMRadioSuite.state();r.lastIds.unshift(playingId);const out=window.JFMRotation.plan(pool,[]).slice(0,5).map(t=>t.id);return out.includes(playingId)},{pool,playingId});
+    c.ok('leren: een geliefd maar net gespeeld nummer komt niet meteen terug (herhaalvenster blijft gelden)',recent===false);
+    const st=await mock(h.page);c.ok('leren: muziek speelt tijdens het leren',st.playing===true);
+    noErrors('leren love: geen page errors',h);
+  }finally{await h.close()}
+}
+async function scenarioLearnManyBans(){
+  const h=await launch({trackMs:20000});
+  await h.page.addInitScript(()=>{window.__mock.rolling=true;localStorage.setItem('mair_dj_enabled_v1','0')});
+  try{
+    await startStation(h);
+    await until(h.page,()=>!!window.JFMTasteModel&&!!window.JFMTasteModel.filterBanned,null,15000,'personal-learning geladen');
+    const pool=await learnPool(h.page);
+    const playing=(await mock(h.page)).uri.split(':').pop();
+    // 70% van wat de zender kent bannen: de zender moet doorspelen
+    const victims=pool.filter(t=>t.id!==playing).slice(0,Math.floor(pool.length*.7));
+    await h.page.evaluate(v=>v.forEach(t=>window.JFMTasteModel.event('ban',t,-12)),victims);
+    const ids=new Set(victims.map(t=>t.id));
+    const builds=await h.page.evaluate(async()=>{const out=[];for(let i=0;i<6;i++){try{out.push((await window.JFMQueue.buildActive('learn-many-'+i)).map(t=>t.id))}catch(e){out.push(['fout:'+e.message])}}return out});
+    c.ok('leren: met 70% van de bron geband geeft de zender nog steeds keuzes',builds.every(b=>b.length>0&&!String(b[0]).startsWith('fout')),builds.map(b=>b.length).join(','));
+    c.ok('leren: die keuzes bevatten geen geband nummer zolang er genoeg over is',builds.every(b=>b.every(id=>!ids.has(id))),builds.map(b=>b.filter(id=>ids.has(id)).length).join(','));
+    // Alles op één na bannen: oude keuze (niets filteren), niet leeg
+    const rest=pool.filter(t=>!ids.has(t.id)&&t.id!==playing);
+    await h.page.evaluate(v=>v.forEach(t=>window.JFMTasteModel.event('ban',t,-12)),rest.slice(0,Math.max(0,rest.length-2)));
+    const tiny=await h.page.evaluate(async()=>{try{return(await window.JFMQueue.buildActive('learn-tiny')).length}catch(e){return -1}});
+    c.ok('leren: bijna alles geband: de zender krijgt toch een lijst (oude keuze, niet leeg)',tiny>=1,'lengte '+tiny);
+    const played=[];
+    for(let i=0;i<14;i++){
+      await h.page.evaluate(()=>window.__mock.finishTrack(500));await sleep(1400);
+      for(let w=0;w<4&&!(await h.page.evaluate(()=>window.__mock.state().playing));w++)await sleep(700);
+      const s=await mock(h.page);played.push(s.playing);if(!s.playing){await sleep(2500);if(!(await mock(h.page)).playing)break}
+    }
+    c.ok('leren: na veel bans spelen 14 wissels zonder stilvallen',played.length>=14&&played.every(Boolean),played.filter(p=>!p).length+' stil');
+    noErrors('leren veel bans: geen page errors',h);
+  }finally{await h.close()}
+}
+ const scenarios={learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
