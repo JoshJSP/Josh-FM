@@ -163,7 +163,7 @@ function acceptFix(p){
 // op de lijn die Map Matching van de laatste fixes maakt (die geeft ook de maximumsnelheid). Lukt geen van beide, dan
 // de GPS-fix, licht afgevlakt met de voorspelling uit snelheid en richting: een losse sprong trekt de pijl maar half mee.
 const MATCH_GAP_MS=4000,MATCH_FRESH_MS=15000,MATCH_AHEAD_M=80,TRAIL_MS=60000;
-let disp=null,trail=[],match=null,matchBusy=false,matchLast=0,matches=0;
+let disp=null,trail=[],match=null,matchBusy=false,matchLast=0,matches=0,matchFails=0,matchErr='',ov=null,ovBusy=false,ovLast=0;
 const bearingOf=(a,b)=>{const r=x=>x*Math.PI/180,y=Math.sin(r(b.longitude-a.longitude))*Math.cos(r(b.latitude)),x=Math.cos(r(a.latitude))*Math.sin(r(b.latitude))-Math.sin(r(a.latitude))*Math.cos(r(b.latitude))*Math.cos(r(b.longitude-a.longitude));return y||x?(Math.atan2(y,x)*180/Math.PI+360)%360:null};
 const moveBy=(p,m,deg)=>{const r=deg*Math.PI/180;return{longitude:p.longitude+m*Math.sin(r)/(111320*Math.cos(p.latitude*Math.PI/180)),latitude:p.latitude+m*Math.cos(r)/110540}};
 function place(){
@@ -179,20 +179,49 @@ function place(){
   disp={longitude:q.longitude,latitude:q.latitude,src,bearing:brg,at:now}
 }
 // Map Matching zonder route: de laatste fixes (hooguit een minuut, minstens 25 m gereden), elke 4 s één aanvraag.
+// Een aanvraag die niets geeft (time-out, fout, geen match, onbekende snelheid) mag het bordje niet leeg laten: dan
+// vraagt OpenStreetMap (overpassLimit) naar de weg onder de auto. Fouten komen in het foutlog (Diagnostiek) zodat een
+// echte rit laat zien waarom. De aanvraag heeft een time-out: een aanvraag die op iOS blijft hangen hield matchBusy voorgoed vast.
+const MATCH_TIMEOUT_MS=8000,OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter'];
+function matchFailed(why,p){matchFails++;matchErr=String(why);try{window.MAIRRuntime?.caught?.('carmode.match',Error(matchErr))}catch{/* log kapot: onschuldig */}overpassLimit(p)}
+function fetchJson(url,ms){const ac=new AbortController(),to=setTimeout(()=>ac.abort(),ms);return fetch(url,{signal:ac.signal}).then(r=>{if(!r.ok)throw Error('http '+r.status);return r.json()}).finally(()=>clearTimeout(to))}
+// OSM-tag maxspeed: "50", "50 mph", "NL:urban"; andere symbolische waarden ("NL:motorway" is 100 of 130) tellen niet.
+const osmSpeed=v=>{v=String(v||'').trim();const m=/^(\d+)\s*(mph)?$/i.exec(v);return m?Math.round(m[2]?m[1]*1.609344:+m[1]):v==='NL:urban'?50:v==='NL:rural'?80:null};
+// Gratis terugval: dichtstbijzijnde weg (hooguit 20 m) met een maxspeed-tag, hooguit eens per 8 s.
+async function overpassLimit(p){
+  const now=Date.now();if(s.routeActive||ovBusy||!p||now-ovLast<8000)return;
+  ovLast=now;ovBusy=true;
+  const q=`[out:json][timeout:5];way(around:20,${p.latitude.toFixed(6)},${p.longitude.toFixed(6)})[highway][maxspeed];out tags geom 8;`;
+  try{
+    for(const url of OVERPASS){
+      let d;try{d=await fetchJson(`${url}?data=${encodeURIComponent(q)}`,6000)}catch{continue}
+      let best=null;
+      for(const w of d?.elements||[]){
+        const line=(w.geometry||[]).map(g=>({longitude:g.lon,latitude:g.lat})),v=osmSpeed(w.tags?.maxspeed);if(line.length<2||v==null)continue;
+        const cum=[0];for(let i=1;i<line.length;i++)cum.push(cum[i-1]+hav(line[i-1],line[i]));
+        const m=windowed(p,null,null,line,cum);if(m&&(!best||m.distance<best.d))best={d:m.distance,v}
+      }
+      if(s.routeActive)return;
+      ov={at:Date.now(),pos:{longitude:p.longitude,latitude:p.latitude},limit:best?best.v:null};render();return;
+    }
+  }finally{ovBusy=false}
+}
 function trackFix(p){
   const now=Date.now();trail.push({longitude:p.longitude,latitude:p.latitude,acc:Number(p.accuracy||0),t:now});
   trail=trail.filter(x=>now-x.t<TRAIL_MS).slice(-8);
   if(s.routeActive||!token||!open||matchBusy||now-matchLast<MATCH_GAP_MS||trail.length<3||hav(trail[0],trail.at(-1))<25)return;
-  matchLast=now;matchBusy=true;const pts=trail.slice();
+  matchLast=now;matchBusy=true;const pts=trail.slice(),here=pts.at(-1);
   const qs=new URLSearchParams({access_token:token,geometries:'geojson',overview:'full',annotations:'maxspeed',tidy:'true',radiuses:pts.map(x=>Math.round(Math.min(50,Math.max(5,x.acc*1.5)))).join(';'),timestamps:pts.map(x=>Math.round(x.t/1000)).join(';')});
-  fetch(`https://api.mapbox.com/matching/v5/mapbox/driving/${pts.map(x=>`${x.longitude.toFixed(6)},${x.latitude.toFixed(6)}`).join(';')}?${qs}`).then(r=>r.ok?r.json():null).then(d=>{
+  fetchJson(`https://api.mapbox.com/matching/v5/mapbox/driving/${pts.map(x=>`${x.longitude.toFixed(6)},${x.latitude.toFixed(6)}`).join(';')}?${qs}`,MATCH_TIMEOUT_MS).then(d=>{
     if(s.routeActive)return;
     const m=d?.code==='Ok'?d.matchings?.at(-1):null,c=m?.geometry?.coordinates;
-    if(!m||!d.tracepoints?.at(-1)||!Array.isArray(c)||c.length<2){match=null;return}
+    if(!m||!d.tracepoints?.at(-1)||!Array.isArray(c)||c.length<2){matchFailed(d?.code==='Ok'?'laatste punt niet gematcht':d?.code||'leeg antwoord',here);return}
     const line=c.map(x=>({longitude:Number(x[0]),latitude:Number(x[1])})),cum=[0];for(let i=1;i<line.length;i++)cum.push(cum[i-1]+hav(line[i-1],line[i]));
     const e=(m.legs||[]).flatMap(l=>l?.annotation?.maxspeed||[]).at(-1),v=Number(e?.speed);
-    match={line,cum,at:Date.now(),limit:Number.isFinite(v)&&v>0?Math.round(e.unit==='mph'?v*1.609344:v):null};matches++;place();render()
-  }).catch(()=>{/* geen bereik: de pijl volgt de GPS tot de volgende poging */}).finally(()=>{matchBusy=false})
+    match={line,cum,at:Date.now(),limit:Number.isFinite(v)&&v>0?Math.round(e.unit==='mph'?v*1.609344:v):null};matches++;
+    if(match.limit==null)overpassLimit(here);
+    place();render()
+  }).catch(e=>matchFailed(e?.name==='AbortError'?'time-out':e?.message||e,here)).finally(()=>{matchBusy=false})
 }
 // --- Rotondes ---------------------------------------------------------------
 // Mapbox gebruikt spaties in de types: roundabout, rotary, roundabout turn,
@@ -388,7 +417,11 @@ const durShort=x=>{if(!Number.isFinite(x))return'—';const m=Math.max(0,Math.ro
 const kmhNow=()=>spd!=null&&Date.now()-spdAt<10000?Math.round(spd*3.6):null;
 // Maximumsnelheid van het routesegment waar je nu op zit (limits staan gelijk aan de geometrie). Onbekend of "geen" = null.
 function limitNow(){
-  if(!s.routeActive)return match&&Date.now()-match.at<30000?match.limit:null;
+  if(!s.routeActive){
+    // Map Matching eerst, anders OpenStreetMap (alleen als dat voor de plek geldt waar je nu bent); ouder dan 30 s of onbekend = geen bordje.
+    const now=Date.now(),fresh=x=>x&&now-x.at<30000&&x.limit!=null;
+    return fresh(match)?match.limit:fresh(ov)&&s.pos&&hav(ov.pos,s.pos)<80?ov.limit:null
+  }
   if(!limits.length||!s.proj)return null;
   const e=limits[Math.max(0,Math.min(limits.length-1,s.proj.index-1))],v=Number(e?.speed);
   return Number.isFinite(v)&&v>0?Math.round(e.unit==='mph'?v*1.609344:v):null
@@ -528,7 +561,7 @@ function healLayout(){
     if(l&&!l.dataset.healed){l.dataset.healed='1';l.href=l.getAttribute('href').split('?')[0]+'?v='+LAYOUT}
   }catch{/* geen stylesheet-info: onschuldig */}
 }
-function setOpen(v){ensure();open=!!v;overlay.classList.toggle('is-open',open);document.body.classList.toggle('mair-car-mode-open',open);if(open){healLayout();document.body.dataset.mairCarMode='1';s.screen=s.routeActive?'drive':'home';if(s.routeActive){watch();startRefresh()}config().then(render);requestWake();render()}else{delete document.body.dataset.mairCarMode;unwatch();stopRefresh();closeMenu();releaseWake();try{window.MAIRCarMap?.destroy?.()}catch{/* kaart al weg: onschuldig */}mapRoute=null;disp=null;trail=[];match=null}try{window.dispatchEvent(new CustomEvent('mair:car-mode',{detail:{open}}))}catch{}}
+function setOpen(v){ensure();open=!!v;overlay.classList.toggle('is-open',open);document.body.classList.toggle('mair-car-mode-open',open);if(open){healLayout();document.body.dataset.mairCarMode='1';s.screen=s.routeActive?'drive':'home';if(s.routeActive){watch();startRefresh()}config().then(render);requestWake();render()}else{delete document.body.dataset.mairCarMode;unwatch();stopRefresh();closeMenu();releaseWake();try{window.MAIRCarMap?.destroy?.()}catch{/* kaart al weg: onschuldig */}mapRoute=null;disp=null;trail=[];match=null;ov=null}try{window.dispatchEvent(new CustomEvent('mair:car-mode',{detail:{open}}))}catch{}}
 document.addEventListener('keydown',e=>{if(open&&e.key==='Escape')setOpen(false)});document.addEventListener('visibilitychange',()=>{if(!open)return;document.visibilityState==='visible'?requestWake():releaseWake()});window.addEventListener('pageshow',()=>{if(open)requestWake()});window.addEventListener('pagehide',()=>releaseWake());['jfm:trackchange','jfm:playback-state','jfm:upcoming-invalidated','mair:director-replanned','mair:channelchange'].forEach(n=>window.addEventListener(n,()=>{if(open)render()}));
-window.MAIRCarModePrototype={version:'journey-nav-v8-c2-2026-10-16',open:()=>setOpen(true),close:()=>setOpen(false),toggle:()=>setOpen(!open),render,chooseDestination:()=>openSearch('destination'),addStop:()=>openSearch('stop'),status:()=>({open,screen:s.screen,routeActive:s.routeActive,destination:s.destination,stops:s.stops.slice(),wakeLockSupported:wakeSupported(),wakeLockActive:!!(wake&&!wake.released),geo:{...s.geo},hasPosition:!!s.pos,legMetrics:legMetric(),kmh:kmhNow(),limit:limitNow(),lanes:(bannerNow()?.sub?.components||[]).filter(x=>x?.type==='lane').length,rem:nearDistance(),stepIndex:s.step,layout:LAYOUT,display:disp?{...disp}:null,matches,map:window.MAIRCarMap?.status?.()||null,journey:window.MAIRJourneyContext||null}),requestLocation:()=>ensureLocation({force:true}),toast,maneuverKind,arrowSvg};
+window.MAIRCarModePrototype={version:'journey-nav-v8-c2-2026-10-16',open:()=>setOpen(true),close:()=>setOpen(false),toggle:()=>setOpen(!open),render,chooseDestination:()=>openSearch('destination'),addStop:()=>openSearch('stop'),status:()=>({open,screen:s.screen,routeActive:s.routeActive,destination:s.destination,stops:s.stops.slice(),wakeLockSupported:wakeSupported(),wakeLockActive:!!(wake&&!wake.released),geo:{...s.geo},hasPosition:!!s.pos,legMetrics:legMetric(),kmh:kmhNow(),limit:limitNow(),lanes:(bannerNow()?.sub?.components||[]).filter(x=>x?.type==='lane').length,rem:nearDistance(),stepIndex:s.step,layout:LAYOUT,display:disp?{...disp}:null,matches,matchFails,matchErr,limitFrom:s.routeActive?'route':match&&Date.now()-match.at<30000&&match.limit!=null?'match':ov&&Date.now()-ov.at<30000&&ov.limit!=null?'osm':null,map:window.MAIRCarMap?.status?.()||null,journey:window.MAIRJourneyContext||null}),requestLocation:()=>ensureLocation({force:true}),toast,maneuverKind,arrowSvg};
 })();

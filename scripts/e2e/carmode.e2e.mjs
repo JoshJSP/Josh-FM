@@ -63,8 +63,8 @@ const STYLE_JSON=()=>({version:8,name:'e2e-nacht',sources:{decor:{type:'geojson'
   {id:'main',type:'line',source:'decor',filter:['==',['get','cls'],'main'],paint:{'line-color':'#35416a','line-width':9}},
   {id:'bridge-street',type:'line',source:'decor',filter:['==',['get','cls'],'main'],paint:{'line-color':'#3b4772','line-width':5}},
   {id:'road-label',type:'symbol',source:'decor',filter:['==',['get','cls'],'none'],layout:{'icon-image':'label'}}]});
-async function mapbox(h,{token='pk.test'}={}){
-  const m={directions:0,delayNext:0,failNext:false,roundabout:true,annotate:true,queries:[],params:[],styleReq:0,otherReq:[],box:[],geocode:[],matching:[],failMatch:false,failBox:false,failTiles:false,tiles:{ok:0,fail:0}};
+async function mapbox(h,{token=process.env.REAL_MM_TOKEN||'pk.test'}={}){
+  const m={directions:0,delayNext:0,failNext:false,roundabout:true,annotate:true,queries:[],params:[],styleReq:0,otherReq:[],box:[],geocode:[],matching:[],failMatch:false,hangMatch:false,matchHttp:0,overpass:[],ovSpeed:'80',failOverpass:false,failBox:false,failTiles:false,tiles:{ok:0,fail:0}};
   await h.page.route(ORIGIN+'/api/config',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({spotifyClientId:'mockclientid0123456789abcdef',mapboxPublicToken:token})}));
   await h.page.route('https://api.mapbox.com/**',async route=>{
     const u=new URL(route.request().url());
@@ -87,6 +87,9 @@ async function mapbox(h,{token='pk.test'}={}){
       const x=/stop/i.test(q)?STOP_M:DEST_M,name=/stop/i.test(q)?'Tussenstop A':'Testbestemming';
       return J({features:[{geometry:{coordinates:[lonAt(x),LAT0]},properties:{name,full_address:name+', Nederland'}}]});
     }
+    if(u.pathname.includes('/matching/')&&process.env.REAL_MM_TOKEN){m.matching.push(Object.fromEntries(u.searchParams));return route.continue()}
+    if(u.pathname.includes('/matching/')&&m.hangMatch){m.matching.push(Object.fromEntries(u.searchParams));return}
+    if(u.pathname.includes('/matching/')&&m.matchHttp){m.matching.push(Object.fromEntries(u.searchParams));return J({message:'Too Many Requests'},m.matchHttp)}
     if(u.pathname.includes('/matching/')){
       // De "weg" is de lijn lat=LAT0: elke fix wordt daarop gezet, maximumsnelheid 50.
       const pts=decodeURIComponent(u.pathname.split('/').pop()).split(';').map(p=>p.split(',').map(Number));m.matching.push(Object.fromEntries(u.searchParams));
@@ -103,6 +106,14 @@ async function mapbox(h,{token='pk.test'}={}){
     const pts=decodeURIComponent(u.pathname.split('/').pop()).split(';').map(p=>p.split(',').map(Number));
     const body=JSON.stringify(makeRoute(pts,m.roundabout&&m.directions===1,{annotate:m.annotate}));
     return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body}).catch(()=>{});
+  });
+  // OpenStreetMap (Overpass): een weg met maxspeed ter plekke van de vraag (lat=LAT0), plus een verdere weg met 30 als lokaas.
+  await h.page.route(/https:\/\/overpass[^/]*\/api\/interpreter/,route=>{
+    const q=new URL(route.request().url()).searchParams.get('data')||'',pos=/around:\d+,([\d.-]+),([\d.-]+)/.exec(q)||[];m.overpass.push({q,url:route.request().url().split('?')[0]});
+    const H={'access-control-allow-origin':'*'};
+    if(m.failOverpass)return route.fulfill({status:502,body:'busy',headers:H}).catch(()=>{});
+    const lon=Number(pos[2]),way=(dlat,speed,id)=>({type:'way',id,tags:{highway:'residential',...(speed?{maxspeed:speed}:{})},geometry:[{lat:LAT0+dlat,lon:lon-0.01},{lat:LAT0+dlat,lon:lon+0.01}]});
+    return route.fulfill({status:200,contentType:'application/json',headers:H,body:JSON.stringify({elements:m.ovSpeed===null?[]:[way(.00015,'30',2),way(0,m.ovSpeed,1)]})}).catch(()=>{});
   });
   return m;
 }
@@ -625,7 +636,63 @@ async function scenarioSnap(){
   }finally{await h.close()}
 }
 
-const scenarios={nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap};
+// REAL_MM_TOKEN=<token>: echte Map Matching en een echte weg (A12 bij Utrecht, ~25 m tussen de fixes, 25 m/s). Alleen handmatig.
+async function realRoad(){
+  const tk=process.env.REAL_MM_TOKEN;if(!tk)return null;
+  const d=await (await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/4.9210,52.0850;5.0900,52.0900?access_token=${tk}&geometries=geojson&overview=full`)).json();
+  const g=d.routes[0].geometry.coordinates,out=[],R=6371000,hv=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b[1]-a[1])/2)**2+Math.cos(r(a[1]))*Math.cos(r(b[1]))*Math.sin(r(b[0]-a[0])/2)**2;return 2*R*Math.asin(Math.sqrt(h))};
+  let acc=0,next=6000;for(let i=1;i<g.length&&out.length<14;i++){const l=hv(g[i-1],g[i]);while(acc+l>=next&&out.length<14){const u=(next-acc)/l;out.push([g[i-1][0]+(g[i][0]-g[i-1][0])*u,g[i-1][1]+(g[i][1]-g[i-1][1])*u]);next+=25}acc+=l}
+  return out;
+}
+// ---- scenario 12: rijden zonder bestemming, bordje maximumsnelheid --------------
+// Verse start (nooit een route gehad): Car Mode open, "Start zonder route", ~1 fix per seconde met snelheid langs de weg.
+async function scenarioNoRoute(){
+  const t=await setup(),{page,h,mb}=t;
+  const lim=()=>txt(page,'.car-limit');
+  const ride=async(from,n)=>{for(let m=from;m<from+n*25;m+=25){await t.at(m,{acc:6,jump:false});await page.evaluate(()=>{window.__skew+=1000})}};
+  try{
+    const road=await realRoad();
+    if(road)await t.h.ctx.setGeolocation({latitude:road[0][1],longitude:road[0][0],accuracy:6});
+    await page.evaluate(()=>window.MAIRCarModePrototype.open());await sleep(300);
+    await page.locator('#mairCarWaveOverlay [data-act="music"]').first().click();await sleep(300);
+    await page.evaluate(()=>{window.__speed=25;window.__heading=90});
+    if(road){for(const p of road){await t.h.ctx.setGeolocation({latitude:p[1],longitude:p[0],accuracy:6});await sleep(350);await page.evaluate(()=>{window.__skew+=1000})}}
+    else await ride(1000,12);
+    await until(page,()=>window.MAIRCarModePrototype.status().limit!=null,null,6000,'limit').catch(()=>{});
+    let st=await status(page);
+    c.ok('zonder route (verse start): Map Matching wordt aangeroepen en het bordje toont een getal',mb.matching.length>=1&&/^\d+$/.test(await lim()),`limit=${st.limit} matches=${st.matches} screen=${st.screen} requests=${mb.matching.length}`);
+    if(outDir)await page.screenshot({path:outDir+'/carmode-noroute.png'});
+    c.ok('Map Matching gaf het bordje: OpenStreetMap niet gevraagd',mb.overpass.length===0,String(mb.overpass.length));
+    if(!road){
+    // Map Matching geeft niets (geen match): het bordje komt dan van OpenStreetMap, van de dichtstbijzijnde weg (80, niet het lokaas 30)
+    mb.failMatch=true;await page.evaluate(()=>{window.__skew+=40000});
+    await ride(1400,8);
+    await until(page,()=>window.MAIRCarModePrototype.status().limitFrom==='osm',null,6000,'osm').catch(()=>{});
+    st=await status(page);
+    c.ok('Map Matching geeft geen match: bordje van OpenStreetMap, de dichtstbijzijnde weg (80)',(await lim())==='80'&&st.limitFrom==='osm',`${await lim()} ${st.limitFrom} ${JSON.stringify(mb.overpass.map(x=>x.url))}`);
+    c.ok('de OpenStreetMap-vraag zoekt alleen wegen met maxspeed binnen 20 m',/around:20,/.test(mb.overpass[0]?.q||'')&&/\[maxspeed\]/.test(mb.overpass[0]?.q||''),mb.overpass[0]?.q);
+    c.ok('de fout staat in het foutlog (Diagnostiek) met de reden',await page.evaluate(()=>(window.MAIRRuntime?.errorLog?.()||[]).some(e=>/carmode\.match/.test(JSON.stringify(e)))),JSON.stringify(await page.evaluate(()=>(window.MAIRRuntime?.errorLog?.()||[]).slice(-3))).slice(0,300));
+    // HTTP 429 van Mapbox: zelfde terugval
+    mb.failMatch=false;mb.matchHttp=429;mb.ovSpeed='60';await page.evaluate(()=>{window.__skew+=40000});
+    await ride(1700,8);await until(page,()=>window.MAIRCarModePrototype.status().limit===60,null,6000,'60').catch(()=>{});
+    c.ok('Mapbox 429: bordje van OpenStreetMap (60)',(await lim())==='60',await lim());
+    // Nergens een maximumsnelheid bekend: bordje weg, geen oude waarde
+    mb.ovSpeed=null;await page.evaluate(()=>{window.__skew+=40000});
+    await ride(2000,8);await sleep(500);
+    c.ok('geen maximumsnelheid bekend (Mapbox en OpenStreetMap leeg): bordje weg, geen oude waarde',!(await has(page,'.car-limit')),await lim());
+    c.ok('de snelheid zelf blijft staan',(await txt(page,'.car-speed'))==='90',await txt(page,'.car-speed'));
+    // Mapbox-aanvraag blijft hangen (iOS): na de time-out moet er weer een nieuwe aanvraag komen
+    mb.matchHttp=0;mb.hangMatch=true;mb.ovSpeed='80';await page.evaluate(()=>{window.__skew+=40000});
+    await ride(2300,6);const hung=mb.matching.length;
+    await sleep(9500);mb.hangMatch=false;await page.evaluate(()=>{window.__skew+=40000});await ride(2500,8);
+    await until(page,()=>window.MAIRCarModePrototype.status().limitFrom==='match',null,6000,'match na hangen').catch(()=>{});
+    c.ok('hangende Map Matching-aanvraag houdt de rest niet voorgoed vast (time-out, daarna weer een aanvraag)',mb.matching.length>hung&&(await lim())==='50',`${hung}→${mb.matching.length} limit=${await lim()}`);
+    }
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+}
+
+const scenarios={nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);
