@@ -578,10 +578,11 @@ async function scenarioLearnBan(){
     const st=await mock(h.page);c.ok('leren: na de ban speelt de zender door',st.playing===true,JSON.stringify(st));
     // Nog drie nummers van dezelfde artiest bannen: dan valt de hele artiest weg
     const pool=await learnPool(h.page);
-    const bannedArtist=pool.find(t=>t.id!==first)?.artists[0];
-    const mates=pool.filter(t=>t.artists[0]===bannedArtist&&t.id!==first).slice(0,3);
-    await h.page.evaluate(ms=>ms.forEach(t=>window.JFMTasteModel.event('ban',t,-12)),mates);
+    // Het spelende nummer is nooit een van de mates: buildActive houdt dat (terecht) vooraan, dan telde het hier als lek.
     const playingNow=(await mock(h.page)).uri.split(':').pop();
+    const bannedArtist=pool.find(t=>t.id!==first&&t.id!==playingNow)?.artists[0];
+    const mates=pool.filter(t=>t.artists[0]===bannedArtist&&t.id!==first&&t.id!==playingNow).slice(0,3);
+    await h.page.evaluate(ms=>ms.forEach(t=>window.JFMTasteModel.event('ban',t,-12)),mates);
     const builds=await h.page.evaluate(async()=>{const out=[];for(let i=0;i<10;i++){try{out.push((await window.JFMQueue.buildActive('learn-ban-'+i)).map(t=>({id:t.id,a:t.artists[0]?.name||t.artists[0]})))}catch(e){out.push([])}}return out});
     const bannedIds=new Set([first,...mates.map(t=>t.id)]);
     const leaked=builds.flat().filter(t=>bannedIds.has(t.id)||t.a===bannedArtist&&t.id!==playingNow);
