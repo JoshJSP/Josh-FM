@@ -719,7 +719,8 @@ async function scenarioVibe(){
     c.ok('vibe: knoppen zijn groot genoeg voor in de auto (>=64 px hoog)',!!big&&big.h>=64,JSON.stringify(big));
     if(outDir)await page.screenshot({path:outDir+'/carmode-vibe-blad.png'});
     await page.locator('#mairCarWaveOverlay [data-vibe="chill"]').click();
-    await until(page,n=>{const m=window.__mock;return m.uris.slice(m.idx+1).join()!==n},before.next.join(),10000,'Spotify krijgt nieuwe volgorde').catch(()=>{});
+    // wacht tot Spotify de nieuwe wachtrij volgt (niet alleen tot er iets verandert: er kan nog een tussenstand zijn)
+    await until(page,n=>{const m=window.__mock,next=m.uris.slice(m.idx+1);return next.join()!==n&&queue[0]?.uri===m.uris[m.idx]&&next.slice(0,5).join()===queue.slice(1,6).map(x=>x.uri).join()},before.next.join(),10000,'Spotify volgt de nieuwe wachtrij').catch(()=>{});
     const after=await remote(),local=await page.evaluate(()=>queue.map(x=>x.uri));
     c.ok('vibe: keuze opgeslagen (JFMRotation en localStorage)',await page.evaluate(()=>window.JFMRotation.state().mode==='chill'&&JSON.parse(localStorage.getItem('mair_director_state_v3')).mode==='chill'));
     c.ok('vibe: blad dicht, muziekblok toont Chill',!(await has(page,'.car-vibes'))&&/Chill/.test(await txt(page,'.car-music-bar .car-vibe')),await txt(page,'.car-music-bar .car-vibe'));
