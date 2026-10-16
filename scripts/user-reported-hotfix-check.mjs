@@ -4,7 +4,7 @@ import {RELEASE_CACHE, RELEASE_ASSET_VERSION} from './release-cache.mjs';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const sleep=read('mair-sleep.js'),choice=read('music-choice.js'),policy=read('mair-station-policy.js'),classifier=read('api/category-filter.js'),purity=read('mair-category-purity.js'),rotation=read('rotation-engine.js'),queue=read('station-queue.js'),news=read('mair-live-news.js'),dj=read('mair-dj-v2.js'),easy=read('mair-easy-use-v1.js'),owedGuard=read('mair-dj-break-owed-guard.js'),transitionFallback=read('mair-dj-transition-fallback.js'),sequencer=read('mair-radio-sequencer.js'),version=read('version.js'),build7=read('build7.js'),sw=read('sw.js'),budget=read('spotify-api-budget.js'),upcoming=read('spotify-upcoming-truth.js'),userControls=read('mair-user-controls.js'),diagnostics=read('mair-diagnostics-hub.js'),testLab=read('mair-test-lab.js'),assets=read('mair-template-assets.css');
 
-assert.match(sleep,/mair-sleep-v1\.2/);
+assert.match(sleep,/mair-sleep-v2\.0/);
 assert.match(sleep,/data-sleep-minutes="15"/);assert.match(sleep,/data-sleep-minutes="30"/);assert.match(sleep,/data-sleep-minutes="45"/);assert.match(sleep,/data-sleep-minutes="60"/);
 assert.match(sleep,/Stop na dit nummer/);assert.match(sleep,/Luister naar MAIR SLEEP/);
 assert.match(sleep,/window\.JFMPlayback\?\.pause/);assert.doesNotMatch(sleep,/api\('\/me\/player/,'Sleep must never become a second Spotify transport owner');
