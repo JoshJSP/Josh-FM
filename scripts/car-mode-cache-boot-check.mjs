@@ -23,7 +23,7 @@ const runtimeAssets = [...(/const RUNTIME_ASSETS=\[([\s\S]*?)\n\];/.exec(integra
   .matchAll(/\['(?:style|script)','([^']+)','[^']+'\]/g)].map(m => m[1]);
 
 check('a. elke Car Mode/Sleep/Passenger-asset uit RUNTIME_ASSETS staat in CORE', () => {
-  assert.equal(runtimeAssets.length, 14, 'de tabel moet alle veertien bijgeladen assets bevatten');
+  assert.equal(runtimeAssets.length, 12, 'de tabel moet alle twaalf bijgeladen assets bevatten');
   for (const asset of runtimeAssets) {
     assert.ok(exists(asset), `gedeclareerde asset bestaat niet op schijf: ${asset}`);
     assert.ok(CORE.has(asset), `RUNTIME_ASSETS-asset ontbreekt in de service-worker CORE-cache: ${asset}`);
@@ -102,9 +102,9 @@ function swHarness({ unavailable = [] } = {}) {
 }
 
 check('b. een ontbrekende niet-kritieke Car Mode-module laat de installatie niet falen', async () => {
-  const { context, put } = swHarness({ unavailable: ['mair-car-70-30.js', 'mair-passenger-mode.js'] });
+  const { context, put } = swHarness({ unavailable: ['mair-car-menu-sticky.js', 'mair-passenger-mode.js'] });
   await context.cacheCore();
-  assert.ok(!put.includes('mair-car-70-30.js'), 'een 404 mag niet in de cache belanden');
+  assert.ok(!put.includes('mair-car-menu-sticky.js'), 'een 404 mag niet in de cache belanden');
   assert.ok(put.includes('mair-car-autofit.js'), 'de overige Car Mode-assets moeten wel gecached worden');
   assert.ok(put.includes('index.html') && put.includes('playback-primary.js'), 'de kern moet onaangetast gecached zijn');
   assert.ok(put.length > 100, `de installatie moet vrijwel alles cachen, nu ${put.length}`);
@@ -184,15 +184,15 @@ check('d/e. boot gaat door na een ontbrekende module en bereikt altijd ensureLau
   const healthy = bootHarness();
   assert.ok(await waitForBoot(healthy), 'de integratie-API moet bestaan na een gezonde boot');
   assert.equal(healthy.context.MAIRCarSleepIntegration.status().bootFailures.length, 0, 'een gezonde boot kent geen failures');
-  assert.equal(healthy.loaded.length, 14, 'alle veertien assets moeten geladen zijn');
+  assert.equal(healthy.loaded.length, 12, 'alle twaalf assets moeten geladen zijn');
   assert.ok(healthy.elements.mairCarModeOpen, 'ensureLauncher moet de Car Mode-knop plaatsen');
 
   // een module die vroeg in de reeks faalt mag de rest niet stoppen
-  const broken = bootHarness({ unavailable: ['mair-sleep.js', 'mair-car-70-30.js'] });
+  const broken = bootHarness({ unavailable: ['mair-sleep.js', 'mair-car-autofit.js'] });
   assert.ok(await waitForBoot(broken), 'de integratie-API moet ook bestaan als modules ontbreken');
   const status = broken.context.MAIRCarSleepIntegration.status();
-  assert.deepEqual(Array.from(status.bootFailures, x => x.stage).sort(), ['mair-car-70-30.js', 'mair-sleep.js'], 'elke fout moet per module worden gerapporteerd');
-  assert.equal(broken.loaded.length, 12, 'de overige twaalf assets moeten alsnog geladen zijn');
+  assert.deepEqual(Array.from(status.bootFailures, x => x.stage).sort(), ['mair-car-autofit.js', 'mair-sleep.js'], 'elke fout moet per module worden gerapporteerd');
+  assert.equal(broken.loaded.length, 10, 'de overige tien assets moeten alsnog geladen zijn');
   assert.ok(broken.loaded.includes('mair-car-menu-sticky.js'), 'modules na de fout moeten nog steeds laden');
   assert.ok(broken.loaded.includes('prototypes/mair-car-mode-wave.js'), 'de Car Mode-runtime zelf moet nog steeds laden');
   assert.ok(broken.elements.mairCarModeOpen, 'ensureLauncher moet ook na een mislukte module worden bereikt');
@@ -202,7 +202,7 @@ check('d2. zelfs als elke bijgeladen module faalt, blijft de launcher bereikbaar
   const dead = bootHarness({ unavailable: runtimeAssets });
   assert.ok(await waitForBoot(dead), 'de integratie-API moet bestaan');
   const status = dead.context.MAIRCarSleepIntegration.status();
-  assert.equal(status.bootFailures.length, 14, 'alle veertien fouten moeten zichtbaar zijn');
+  assert.equal(status.bootFailures.length, 12, 'alle twaalf fouten moeten zichtbaar zijn');
   assert.equal(dead.loaded.length, 0, 'er mag niets geladen zijn in dit scenario');
   assert.ok(dead.elements.mairCarModeOpen, 'de Car Mode-ingang mag nooit verdwijnen door ontbrekende modules');
 });

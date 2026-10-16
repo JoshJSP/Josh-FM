@@ -4,18 +4,13 @@
 if(window.MAIRCarAutoFit)return;
 const ROOT='#mairCarWaveOverlay';
 const targets=[
-  ['.car-track-copy h1',22,42,null],
-  ['.car-track-copy p',13,20,null],
-  ['.car-next b',12,19,2],
-  ['.car-next span',10,15,1],
-  ['.car-nav-maneuver strong',12,18,4],
-  ['.car-stop-chip',9,13,1],
-  ['.mair-stop-primary span',8,11,1],
+  ['.car-track-copy h1',14,22,null],
+  ['.car-track-copy p',10,14,null],
+  ['.car-turn-text',11,17,3],
+  ['.car-stop-line',9,12,1],
+  ['.car-lane-head b',10,14,1],
   ['.car-preview-card b',11,18,2],
-  ['.car-stop-row b',10,16,2],
-  ['.car-turn-hero h1',14,34,3],
-  ['.car-turn-focus header small',10,15,1],
-  ['.car-turn-focus header span',9,13,1]
+  ['.car-stop-row b',10,16,2]
 ];
 let queued=false,observedRoot=null;
 function lineCount(el){const cs=getComputedStyle(el),lh=parseFloat(cs.lineHeight)||parseFloat(cs.fontSize)*1.5;return lh>0?Math.ceil(el.scrollHeight/lh):1}
@@ -43,5 +38,5 @@ function schedule(){if(queued)return;queued=true;requestAnimationFrame(run)}
 function boot(){observeRoot();schedule()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 window.addEventListener('resize',schedule,{passive:true});window.addEventListener('orientationchange',schedule,{passive:true});['jfm:trackchange','jfm:playback-state','mair:journey-context','mair:car-mode'].forEach(n=>window.addEventListener(n,schedule));
-window.MAIRCarAutoFit={version:'2026-08-31-v4-clean-nav-four-lines',refresh:schedule};
+window.MAIRCarAutoFit={version:'2026-10-16-v5-b2',refresh:schedule};
 })();

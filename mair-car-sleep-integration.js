@@ -11,16 +11,15 @@ const loadScript=(src,id)=>asset('script',{src,id}),loadStyle=(href,id)=>asset('
 // verborg juist de echte iOS-permissiefouten die Car Mode moet kunnen tonen.
 function currentArtwork(){for(const node of [document.querySelector('#artImg'),document.querySelector('#cover img'),document.querySelector('#artwork img'),document.querySelector('.now-playing img'),document.querySelector('[data-now-playing-artwork]')].filter(Boolean)){const src=String(node.currentSrc||node.src||'').trim();if(src)return src}return'mair-icon-512.png'}
 function syncCar(){try{window.MAIRCarModePrototype?.render?.()}catch{/* optionele UI/DOM-hook niet beschikbaar: onschuldig */}}
+// Car Mode's eigen stylesheet (prototypes/mair-car-mode-wave.css) staat statisch in index.html: die laadt dus nooit laat.
 // Vaste laadvolgorde: de stylesheets eerst, daarna de runtimes in de volgorde waarin ze
 // elkaars DOM verwachten (sleep voor sleep-landscape, car-mode-wave voor de lagen eromheen).
 const RUNTIME_ASSETS=[
-  ['style','prototypes/mair-car-mode-wave.css','mairCarModeCss'],
   ['style','prototypes/mair-sleep-landscape.css','mairSleepLandscapeCss'],
-  ['style','mair-car-nav-clean.css','mairCarNavCleanCss'],
   ['script','mair-sleep.js','mairSleepRuntime'],
   ['script','prototypes/mair-sleep-landscape.js','mairSleepLandscapeRuntime'],
   ['script','prototypes/mair-car-mode-wave.js','mairCarModeRuntime'],
-  ['script','mair-car-70-30.js','mairCar7030Runtime'],
+  ['script','prototypes/mair-car-map.js','mairCarMapRuntime'],
   ['script','mair-journey-director.js','mairJourneyDirectorRuntime'],
   ['script','mair-traffic-journey-toast.js','mairTrafficJourneyToastRuntime'],
   ['script','mair-passenger-mode.js','mairPassengerModeRuntime'],
