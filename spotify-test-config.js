@@ -36,7 +36,7 @@
             const code=String(detail?.error||''),description=String(detail?.error_description||'');authRefreshStatus=r.status;authRefreshError=(description||code||`HTTP ${r.status}`).slice(0,240);authRefreshFailures++;
             if(code==='invalid_grant'){
               if(!clearSpotifySession(sent)){const err=new Error('Spotify-token vernieuwen is tijdelijk niet gelukt. MAIR probeert het later opnieuw.');err.code='AUTH_REFRESH_RECOVERABLE';throw err}
-              authReauthRequired=true;
+              authReauthRequired=true;try{silentRelink()}catch{/* stille her-koppeling is optioneel: dan gewoon het inlogscherm */}
               const err=new Error('Spotify-sessie is verlopen. Koppel Spotify opnieuw.');err.code='AUTH_REAUTH_REQUIRED';throw err
             }
             const err=new Error(`Spotify-token vernieuwen is tijdelijk niet gelukt (${r.status}). MAIR probeert het later opnieuw.`);err.code='AUTH_REFRESH_RECOVERABLE';err.status=r.status;throw err
