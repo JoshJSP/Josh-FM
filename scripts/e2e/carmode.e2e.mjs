@@ -1,5 +1,5 @@
 // Car Mode (ontwerp C2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
-//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth)
+//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth|viberide)
 // Route: rechte lijn naar het oosten, rotonde op 1,5 km (2e afslag), afrit rechts op 25 km (met rijstroken-banner op
 // 800 m ervoor), 25,5 km in totaal. Maximumsnelheid: 100 tot 5 km, 130 tot 8 km, onbekend tot 9 km, daarna 80.
 // Het GPS-filter weigert sprongen sneller dan 110 m/s; Date.now() krijgt daarom een instelbare voorsprong
@@ -832,7 +832,59 @@ async function scenarioVibeWidth(){
   }
 }
 
-const scenarios={nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
+// ---- scenario 14: vibe wisselen midden in een rit --------------------------------
+// Bug op v174 (iPhone, echte rit): vibe wisselen tijdens een journey veranderde de muziek niet. Dit rijdt een route met een
+// spelend station, wisselt halverwege de vibe en kijkt wat Spotify daarna gaat spelen.
+async function scenarioVibeRide(){
+  const t=await setup(),{page,h}=t;
+  const snap=()=>page.evaluate(()=>{const m=window.__mock;return{cur:m.uris[m.idx],pos:m.state().position,playing:m.playing,next:m.uris.slice(m.idx+1),local:queue.map(x=>x.uri),mode:window.JFMRotation.state().mode,journey:window.MAIRJourneyDirector?.state?.()||null}});
+  try{
+    await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('mair_director_state_v3')||'{}');s.mode='party';localStorage.setItem('mair_director_state_v3',JSON.stringify(s))});
+    await page.reload({waitUntil:'load'});await until(page,()=>window.MAIRCarModePrototype&&window.JFMRotation&&window.__mock,null,15000,'herladen');await sleep(1500);
+    await page.locator('nav button, [role=tab]',{hasText:'Stations'}).locator('visible=true').first().click();await sleep(500);
+    await page.locator('[data-mair-station]').locator('visible=true').first().click();
+    await until(page,()=>window.__mock.state().playing&&window.__mock.state().uris>=10&&queue.length>=10,null,25000,'station speelt');
+    await sleep(1500);
+    await startRoute(t);
+    for(let m=500;m<=6000;m+=500)await t.at(m);
+    await until(page,()=>window.MAIRJourneyDirector?.state?.().active,null,8000,'journey actief');
+    await sleep(9000); // eventuele journey-replan na het starten laten uitrazen
+    const before=await snap(),beforeDj=await page.evaluate(()=>window.MAIRDJ?.state?.()?.phase||'');
+    await page.evaluate(()=>{window.__rp=[];addEventListener('mair:director-replanned',e=>window.__rp.push(e.detail))});
+    await page.locator('#mairCarWaveOverlay [data-act="menu"]').click();await sleep(300);
+    await page.locator('#mairCarWaveOverlay .car-menu [data-act="vibe"]').click();await sleep(300);
+    await page.locator('#mairCarWaveOverlay [data-vibe="chill"]').click();
+    await until(page,n=>{const m=window.__mock,next=m.uris.slice(m.idx+1);return next.slice(0,8).join()!==n&&queue[0]?.uri===m.uris[m.idx]&&next.slice(0,5).join()===queue.slice(1,6).map(x=>x.uri).join()},before.next.slice(0,8).join(),15000,'Spotify volgt de nieuwe wachtrij').catch(()=>{});
+    const after=await snap(),rp=await page.evaluate(()=>window.__rp);
+    const fresh=after.next.slice(0,8).filter(u=>!before.next.slice(0,40).includes(u)).length;
+    console.log('  voor :',before.cur.slice(-3),before.next.slice(0,6).map(u=>u.slice(-3)).join(' '),'| journey',JSON.stringify(before.journey?.phase));
+    console.log('  na   :',after.cur.slice(-3),after.next.slice(0,6).map(u=>u.slice(-3)).join(' '),'| replans',JSON.stringify(rp));
+    c.ok('vibe tijdens rit: journey is actief en blijft actief',!!before.journey?.active&&!!after.journey?.active);
+    c.ok('vibe tijdens rit: keuze is chill',after.mode==='chill');
+    c.ok('vibe tijdens rit: volgende nummer bij Spotify is veranderd',after.next[0]!==before.next[0],`${before.next[0]} -> ${after.next[0]}`);
+    c.ok('vibe tijdens rit: komende wachtrij vervangen door nieuwe nummers (minstens 5 van de eerste 8 nieuw)',fresh>=5,`nieuw: ${fresh}/8`);
+    c.ok('vibe tijdens rit: Spotify speelt hierna precies de nieuwe wachtrij',after.local[0]===after.cur&&after.next.slice(0,5).join()===after.local.slice(1,6).join(),`${after.next.slice(0,3).map(u=>u.slice(-3))} | ${after.local.slice(1,4).map(u=>u.slice(-3))}`);
+    c.ok('vibe tijdens rit: huidige nummer speelt uit (zelfde nummer, niet terug naar 0, blijft spelen)',after.cur===before.cur&&after.playing&&after.pos>=before.pos,`${before.cur.slice(-3)}@${before.pos} -> ${after.cur.slice(-3)}@${after.pos}`);
+    c.ok('vibe tijdens rit: geen dubbel nummer in wat Spotify gaat spelen',new Set([after.cur,...after.next]).size===after.next.length+1);
+    c.ok('vibe tijdens rit: geen DJ-break midden in het nummer (DJ praat niet, muziek speelt)',await page.evaluate(()=>window.MAIRDJ?.state?.()?.phase!=='SPEAKING'&&window.__mock.playing),beforeDj+' -> '+await page.evaluate(()=>window.MAIRDJ?.state?.()?.phase));
+    // het huidige nummer speelt uit; daarna moet het eerste nummer van de nieuwe vibe komen
+    const firstNew=after.next[0];await page.evaluate(()=>window.__mock.finishTrack(300));
+    await until(page,u=>window.__mock.uris[window.__mock.idx]===u&&window.__mock.playing,firstNew,8000,'volgende nummer').catch(()=>{});
+    const now=await page.evaluate(()=>({uri:window.__mock.uris[window.__mock.idx],playing:window.__mock.playing}));
+    c.ok('vibe tijdens rit: na het uitspelen komt het eerste nummer van de nieuwe vibe en de muziek loopt door',now.uri===firstNew&&now.playing,JSON.stringify(now)+' verwacht '+firstNew);
+    // station faalt bij de volgende wissel: muziek loopt door, wachtrij valt terug op opnieuw ordenen
+    await page.evaluate(()=>{window.MAIRStationController.buildPool=async()=>{throw Error('e2e: station kapot')}});
+    const pre=await snap();
+    await page.locator('#mairCarWaveOverlay [data-act="menu"]').click();await sleep(300);
+    await page.locator('#mairCarWaveOverlay .car-menu [data-act="vibe"]').click();await sleep(300);
+    await page.locator('#mairCarWaveOverlay [data-vibe="party"]').click();await sleep(3000);
+    const post=await snap();
+    c.ok('vibe tijdens rit, station faalt: muziek speelt door (zelfde nummer), keuze staat op Feest, er staat nog een volgend nummer klaar',post.cur===pre.cur&&post.playing&&post.mode==='party'&&post.next.length>0,JSON.stringify({cur:post.cur.slice(-3),playing:post.playing,mode:post.mode,next:post.next.length}));
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+}
+
+const scenarios={viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);

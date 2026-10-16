@@ -494,7 +494,13 @@ const vibeLabel=()=>(VIBES.find(v=>v[0]===vibeNow())||VIBES[0])[1];
 const vibeButton=()=>window.JFMRotation?.setMode?`<button type="button" class="car-vibe" data-act="vibe"><small>VIBE</small><b>${esc(vibeLabel())}</b></button>`:'';
 function vibeSheet(){const now=vibeNow();return`<div class="car-menu-backdrop"><section class="car-menu car-vibes"><div class="car-vibe-grid">${VIBES.map(([id,l])=>`<button type="button" data-act="setvibe" data-vibe="${id}"${id===now?' class="on" aria-pressed="true"':''}>${esc(l)}</button>`).join('')}</div><button class="muted" data-act="menuclose">Annuleren</button></section></div>`}
 // Nieuwe vibe: huidige nummer speelt door, de rest van de wachtrij wordt opnieuw gepland en Spotify krijgt de nieuwe volgorde.
-function setVibe(id){if(!window.JFMRotation?.setMode?.(id))return;render();Promise.resolve(window.JFMProgramDirector?.replan?.('vibe',true)).catch(e=>window.MAIRRuntime?.caught?.('carmode.vibe',e))}
+// Alleen opnieuw ordenen veranderde tijdens een rit niets merkbaars (zelfde nummers, de journey-score weegt zwaar). Daarom komen de
+// nummers na het huidige uit het station dat bij de vibe past. MAIR en Vergeten favorieten ordenen de eigen wachtrij opnieuw.
+// Lukt het station niet binnen 12 s, dan ook gewoon opnieuw ordenen: de muziek loopt altijd door.
+const VIBE_STATION={drive:'hits',energy:'hits',chill:'chill',party:'party',discover:'new'};
+async function vibePool(id){const st=VIBE_STATION[id];if(!st||!window.MAIRStationController?.buildPool)return null;let timer;try{const b=await Promise.race([window.MAIRStationController.buildPool(st),new Promise(r=>{timer=setTimeout(r,12000)})]);return b?.tracks?.length>=5?b.tracks:null}catch(e){window.MAIRRuntime?.caught?.('carmode.vibe-pool',e);return null}finally{clearTimeout(timer)}}
+let vibeSeq=0;
+function setVibe(id){if(!window.JFMRotation?.setMode?.(id))return;render();const seq=++vibeSeq;vibePool(id).then(pool=>{if(seq===vibeSeq)return window.JFMProgramDirector?.replan?.('vibe',true,pool)}).catch(e=>window.MAIRRuntime?.caught?.('carmode.vibe',e))}
 function menu(){return`<div class="car-menu-backdrop"><section class="car-menu"><button data-act="vibe">Vibe: ${esc(vibeLabel())}</button>${s.routeActive?'<button data-act="addstop">Tussenstop toevoegen</button><button data-act="search">Bestemming wijzigen</button><button data-act="waze">Open in Waze</button><button data-act="music">Verder zonder route</button>':'<button data-act="search">Bestemming toevoegen</button>'}<button class="danger" data-act="close">Car Mode sluiten</button><button class="muted" data-act="menuclose">Annuleren</button></section></div>`}
 function openSearch(purpose='destination'){closeMenu();s.searchPurpose=purpose;s.searchQuery='';s.searchResults=[];s.error='';s.screen='search';render();queueMicrotask(bindSearch);
   // Hier is locatie voor het eerst echt nodig (proximity bij zoeken en straks als
