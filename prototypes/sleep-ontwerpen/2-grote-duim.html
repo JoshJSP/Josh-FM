@@ -1,0 +1,28 @@
+<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Sleep 2 Grote duim</title>
+<!-- Idee: de hele onderkant van het scherm is bediening. Geen klein mikken in het donker. Schakelaar "Daarna MAIR SLEEP" (eerst je muziek, dan het rustige station) gebruikt de bestaande stationkeuze. Klein tot middel werk. -->
+<style>
+*{box-sizing:border-box;margin:0}html,body{height:100%;background:#07050d;color:#f2ecff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;overflow:hidden}
+.s{height:100dvh;padding:18px 14px 16px;display:flex;flex-direction:column;gap:12px;background:radial-gradient(circle at 50% 0,#1c0f36 0,#07050d 55%)}
+.top{display:flex;justify-content:space-between;align-items:center;padding:0 6px}
+.top b{font-size:34px;font-weight:800;letter-spacing:-.03em}.top small{display:block;font-size:12px;color:#a58fd6;margin-top:2px}
+.x{width:52px;height:52px;border-radius:50%;background:#150d28;display:grid;place-items:center;font-size:26px;color:#c18aff}
+.grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px}
+.t{border-radius:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;background:#1a1031;border:1px solid #2f1e57}
+.t b{font-size:68px;line-height:1;letter-spacing:-.04em}.t span{font-size:15px;color:#b79cf0;margin-top:4px;font-weight:600}
+.t.on{background:linear-gradient(150deg,#9b4dff,#5a25c9);border-color:#c18aff;box-shadow:0 0 50px rgba(155,77,255,.4)}.t.on span{color:#efe4ff}
+.bar{height:76px;border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:800;background:#150d28;border:1px solid #2f1e57}
+.bar.m{background:#101a2b;border-color:#25406a;color:#b9d2ff;justify-content:space-between;padding:0 24px;font-size:19px}
+.sw{width:56px;height:32px;border-radius:16px;background:#326bff;position:relative}.sw:after{content:"";position:absolute;right:4px;top:4px;width:24px;height:24px;border-radius:50%;background:#fff}
+.bar.off{color:#ffb4c0;height:60px;font-size:17px;background:#1b0d16;border-color:#4a1f33}
+@media (orientation:landscape) and (max-height:500px){
+.s{padding:10px 16px;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:48px 1fr 66px;gap:10px}
+.top{grid-column:1/5}.top b{font-size:24px}.top small{display:inline;margin-left:10px}.x{width:44px;height:44px}
+.grid{grid-column:1/5;grid-template-columns:repeat(4,1fr);grid-template-rows:1fr}.t b{font-size:58px}
+.bar{height:66px;font-size:16px}.bar.m{font-size:15px;padding:0 14px}.bar.off{height:66px;font-size:16px}.bar.a{grid-column:1/2;font-size:15px}.bar.m{grid-column:2/4}.bar.off{grid-column:4/5}}
+</style></head><body><div class="s">
+<div class="top"><div><b>Stop over</b><small>Midnight City, M83</small></div><span class="x">×</span></div>
+<div class="grid"><div class="t"><b>15</b><span>minuten</span></div><div class="t on"><b>30</b><span>stopt om 23:48</span></div><div class="t"><b>45</b><span>minuten</span></div><div class="t"><b>60</b><span>minuten</span></div></div>
+<div class="bar a">Stop na dit nummer</div>
+<div class="bar m"><span>Daarna MAIR SLEEP</span><span class="sw"></span></div>
+<div class="bar off">Timer uit</div>
+</div></body></html>
