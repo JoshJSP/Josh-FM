@@ -56,7 +56,7 @@
     "queue-package2": "node --check queue-core.js && node --check station-queue.js && node --check request-manager.js && node scripts/queue-package2-check.mjs",
     "request-search": "node --check app.js && node --check stability-core.js && node scripts/request-search-check.mjs",
     "shortcuts": "node --check mair-shortcuts.js && node scripts/shortcuts-check.mjs",
-    "e2e": "node scripts/e2e/playback.e2e.mjs",
+    "e2e": "node scripts/e2e/playback.e2e.mjs && node scripts/e2e/carmode.e2e.mjs",
     "e2e:carmode": "node scripts/e2e/carmode.e2e.mjs",
     "nachtronde-fixes": "node --check mair-voice-gain.js && node scripts/voice-gain-check.mjs && node --check mair-wakelock.js && node scripts/wakelock-check.mjs && node --check mair-share-week.js && node scripts/share-week-check.mjs && node scripts/top40-background-check.mjs && node scripts/dj-audio-guard-check.mjs && node scripts/sleep-timer-check.mjs && node scripts/nachtronde-fixes-check.mjs",
     "dj-block": "node --check mair-live-context.js && node scripts/dj-block-check.mjs",
