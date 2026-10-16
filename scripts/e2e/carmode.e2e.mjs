@@ -1,4 +1,4 @@
-// Car Mode (ontwerp B2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
+// Car Mode (ontwerp C2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
 //   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map)
 // Route: rechte lijn naar het oosten, rotonde op 1,5 km (2e afslag), afrit rechts op 25 km (met rijstroken-banner op
 // 800 m ervoor), 25,5 km in totaal. Maximumsnelheid: 100 tot 5 km, 130 tot 8 km, onbekend tot 9 km, daarna 80.
@@ -123,19 +123,21 @@ const kind=page=>page.evaluate(()=>document.querySelector('#mairCarWaveOverlay .
 const leftKm=async page=>kmOf((await txt(page,'.car-eta-card>span')).split('·').pop());
 const LONG='Te Laat Voor Dit (feat. Heel Lange Artiest Naam) - Extended Radio Edit 2026';
 async function longNext(page){await page.evaluate(t=>{window.jfmUpcoming=()=>[{name:t,artists:['Jairzinho','Sevn Alias','BKO','Boef']}];window.dispatchEvent(new Event('jfm:upcoming-invalidated'))},LONG);await sleep(500)}
-const SIGNATURE=['.car-drive-head','.car-turn-card','.car-eta-card','.car-speed-card','.car-music-bar','.car-track-progress','.car-controls [data-tr="prev"]','.car-controls [data-tr="play"]','.car-controls [data-tr="next"]'];
+const SIGNATURE=['.car-drive-head','.car-topbar','.car-map-slot','.car-turn-card','.car-eta-card','.car-speed-card','.car-music-bar','.car-track-progress','.car-controls [data-tr="prev"]','.car-controls [data-tr="play"]','.car-controls [data-tr="next"]'];
 async function layoutChecks(t,tag){
   const {page}=t,vp=page.viewportSize();
-  const ids=['.car-turn-card','.car-eta-card','.car-speed-card','.car-music-bar'];
+  const ids=['.car-turn-card','.car-eta-card','.car-speed-card','.car-music-bar','.car-map-slot'];
   const r={};for(const s of ids)r[s]=await rect(page,s);
   const ex=await rect(page,'.car-nav-exit'),dist=await rect(page,'.car-turn-dist'),arrow=await rect(page,'.car-turn-arrow');
   if(ex){c.ok(`${tag}: afslag-label overlapt de afstand niet`,!hit(ex,dist),JSON.stringify({ex,dist}));c.ok(`${tag}: afslag-label zit binnen de pijlkolom`,ex.x>=arrow.x-1&&ex.r<=arrow.r+1)}
   const lane=await rect(page,'.car-lane-card');if(lane)r['.car-lane-card']=lane;
   const all=Object.entries(r).filter(([,v])=>v);
-  c.ok(`${tag}: alle kaartjes blijven binnen het scherm (${vp.width}x${vp.height})`,all.length>=4&&all.every(([,x])=>x.b<=vp.height+1&&x.r<=vp.width+1&&x.y>=-1&&x.x>=-1),JSON.stringify(all));
+  c.ok(`${tag}: alle kaartjes blijven binnen het scherm (${vp.width}x${vp.height})`,all.length>=5&&all.every(([,x])=>x.b<=vp.height+1&&x.r<=vp.width+1&&x.y>=-1&&x.x>=-1),JSON.stringify(all));
   const bad=[];for(let i=0;i<all.length;i++)for(let j=i+1;j<all.length;j++)if(hit(all[i][1],all[j][1]))bad.push(all[i][0]+'×'+all[j][0]);
   c.ok(`${tag}: kaartjes overlappen elkaar niet`,!bad.length,bad.join(','));
-  const bar=r['.car-music-bar'];c.ok(`${tag}: muziekbalk is ~25% van de hoogte en zit onderaan`,bar&&bar.h/vp.height>.2&&bar.h/vp.height<.3&&vp.height-bar.b<vp.height*.04,JSON.stringify(bar));
+  const bar=r['.car-music-bar'],sp=r['.car-speed-card'],mp=r['.car-map-slot'],top=await rect(page,'.car-topbar');
+  c.ok(`${tag}: C2: bovenbalk over de hele breedte, afslag en aankomst erin`,top&&top.w>vp.width*.9&&top.b<=mp.y+1&&[r['.car-turn-card'],r['.car-eta-card']].every(x=>x.y>=top.y-1&&x.b<=top.b+1),JSON.stringify(top));
+  c.ok(`${tag}: C2: kaart links, snelheid en muziek rechts, muziek onder snelheid`,mp.r<=sp.x&&mp.r<=bar.x&&sp.b<=bar.y&&mp.w>vp.width*.5&&vp.height-bar.b<vp.height*.06,JSON.stringify({mp,sp,bar}));
   const btn=await page.evaluate(()=>[...document.querySelectorAll('#mairCarWaveOverlay .car-controls button')].map(b=>{const q=b.getBoundingClientRect();return[Math.round(q.width),Math.round(q.height)]}));
   c.ok(`${tag}: knoppen zijn groot genoeg (>=40 px)`,btn.length===4&&btn.every(([w,hh])=>w>=40&&hh>=40),JSON.stringify(btn));
   c.ok(`${tag}: geen VOLGENDE / volgend nummer`,!(await has(page,'.car-next'))&&!/VOLGENDE/.test(await txt(page,'.car-drive')),await txt(page,'.car-drive'));
@@ -155,11 +157,11 @@ async function scenarioNav(){
     c.ok('één Car Mode-stylesheet, statisch gelinkt, en hij hoort bij deze JS (geen mengelmoes van versies)',css.links.length===1&&/mair-car-mode-wave\.css/.test(css.links[0])&&css.layout===(await status(page)).layout,JSON.stringify(css));
     c.ok('portretstand: "Draai je iPhone"-melding blijft',await page.evaluate(()=>{const o=document.getElementById('mairCarWaveOverlay');return /Draai je iPhone/.test([...document.styleSheets].flatMap(s=>{try{return[...s.cssRules]}catch{return[]}}).map(r=>r.cssText).join(''))}));
     const sigStart=await page.evaluate(s=>s.map(x=>!!document.querySelector('#mairCarWaveOverlay '+x)),SIGNATURE);
-    c.ok('rijscherm heeft de B2-onderdelen (afslag, aankomst, snelheid, muziekbalk met voortgangsbalk en knoppen)',sigStart.every(Boolean),JSON.stringify(sigStart));
+    c.ok('rijscherm heeft de C2-onderdelen (bovenbalk met afslag en aankomst, kaartvak, snelheid, muziekblok met voortgangsbalk en knoppen)',sigStart.every(Boolean),JSON.stringify(sigStart));
     c.ok('afstand bij de rotonde: 1.5 km',(await txt(page,'.car-turn-dist'))==='1.5km',await txt(page,'.car-turn-dist'));
     c.ok('rotonde krijgt de ring-pijl met label "2e"',(await kind(page))==='roundabout'&&(await txt(page,'.car-nav-exit'))==='2e',await kind(page));
     await layoutChecks(t,'start');
-    if(outDir)await page.screenshot({path:outDir+'/carmode-b2-start.png'});
+    if(outDir)await page.screenshot({path:outDir+'/carmode-c2-start.png'});
     const before=mb.directions;await sleep(17000);
     c.ok('geen extra Mapbox-aanvragen in 17 s',mb.directions===before,`${before}→${mb.directions}`);
     // vlak bij de rotonde: precies dezelfde indeling (geen wisselen naar een 70/30-scherm)
@@ -261,12 +263,17 @@ async function scenarioArrows(){
     await page.evaluate(()=>{window.__speed=27.78});await t.at(2020,{jump:false});await sleep(300);
     c.ok('coords.speed 27,78 m/s: 100 km/u',(await txt(page,'.car-speed'))==='100',await txt(page,'.car-speed'));
     await page.evaluate(()=>{window.__speed=0});await t.at(2030,{jump:false});await sleep(300);
-    c.ok('stilstaan (0 m/s): 0 km/u, geen "--"',(await txt(page,'.car-speed'))==='0',await txt(page,'.car-speed'));
-    await page.evaluate(()=>{window.__speed=36.1});await t.at(2040,{jump:false});await sleep(300);
+    const half=Number(await txt(page,'.car-speed'));
+    c.ok('snelheid licht afgevlakt: 100 → 0 geeft eerst een tussenwaarde (50)',half===50,String(half));
+    for(let i=1;i<=8;i++)await t.at(2030+i*2,{jump:false});
+    c.ok('stilstaan (0 m/s): na een paar fixes 0 km/u, geen "--"',(await txt(page,'.car-speed'))==='0',await txt(page,'.car-speed'));
+    await page.evaluate(()=>{window.__speed=36.1});for(let i=1;i<=9;i++)await t.at(2050+i*2,{jump:false});await sleep(300);
     c.ok('36,1 m/s: 130 km/u afgerond',(await txt(page,'.car-speed'))==='130',await txt(page,'.car-speed'));
     // maximumsnelheid
     c.ok('bordje met maximumsnelheid 100 (route 0-5 km)',(await txt(page,'.car-limit'))==='100',await txt(page,'.car-limit'));
     c.ok('te hard rijden kleurt de snelheid rood (130 op 100)',await page.evaluate(()=>!!document.querySelector('#mairCarWaveOverlay .car-speed.over')));
+    await page.evaluate(()=>{window.__skew+=6000;window.__speed=11.11});await t.at(2080,{jump:false});
+    c.ok('na een gat van >5 s geen naijlen: meteen 40 km/u',(await txt(page,'.car-speed'))==='40',await txt(page,'.car-speed'));
     await page.evaluate(()=>{window.__speed=27.78});
     await t.at(6000);await sleep(300);
     c.ok('bordje 130 op het volgende stuk',(await txt(page,'.car-limit'))==='130',await txt(page,'.car-limit'));
@@ -287,7 +294,7 @@ async function scenarioArrows(){
     await layoutChecks(t,'rijstroken');await sleep(1500);
     const pp=await page.evaluate(()=>({proj:window.MAIRCarMap.project(5+24500/68537,52),puck:window.MAIRCarMap.puckAt()}));
     c.ok('positiepijl staat precies op de plek van de auto op de kaart (en de route loopt eronder door)',pp.proj&&pp.puck&&Math.abs(pp.proj.x-pp.puck.x)<4&&Math.abs(pp.proj.y-pp.puck.y)<4,JSON.stringify(pp));
-    if(outDir)await page.screenshot({path:outDir+'/carmode-b2-rijstroken.png'});
+    if(outDir)await page.screenshot({path:outDir+'/carmode-c2-rijstroken.png'});
     await t.at(25200);await sleep(400);
     c.ok('na de afrit: kaartje weg, aankomst-pijl',!(await has(page,'.car-lane-card'))&&(await kind(page))==='arrive',await kind(page));
     c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
@@ -317,7 +324,10 @@ async function scenarioMap(){
     c.ok('kaart is geladen (echte Mapbox GL JS, WebGL)',ms.created&&ms.ready&&!ms.failed,JSON.stringify(ms));
     c.ok('donkere navigatiestijl gevraagd (navigation-night)',/navigation-night/.test(mb.styleUrl||''),mb.styleUrl);
     c.ok('route staat als lijn op de kaart',ms.hasRoute);
-    c.ok('overlay krijgt .has-map en de kaart vult het scherm',await page.evaluate(()=>{const o=document.getElementById('mairCarWaveOverlay'),m=document.getElementById('carMap'),r=m.getBoundingClientRect();return o.classList.contains('has-map')&&r.width>=innerWidth-1&&r.height>=innerHeight-1}));
+    const navMap=await page.evaluate(()=>{const o=document.getElementById('mairCarWaveOverlay'),r=document.getElementById('carMap').getBoundingClientRect(),q=o.querySelector('.car-map-slot').getBoundingClientRect();return{has:o.classList.contains('has-map'),x:r.left,y:r.top,w:r.width,h:r.height,sx:q.left,sy:q.top,sw:q.width,sh:q.height}});
+    c.ok('overlay krijgt .has-map en de kaart staat links in het kaartvak onder de bovenbalk',navMap.has&&Math.abs(navMap.x-navMap.sx)<1&&Math.abs(navMap.y-navMap.sy)<1&&Math.abs(navMap.w-navMap.sw)<1&&navMap.w<page.viewportSize().width*.7&&navMap.y>page.viewportSize().height*.25,JSON.stringify(navMap));
+    const lay=await page.evaluate(()=>window.MAIRCarMap.status());
+    c.ok('route is een eigen dikke lijn met rand en gloed op de kaart',lay.routeLayers===4,JSON.stringify(lay));
     await t.at(2000);await t.at(2050,{jump:false});await sleep(1500);
     ms=await page.evaluate(()=>window.MAIRCarMap.status());
     c.ok('kaart draait mee met de rijrichting (oosten ≈ 90°)',ms.bearing!=null&&Math.abs(ms.bearing-90)<8,String(ms.bearing));
@@ -334,8 +344,14 @@ async function scenarioMap(){
     // menu → verder zonder route: kaart verborgen, niet verwijderd
     await page.evaluate(()=>document.querySelector('#mairCarWaveOverlay [data-act="menu"]').click());await sleep(200);
     await page.locator('#mairCarWaveOverlay .car-menu [data-act="music"]').click();await sleep(500);
-    c.ok('zonder route: geen kaart, wel muziekscherm met dezelfde balk',!(await page.evaluate(()=>document.getElementById('mairCarWaveOverlay').classList.contains('has-map')))&&await has(page,'.car-music-bar')&&await has(page,'.car-track-progress'));
-    if(outDir)await page.screenshot({path:outDir+'/carmode-b2-muziek.png'});
+    await sleep(800);
+    const free=await page.evaluate(()=>{const o=document.getElementById('mairCarWaveOverlay'),r=document.getElementById('carMap').getBoundingClientRect();return{has:o.classList.contains('has-map'),top:!!o.querySelector('.car-topbar'),find:!!o.querySelector('.car-find'),y:r.top,h:r.height,route:window.MAIRCarMap.status().hasRoute}});
+    c.ok('zonder bestemming: kaart blijft, bovenbalk weg, kaart hoger, geen routelijn',free.has&&!free.top&&free.y<navMap.y-40&&free.h>navMap.h+40&&!free.route,JSON.stringify(free));
+    c.ok('zonder bestemming: kleine zoekknop, snelheid en muziekblok rechts',free.find&&await has(page,'.car-speed-card')&&await has(page,'.car-music-bar')&&await has(page,'.car-track-progress'));
+    await page.locator('#mairCarWaveOverlay .car-find').click();
+    c.ok('zoekknop opent het zoekveld',await page.locator('#carSearchInput').isVisible());
+    await page.locator('#mairCarWaveOverlay [data-act="music"]').click();await sleep(1500);
+    if(outDir)await page.screenshot({path:outDir+'/carmode-c2-zonder-bestemming.png'});
     // Car Mode dicht = kaart opgeruimd; nieuwe sessie = nieuwe lading (één per sessie)
     await page.evaluate(()=>window.MAIRCarModePrototype.close());await sleep(300);
     ms=await page.evaluate(()=>window.MAIRCarMap.status());
@@ -412,8 +428,8 @@ async function scenarioSizes(){
     try{
       await startRoute(t);await longNext(page);
       await page.evaluate(()=>{window.__speed=27.78});for(const m of [5000,10000,15000,20000,24500])await t.at(m);await sleep(500);
-      await layoutChecks(t,`B2 ${w}x${hh}`);await sleep(1500);
-      if(outDir)await page.screenshot({path:`${outDir}/carmode-b2-${w}x${hh}.png`});
+      await layoutChecks(t,`C2 ${w}x${hh}`);await sleep(1500);
+      if(outDir)await page.screenshot({path:`${outDir}/carmode-c2-${w}x${hh}.png`});
     }finally{await h.close()}
   }
 }
