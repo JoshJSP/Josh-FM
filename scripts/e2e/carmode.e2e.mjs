@@ -360,6 +360,15 @@ async function scenarioMap(){
     c.ok('route staat als lijn op de kaart',ms.hasRoute);
     const navMap=await page.evaluate(()=>{const o=document.getElementById('mairCarWaveOverlay'),r=document.getElementById('carMap').getBoundingClientRect(),q=o.querySelector('.car-map-slot').getBoundingClientRect();return{has:o.classList.contains('has-map'),x:r.left,y:r.top,w:r.width,h:r.height,sx:q.left,sy:q.top,sw:q.width,sh:q.height}});
     c.ok('overlay krijgt .has-map en de kaart staat links in het kaartvak onder de bovenbalk',navMap.has&&Math.abs(navMap.x-navMap.sx)<1&&Math.abs(navMap.y-navMap.sy)<1&&Math.abs(navMap.w-navMap.sw)<1&&navMap.w>=page.viewportSize().width*.62&&navMap.w<page.viewportSize().width*.75&&navMap.y>page.viewportSize().height*.15,JSON.stringify(navMap));
+    // kaart en rechterkolom naast elkaar: geen kaartcanvas onder de panelen, ook als de overlay smaller is dan 100vw (iOS-app)
+    const side=()=>page.evaluate(()=>{const o=document.getElementById('mairCarWaveOverlay'),cv=o.querySelector('#carMap canvas.mapboxgl-canvas').getBoundingClientRect(),m=document.getElementById('carMap').getBoundingClientRect(),cols=[...o.querySelectorAll('.car-drive-head,.car-speed-card,.car-music-bar')].map(e=>e.getBoundingClientRect()).filter(r=>r.width),colL=Math.min(...cols.map(r=>r.left)),hits=cols.flatMap(r=>[[r.left+4,r.top+r.height/2],[r.left+r.width/2,r.top+r.height/2],[r.right-4,r.top+4]]).map(([x,y])=>document.elementFromPoint(x,y)).filter(e=>e&&e.closest('#carMap')).length;return{mapR:m.right,cvR:cv.right,colL,hits}});
+    let sd=await side();
+    c.ok('kaart en kaartcanvas stoppen voor de rechterkolom, niets van de kaart onder de panelen',sd.mapR<=sd.colL&&sd.cvR<=sd.colL+1&&sd.hits===0,JSON.stringify(sd));
+    await page.evaluate(()=>{document.getElementById('mairCarWaveOverlay').style.cssText='left:60px;right:60px'});await sleep(800);
+    sd=await side();
+    c.ok('overlay smaller dan 100vw (iOS-app): kaart wordt mee smaller en blijft naast de kolom',sd.mapR<=sd.colL&&sd.cvR<=sd.colL+1&&sd.hits===0,JSON.stringify(sd));
+    if(outDir)await page.screenshot({path:outDir+'/carmode-c2-ios-app.png'});
+    await page.evaluate(()=>{document.getElementById('mairCarWaveOverlay').style.cssText=''});await sleep(500);
     const lay=await page.evaluate(()=>window.MAIRCarMap.status());
     c.ok('route is een eigen dikke lijn met rand en gloed op de kaart',lay.routeLayers===4,JSON.stringify(lay));
     await t.at(2000);await t.at(2050,{jump:false});await sleep(1500);

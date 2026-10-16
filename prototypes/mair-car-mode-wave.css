@@ -29,7 +29,8 @@
    gelinkt in index.html. --car-layout laat de JS controleren dat dit de goede versie is. Maten ontworpen op 844x390,
    ze schalen mee met de schermhoogte (--u = 1/390 van de hoogte). */
 :root{--car-layout:"c2-20261016b"}
-.mair-car-wave-overlay{--u:calc(100dvh/390);--safe-l:max(0px,env(safe-area-inset-left));--safe-r:max(0px,env(safe-area-inset-right));--g:calc(var(--u)*8);--side:max(calc(var(--u)*222),30vw);--el:calc(var(--g) + var(--safe-l));--er:calc(var(--g) + var(--safe-r));--mapw:calc(100vw - var(--el) - var(--er) - var(--side) - var(--g));--top:var(--g);--head-h:calc(var(--u)*52);--speed-h:calc(var(--u)*100)}
+.mair-car-wave-overlay{--u:calc(100dvh/390);--safe-l:max(0px,env(safe-area-inset-left));--safe-r:max(0px,env(safe-area-inset-right));--g:calc(var(--u)*8);--side:max(calc(var(--u)*222),30vw);--el:calc(var(--g) + var(--safe-l));--er:calc(var(--g) + var(--safe-r));--mapw:calc(100% - var(--el) - var(--er) - var(--side) - var(--g));--top:var(--g);--head-h:calc(var(--u)*52);--speed-h:calc(var(--u)*100)}
+/* --mapw met 100% (breedte van de overlay), niet 100vw: in de iOS-app is 100vw het hele scherm en liep de kaart onder de kolom door */
 /* in de iOS-app laat de webview de zijkanten al vrij (zie insetByShell in de JS) */
 .mair-car-wave-overlay.car-inset{--safe-l:0px;--safe-r:0px}
 .mair-car-wave-overlay.car-has-nav{--top:calc(var(--g) + var(--u)*60 + var(--g));--head-h:0px;--speed-h:calc(var(--u)*96)}
@@ -59,10 +60,10 @@
 .car-drive-head{position:absolute;z-index:5;right:var(--er);width:var(--side);top:var(--top);height:calc(var(--u)*44);display:flex;align-items:center;justify-content:flex-end}
 .car-drive-head strong{display:none}
 .car-head-actions{display:flex;gap:calc(var(--u)*8);width:100%;justify-content:flex-end}
-.car-more,.car-find{min-width:calc(var(--u)*56);height:calc(var(--u)*44);border:1px solid var(--car-line);border-radius:calc(var(--u)*14);background:rgba(14,12,20,.85);color:#ddd;font-size:calc(var(--u)*15);pointer-events:auto}
+.car-more,.car-find{min-width:calc(var(--u)*56);height:calc(var(--u)*44);border:1px solid var(--car-line);border-radius:calc(var(--u)*14);background:#0e0c14;color:#ddd;font-size:calc(var(--u)*15);pointer-events:auto}
 .car-more{padding:0 0 calc(var(--u)*5);letter-spacing:.08em}
 .car-find{flex:1;padding:0 calc(var(--u)*14);border-color:rgba(155,77,255,.55);color:#fff;font-weight:800}
-.car-topbar,.car-speed-card,.car-music-bar{position:absolute;z-index:4;background:linear-gradient(150deg,rgba(16,12,23,.96),rgba(9,8,14,.96));border:1px solid #2d2140;border-radius:calc(var(--u)*18);box-shadow:0 calc(var(--u)*10) calc(var(--u)*30) rgba(0,0,0,.45),inset 0 0 calc(var(--u)*40) rgba(133,57,225,.04)}
+.car-topbar,.car-speed-card,.car-music-bar{position:absolute;z-index:4;background:linear-gradient(150deg,#100c17,#09080e);border:1px solid #2d2140;border-radius:calc(var(--u)*18);box-shadow:0 calc(var(--u)*10) calc(var(--u)*30) rgba(0,0,0,.45),inset 0 0 calc(var(--u)*40) rgba(133,57,225,.04)}
 /* bovenbalk */
 .car-topbar{left:var(--el);right:var(--er);top:var(--g);height:calc(var(--u)*60);display:flex;align-items:center;padding:0 calc(var(--u)*14);background:linear-gradient(120deg,rgba(62,26,112,.5),rgba(14,11,22,.97) 55%)}
 .car-turn-card,.car-lane-card,.car-eta-card{position:relative;display:flex;align-items:center;height:100%}
