@@ -124,8 +124,9 @@
 .car-vibe{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:calc(var(--u,1px)*8);min-height:calc(var(--u,1px)*42);margin-top:calc(var(--u,1px)*8);padding:0 calc(var(--u,1px)*14);border:1px solid var(--car-line);border-radius:calc(var(--u,1px)*13);background:#15121d;color:#fff;font:inherit;pointer-events:auto}
 .car-vibe small{color:var(--car-soft);font-size:calc(var(--u,1px)*10);font-weight:900;letter-spacing:.12em}
 .car-vibe b{font-size:calc(var(--u,1px)*15);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.car-preview-go{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:9px}.car-preview-go .car-route-start:only-child{grid-column:1/-1}
-.car-preview .car-vibe{grid-column:auto;min-height:60px;margin:0;padding:0 18px;border-radius:18px}.car-preview .car-vibe b{font-size:18px}
+/* routescherm: vibe-knop zo breed als zijn naam, Route starten minstens 140 px; past de naam niet, dan een tweede regel, nooit puntjes */
+.car-preview-go{display:grid;grid-template-columns:auto minmax(140px,1fr);gap:9px}.car-preview-go .car-route-start:only-child{grid-column:1/-1}
+.car-preview .car-vibe{grid-column:auto;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0;min-height:60px;margin:0;padding:6px 18px;border-radius:18px;text-align:left}.car-preview .car-vibe b{font-size:18px;line-height:1.1;white-space:normal;overflow:visible;text-overflow:clip}
 .car-menu.car-vibes{width:min(660px,92vw)}
 .car-vibe-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .car-menu .car-vibe-grid button{min-height:72px;padding:0 8px;text-align:center;font-size:17px;font-weight:800;line-height:1.15}

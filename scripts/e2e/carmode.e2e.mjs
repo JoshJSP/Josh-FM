@@ -1,5 +1,5 @@
 // Car Mode (ontwerp C2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
-//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout)
+//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth)
 // Route: rechte lijn naar het oosten, rotonde op 1,5 km (2e afslag), afrit rechts op 25 km (met rijstroken-banner op
 // 800 m ervoor), 25,5 km in totaal. Maximumsnelheid: 100 tot 5 km, 130 tot 8 km, onbekend tot 9 km, daarna 80.
 // Het GPS-filter weigert sprongen sneller dan 110 m/s; Date.now() krijgt daarom een instelbare voorsprong
@@ -806,7 +806,33 @@ async function scenarioZoomOut(){
   }finally{await h.close()}
 }
 
-const scenarios={nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut};
+// ---- scenario 15: vibe-knop op het routescherm, ook op een smalle iPhone rechtop ------------
+// Josh zag naast ROUTE STARTEN alleen "VIBE M...": de knop was te smal en de gekozen vibe viel weg.
+async function scenarioVibeWidth(){
+  for(const [width,height] of [[390,844],[844,390]]){
+    const t=await setup({width,height}),{page,h}=t;
+    try{
+      await page.evaluate(()=>window.MAIRCarModePrototype.open());
+      await page.locator('[data-act="search"]').first().click();
+      await page.fill('#carSearchInput','test');await page.locator('[data-result-index="0"]').first().waitFor({timeout:8000});await page.locator('[data-result-index="0"]').first().click();
+      await page.locator('[data-act="start"]').waitFor({timeout:8000});
+      const modes=await page.evaluate(()=>!!window.JFMRotation?.setMode);
+      c.ok(`vibe-knop ${width}px: knop staat op het routescherm`,modes&&await has(page,'.car-preview .car-vibe'));
+      const bad=[];
+      for(const id of ['mair','drive','energy','chill','party','discover','forgotten']){
+        await page.evaluate(m=>{window.JFMRotation.setMode(m);window.MAIRCarModePrototype.render()},id);await sleep(150);
+        const r=await page.evaluate(()=>{const o=document.getElementById('mairCarWaveOverlay'),v=o.querySelector('.car-preview .car-vibe'),b=v.querySelector('b'),go=o.querySelector('.car-route-start'),gr=go.getBoundingClientRect(),vr=v.getBoundingClientRect();
+          return{name:b.textContent,b:[b.scrollWidth,b.clientWidth],v:[v.scrollWidth,v.clientWidth],ell:getComputedStyle(b).textOverflow,go:[Math.round(gr.width),Math.round(gr.height),go.scrollWidth<=go.clientWidth],inside:vr.right<=gr.left+1&&gr.right<=o.clientWidth}});
+        if(!(r.b[0]<=r.b[1]&&r.v[0]<=r.v[1]&&r.ell!=='ellipsis'&&r.go[0]>=140&&r.go[1]>=56&&r.go[2]&&r.inside))bad.push(JSON.stringify(r));
+      }
+      c.ok(`vibe-knop ${width}px: elke vibe-naam past helemaal (scrollWidth <= clientWidth, geen puntjes), Route starten blijft >=140x56`,bad.length===0,bad.join(' | '));
+      if(outDir)await page.screenshot({path:`${outDir}/carmode-vibe-route-${width}.png`});
+      c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+    }finally{await h.close()}
+  }
+}
+
+const scenarios={nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);
