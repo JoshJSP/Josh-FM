@@ -6,7 +6,9 @@
 .car-search,.car-preview{width:min(880px,100%);margin:auto;display:grid;align-content:center;gap:18px}.car-search header,.car-preview header{display:flex;align-items:center;gap:15px}.car-search header small,.car-preview header small{color:var(--car-soft);font-size:9px;font-weight:900;letter-spacing:.16em}.car-search header strong,.car-preview header strong{display:block;margin-top:3px;font-size:26px}.car-back{width:50px;height:50px;border:1px solid var(--car-line);border-radius:50%;background:#0f0d15;color:#fff;font-size:33px}.car-searchbox{height:60px;display:flex;align-items:center;gap:11px;padding:0 17px;border:1px solid rgba(155,77,255,.52);border-radius:18px;background:#0e0c14}.car-searchbox span{color:var(--car-soft);font-size:23px}.car-searchbox input{width:100%;height:100%;border:0;outline:0;background:transparent;color:#fff;font-size:18px}.car-search-status{min-height:18px;color:var(--car-muted);font-size:11px}.car-search-results{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow:auto}.car-text-action{justify-self:center;border:0;background:transparent;color:var(--car-muted);padding:9px 16px}
 .car-preview-card{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.car-preview-card>div{min-height:82px;padding:15px;border:1px solid var(--car-line);border-radius:17px;background:var(--car-panel)}.car-preview-card small,.car-preview-card b{display:block}.car-preview-card small,.car-preview-metrics small{color:var(--car-muted);font-size:9px;letter-spacing:.14em}.car-preview-card b{margin-top:7px}.car-preview-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.car-preview-metrics div{text-align:center;padding:14px}.car-preview-metrics b{display:block;font-size:22px}.car-route-start{height:60px;border:0;border-radius:18px;background:linear-gradient(135deg,#7730db,#a957ff);color:#fff;font-weight:900;letter-spacing:.05em;box-shadow:0 0 30px rgba(155,77,255,.16)}.car-loading{display:grid;place-items:center;text-align:center}.car-loading b,.car-loading span{display:block}.car-loading b{font-size:26px}.car-loading span{margin-top:7px;color:var(--car-muted)}
 .car-toast{position:absolute;left:50%;bottom:max(17px,env(safe-area-inset-bottom));transform:translateX(-50%);max-width:80%;padding:10px 14px;border:1px solid #46305e;border-radius:14px;background:rgba(20,14,29,.97);font-size:11px;box-shadow:0 14px 34px rgba(0,0,0,.35)}.car-toast button{border:0;background:transparent;color:#fff;margin-left:9px}.car-menu-backdrop{position:absolute;inset:0;z-index:9;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.64)}.car-menu{width:min(420px,90vw);display:grid;gap:7px;padding:12px;border:1px solid #2b2037;border-radius:23px;background:#0d0b12;box-shadow:0 25px 80px rgba(0,0,0,.5)}.car-menu button{min-height:50px;border:0;border-radius:14px;background:#15121d;color:#fff;text-align:left;padding:0 16px}.car-menu button.danger{color:#ff8d9a}.car-menu button.muted{background:transparent;color:var(--car-muted);text-align:center}
-@media(orientation:portrait){.mair-car-wave-overlay.is-open::after{content:"Draai je iPhone horizontaal voor Car Mode";position:absolute;inset:0;z-index:30;display:grid;place-items:center;padding:40px;background:#05050a;color:#f5f2f8;text-align:center;font-size:20px;font-weight:850}}
+/* Rechtop: het rijscherm vraagt om te draaien, maar starten, zoeken (typen) en de routekeuze werken ook rechtop. */
+@media(orientation:portrait){.mair-car-wave-overlay.is-open:is([data-screen="drive"],[data-screen="music"])::after{content:"Draai je iPhone horizontaal voor Car Mode";position:absolute;inset:0;z-index:30;display:grid;place-items:center;padding:40px;background:#05050a;color:#f5f2f8;text-align:center;font-size:20px;font-weight:850}
+.car-start{grid-template-columns:1fr;align-content:center;gap:18px;overflow:auto}.car-search,.car-preview{align-content:start;overflow:auto}.car-search-results{grid-template-columns:1fr;max-height:none}}
 .car-stops-list{display:grid;gap:8px}.car-stop-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 12px;border:1px solid var(--car-line);border-radius:14px;background:rgba(15,13,22,.72)}.car-stop-row small,.car-stop-row b{display:block}.car-stop-row small{color:var(--car-muted);font-size:14px;font-weight:900;letter-spacing:.1em}.car-stop-row b{margin-top:3px;font-size:18px}.car-stop-actions{display:flex;gap:6px}.car-stop-actions button,.car-add-stop{border:1px solid var(--car-line);background:#12101a;color:#fff}.car-stop-actions button{width:34px;height:34px;border-radius:10px}.car-stop-actions button:disabled{opacity:.3}.car-add-stop{min-height:42px;border-radius:13px;color:var(--car-soft);font-weight:800}@media(orientation:landscape) and (max-height:500px){.car-stops-list{gap:5px}.car-stop-row{padding:7px 9px}.car-stop-actions button{width:30px;height:30px}.car-add-stop{min-height:34px}}
 /* Locatiestatus op het Car Mode-startscherm: expliciet, leesbaar op armlengte. */
 .car-geo{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 0;padding:11px 14px;border:1px solid rgba(255,255,255,.14);border-radius:14px;background:rgba(255,255,255,.05)}
@@ -19,16 +21,23 @@
 .car-geo-action{margin-left:auto;min-height:40px;padding:9px 16px;border:1px solid rgba(255,255,255,.28);border-radius:99px;background:rgba(255,255,255,.1);color:inherit;font-weight:800;font-size:13px}
 .car-geo-action[disabled]{opacity:.55}
 
+
 /* ---- C2: rijscherm ----------------------------------------------------------------------------------------------
-   Bovenbalk over de hele breedte (afslag, banen, aankomst), daaronder de kaart links en snelheid + muziek als blokken
-   rechts. Zonder bestemming valt de bovenbalk weg en wordt de kaart hoger. Eén stylesheet voor heel Car Mode: statisch
+   Bovenbalk over de hele breedte (afslag, banen, aankomst), daaronder de kaart links en rechts een smalle kolom
+   (~30%) met de knoppen, snelheid en muziek. Zonder bestemming valt de bovenbalk weg en loopt de kaart tot bovenaan.
+   Geen kop en zo weinig mogelijk rand: de kaart krijgt alles wat over is. Eén stylesheet voor heel Car Mode: statisch
    gelinkt in index.html. --car-layout laat de JS controleren dat dit de goede versie is. Maten ontworpen op 844x390,
    ze schalen mee met de schermhoogte (--u = 1/390 van de hoogte). */
-:root{--car-layout:"c2-20261016"}
-.mair-car-wave-overlay{--u:calc(100dvh/390);--safe-l:max(0px,env(safe-area-inset-left));--safe-r:max(0px,env(safe-area-inset-right));--side:calc(var(--u)*264);--gx:calc(var(--u)*24);--top:calc(var(--u)*46)}
-.mair-car-wave-overlay.car-has-nav{--top:calc(var(--u)*124)}
-/* het kaartvak: links, van --top tot onderaan, rechts ruimte voor de blokken */
-#carMap,.car-map-slot{position:absolute;left:calc(var(--gx) + var(--safe-l));right:calc(var(--gx) + var(--side) + var(--u)*12 + var(--safe-r));top:var(--top);bottom:calc(var(--u)*14);border-radius:calc(var(--u)*20)}
+:root{--car-layout:"c2-20261016b"}
+.mair-car-wave-overlay{--u:calc(100dvh/390);--safe-l:max(0px,env(safe-area-inset-left));--safe-r:max(0px,env(safe-area-inset-right));--g:calc(var(--u)*8);--side:max(calc(var(--u)*222),30vw);--el:calc(var(--g) + var(--safe-l));--er:calc(var(--g) + var(--safe-r));--mapw:calc(100vw - var(--el) - var(--er) - var(--side) - var(--g));--top:var(--g);--head-h:calc(var(--u)*52);--speed-h:calc(var(--u)*100)}
+/* in de iOS-app laat de webview de zijkanten al vrij (zie insetByShell in de JS) */
+.mair-car-wave-overlay.car-inset{--safe-l:0px;--safe-r:0px}
+.mair-car-wave-overlay.car-has-nav{--top:calc(var(--g) + var(--u)*60 + var(--g));--head-h:0px;--speed-h:calc(var(--u)*96)}
+/* met route staat het menu rechts in de bovenbalk, dan houdt de kolom de ruimte voor snelheid en muziek */
+.car-has-nav .car-drive-head{top:calc(var(--g) + var(--u)*8);right:calc(var(--er) + var(--u)*8);width:auto}
+.car-has-nav .car-topbar{padding-right:calc(var(--u)*78)}
+/* het kaartvak: links, van --top tot onderaan */
+#carMap,.car-map-slot{position:absolute;left:var(--el);width:var(--mapw);top:var(--top);bottom:var(--g);border-radius:calc(var(--u)*18)}
 #carMap{z-index:0;display:none;overflow:hidden;background:#0b0a12}
 .has-map #carMap{display:block}
 .car-map-slot{z-index:1;border:1px solid #281d38;pointer-events:none}
@@ -39,66 +48,73 @@
 #carMap .mapboxgl-ctrl-attrib a{color:#8b839a}
 #carMap .mapboxgl-ctrl-logo{display:none}
 .car-map-puck{position:absolute;z-index:3;width:calc(var(--u)*46);height:calc(var(--u)*46);margin:calc(var(--u)*-23) 0 0 calc(var(--u)*-23);filter:drop-shadow(0 0 calc(var(--u)*10) rgba(155,77,255,.9));pointer-events:none}
-#carScreen{position:absolute;inset:0;z-index:2}
+.car-map-back{position:absolute;z-index:4;left:calc(var(--u)*10);bottom:calc(var(--u)*10);height:calc(var(--u)*48);padding:0 calc(var(--u)*18);border:2px solid var(--car-purple);border-radius:99px;background:rgba(14,12,20,.94);color:#fff;font-size:calc(var(--u)*15);font-weight:800;box-shadow:0 calc(var(--u)*6) calc(var(--u)*18) rgba(0,0,0,.5)}
+.car-map-back[hidden]{display:none}
+/* Het schermdeel laat tikken en vegen door naar de kaart; alleen de knoppen en blokken vangen ze. */
+#carScreen{position:absolute;inset:0;z-index:2;pointer-events:none}
+#carScreen>:not(.car-drive){pointer-events:auto}
 .car-drive{position:absolute;inset:0;height:auto;padding:0;overflow:hidden;pointer-events:none}
 .car-drive button{pointer-events:auto}
-.car-drive-head{position:absolute;z-index:5;left:calc(var(--gx) + var(--safe-l));right:calc(var(--gx) + var(--safe-r));top:calc(var(--u)*8);height:calc(var(--u)*34);display:flex;align-items:center;justify-content:space-between}
-.car-drive-head strong{font-size:calc(var(--u)*15);font-weight:800;letter-spacing:-.01em}
-.car-drive-head strong span{color:var(--car-muted);font-weight:600}
-.car-head-actions{display:flex;gap:calc(var(--u)*8)}
-.car-more,.car-find{min-width:calc(var(--u)*50);height:calc(var(--u)*34);border:1px solid var(--car-line);border-radius:calc(var(--u)*12);background:rgba(14,12,20,.85);color:#ddd;font-size:calc(var(--u)*14);pointer-events:auto}
+/* rechterkolom, bovenaan: zoeken en menu (geen kop meer) */
+.car-drive-head{position:absolute;z-index:5;right:var(--er);width:var(--side);top:var(--top);height:calc(var(--u)*44);display:flex;align-items:center;justify-content:flex-end}
+.car-drive-head strong{display:none}
+.car-head-actions{display:flex;gap:calc(var(--u)*8);width:100%;justify-content:flex-end}
+.car-more,.car-find{min-width:calc(var(--u)*56);height:calc(var(--u)*44);border:1px solid var(--car-line);border-radius:calc(var(--u)*14);background:rgba(14,12,20,.85);color:#ddd;font-size:calc(var(--u)*15);pointer-events:auto}
 .car-more{padding:0 0 calc(var(--u)*5);letter-spacing:.08em}
-.car-find{padding:0 calc(var(--u)*14);border-color:rgba(155,77,255,.55);color:#fff;font-weight:800}
-.car-topbar,.car-speed-card,.car-music-bar{position:absolute;z-index:4;background:linear-gradient(150deg,rgba(16,12,23,.96),rgba(9,8,14,.96));border:1px solid #2d2140;border-radius:calc(var(--u)*20);box-shadow:0 calc(var(--u)*10) calc(var(--u)*30) rgba(0,0,0,.45),inset 0 0 calc(var(--u)*40) rgba(133,57,225,.04)}
+.car-find{flex:1;padding:0 calc(var(--u)*14);border-color:rgba(155,77,255,.55);color:#fff;font-weight:800}
+.car-topbar,.car-speed-card,.car-music-bar{position:absolute;z-index:4;background:linear-gradient(150deg,rgba(16,12,23,.96),rgba(9,8,14,.96));border:1px solid #2d2140;border-radius:calc(var(--u)*18);box-shadow:0 calc(var(--u)*10) calc(var(--u)*30) rgba(0,0,0,.45),inset 0 0 calc(var(--u)*40) rgba(133,57,225,.04)}
 /* bovenbalk */
-.car-topbar{left:calc(var(--u)*12 + var(--safe-l));right:calc(var(--u)*12 + var(--safe-r));top:calc(var(--u)*46);height:calc(var(--u)*70);display:flex;align-items:center;padding:0 calc(var(--u)*16);background:linear-gradient(120deg,rgba(62,26,112,.5),rgba(14,11,22,.97) 55%)}
+.car-topbar{left:var(--el);right:var(--er);top:var(--g);height:calc(var(--u)*60);display:flex;align-items:center;padding:0 calc(var(--u)*14);background:linear-gradient(120deg,rgba(62,26,112,.5),rgba(14,11,22,.97) 55%)}
 .car-turn-card,.car-lane-card,.car-eta-card{position:relative;display:flex;align-items:center;height:100%}
-.car-turn-card{flex:1;min-width:0;gap:calc(var(--u)*12)}
-.car-turn-arrow{flex:none;width:calc(var(--u)*48);display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*2);color:var(--car-soft);filter:drop-shadow(0 0 calc(var(--u)*8) rgba(155,77,255,.35))}
-.car-arrow{display:block;width:calc(var(--u)*46);height:calc(var(--u)*46);overflow:visible}
-.car-nav-exit{display:block;padding:0 calc(var(--u)*6) calc(var(--u)*1);border:2px solid var(--car-purple);border-radius:99px;font-size:calc(var(--u)*11);line-height:1.1;font-weight:900;color:#fff;background:rgba(155,77,255,.22);white-space:nowrap}
+.car-turn-card{flex:1;min-width:0;gap:calc(var(--u)*10)}
+.car-turn-arrow{flex:none;width:calc(var(--u)*44);display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*1);color:var(--car-soft);filter:drop-shadow(0 0 calc(var(--u)*8) rgba(155,77,255,.35))}
+.car-arrow{display:block;width:calc(var(--u)*40);height:calc(var(--u)*40);overflow:visible}
+.car-nav-exit{display:block;padding:0 calc(var(--u)*6) calc(var(--u)*1);border:2px solid var(--car-purple);border-radius:99px;font-size:calc(var(--u)*10);line-height:1.1;font-weight:900;color:#fff;background:rgba(155,77,255,.22);white-space:nowrap}
 .car-turn-copy{min-width:0;flex:1;display:flex;align-items:center;gap:calc(var(--u)*12)}
-.car-turn-dist{flex:none;font-size:calc(var(--u)*34);font-weight:900;letter-spacing:-.04em;line-height:1;white-space:nowrap}
+.car-turn-dist{flex:none;font-size:calc(var(--u)*30);font-weight:900;letter-spacing:-.04em;line-height:1;white-space:nowrap}
 .car-turn-dist small{margin-left:calc(var(--u)*3);font-size:.5em;font-weight:800;color:var(--car-soft);letter-spacing:0}
-.car-turn-text{min-width:0;flex:1;padding-left:calc(var(--u)*12);border-left:1px solid var(--car-line);font-size:calc(var(--u)*13);font-weight:600;line-height:1.22;color:#d9d3e3;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.car-lane-card,.car-eta-card{flex:none;margin-left:calc(var(--u)*16);padding-left:calc(var(--u)*16);border-left:1px solid var(--car-line)}
-.car-lane-head{display:flex;flex-direction:column;align-items:flex-start;gap:calc(var(--u)*4);max-width:calc(var(--u)*86);margin-right:calc(var(--u)*8);min-width:0}
+.car-turn-text{min-width:0;flex:1;padding-left:calc(var(--u)*12);border-left:1px solid var(--car-line);font-size:calc(var(--u)*13);font-weight:600;line-height:1.2;color:#d9d3e3;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.car-lane-card,.car-eta-card{flex:none;margin-left:calc(var(--u)*14);padding-left:calc(var(--u)*14);border-left:1px solid var(--car-line)}
+.car-lane-head{display:flex;flex-direction:column;align-items:flex-start;gap:calc(var(--u)*3);max-width:calc(var(--u)*86);margin-right:calc(var(--u)*8);min-width:0}
 .car-lane-chip{flex:none;padding:calc(var(--u)*1) calc(var(--u)*6);border:1px solid #6d5a96;border-radius:calc(var(--u)*6);background:#120d1f;font-size:calc(var(--u)*12);font-weight:900;line-height:1.2}
 .car-lane-head b{max-width:100%;font-size:calc(var(--u)*11);font-weight:800;color:#e9e1fa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .car-lanes{display:flex;border:1.5px solid #4b3a6b;border-radius:calc(var(--u)*10);overflow:hidden;background:rgba(10,8,16,.55)}
-.car-lane{display:grid;place-items:center;width:calc(var(--u)*40);height:calc(var(--u)*54);border-left:2px dashed rgba(200,185,230,.35)}
+.car-lane{display:grid;place-items:center;width:calc(var(--u)*36);height:calc(var(--u)*46);border-left:2px dashed rgba(200,185,230,.35)}
 .car-lane:first-child{border-left:0}
 .car-lane.active{background:rgba(155,77,255,.30)}
-.car-lane svg{width:calc(var(--u)*38);height:calc(var(--u)*38);overflow:visible}
+.car-lane svg{width:calc(var(--u)*34);height:calc(var(--u)*34);overflow:visible}
 .car-lane .on{color:#fff}.car-lane .off{color:#6b6478}
 .car-eta-card{flex-direction:column;align-items:flex-end;justify-content:center;text-align:right;max-width:calc(var(--u)*170)}
-.car-eta{display:block;font-size:calc(var(--u)*28);font-weight:900;letter-spacing:-.03em;line-height:1.05;font-variant-numeric:tabular-nums}
-.car-eta-card>span{display:block;margin-top:calc(var(--u)*2);color:var(--car-muted);font-size:calc(var(--u)*12.5);font-weight:700;white-space:nowrap}
-.car-stop-line{display:block;max-width:100%;margin-top:calc(var(--u)*2);color:var(--car-soft);font-size:calc(var(--u)*11);font-style:normal;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.car-eta{display:block;font-size:calc(var(--u)*25);font-weight:900;letter-spacing:-.03em;line-height:1.05;font-variant-numeric:tabular-nums}
+.car-eta-card>span{display:block;margin-top:calc(var(--u)*2);color:var(--car-muted);font-size:calc(var(--u)*12);font-weight:700;white-space:nowrap}
+.car-stop-line{display:block;max-width:100%;margin-top:calc(var(--u)*1);color:var(--car-soft);font-size:calc(var(--u)*11);font-style:normal;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* rechterkolom: snelheid en muziek */
-.car-speed-card,.car-music-bar{right:calc(var(--gx) + var(--safe-r));width:var(--side)}
-.car-speed-card{top:var(--top);height:calc(var(--u)*104);display:flex;align-items:center;justify-content:center;gap:calc(var(--u)*16)}
-.mair-car-wave-overlay:not(.car-has-nav) .car-speed-card{height:calc(var(--u)*120)}
+.car-speed-card,.car-music-bar{right:var(--er);width:var(--side)}
+.car-speed-card{top:calc(var(--top) + var(--head-h));height:var(--speed-h);display:flex;align-items:center;justify-content:center;gap:calc(var(--u)*16)}
 .car-speed-box{display:flex;flex-direction:column}
-.car-speed{font-size:calc(var(--u)*54);font-weight:900;letter-spacing:-.05em;line-height:.9;font-variant-numeric:tabular-nums;min-width:calc(var(--u)*56)}
+.car-speed{font-size:calc(var(--u)*50);font-weight:900;letter-spacing:-.05em;line-height:.9;font-variant-numeric:tabular-nums;min-width:calc(var(--u)*56)}
 .car-speed.over{color:#ff6d78}
 .car-speed-box small{margin-top:calc(var(--u)*4);color:var(--car-muted);font-size:calc(var(--u)*11);font-weight:800;letter-spacing:.08em}
-.car-limit{flex:none;width:calc(var(--u)*56);height:calc(var(--u)*56);display:grid;place-items:center;border-radius:50%;background:#fff;border:calc(var(--u)*6) solid #d62f3a;color:#111;font-size:calc(var(--u)*22);font-weight:900;letter-spacing:-.04em;box-shadow:0 calc(var(--u)*4) calc(var(--u)*14) rgba(0,0,0,.45)}
-.car-gps-weak{position:absolute;z-index:4;left:calc(var(--gx) + var(--u)*12 + var(--safe-l));top:calc(var(--top) + var(--u)*10);padding:calc(var(--u)*5) calc(var(--u)*12);border-radius:99px;background:rgba(14,12,20,.9);border:1px solid var(--car-line);color:var(--car-muted);font-size:calc(var(--u)*12);font-weight:800;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
-.car-music-bar{top:calc(var(--top) + var(--u)*112);bottom:calc(var(--u)*14);padding:calc(var(--u)*10) calc(var(--u)*12);display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto 1fr;column-gap:calc(var(--u)*10);pointer-events:auto}
-.mair-car-wave-overlay:not(.car-has-nav) .car-music-bar{top:calc(var(--top) + var(--u)*128)}
-.car-artwork{width:calc(var(--u)*52);height:calc(var(--u)*52);object-fit:cover;border-radius:calc(var(--u)*11);background:#121018;box-shadow:0 calc(var(--u)*12) calc(var(--u)*30) rgba(0,0,0,.4)}
+.car-limit{flex:none;width:calc(var(--u)*54);height:calc(var(--u)*54);display:grid;place-items:center;border-radius:50%;background:#fff;border:calc(var(--u)*6) solid #d62f3a;color:#111;font-size:calc(var(--u)*21);font-weight:900;letter-spacing:-.04em;box-shadow:0 calc(var(--u)*4) calc(var(--u)*14) rgba(0,0,0,.45)}
+.car-gps-weak{position:absolute;z-index:4;left:calc(var(--el) + var(--u)*12);top:calc(var(--top) + var(--u)*10);padding:calc(var(--u)*5) calc(var(--u)*12);border-radius:99px;background:rgba(14,12,20,.9);border:1px solid var(--car-line);color:var(--car-muted);font-size:calc(var(--u)*12);font-weight:800;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.car-music-bar{top:calc(var(--top) + var(--head-h) + var(--speed-h) + var(--g));bottom:var(--g);padding:calc(var(--u)*10) calc(var(--u)*10);display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto 1fr;column-gap:calc(var(--u)*10);pointer-events:auto}
+.car-artwork{width:calc(var(--u)*50);height:calc(var(--u)*50);object-fit:cover;border-radius:calc(var(--u)*11);background:#121018;box-shadow:0 calc(var(--u)*12) calc(var(--u)*30) rgba(0,0,0,.4)}
 .car-track-copy{min-width:0;display:flex;flex-direction:column;justify-content:center}
 .car-track-copy h1{margin:0;font-size:calc(var(--u)*16);font-weight:800;letter-spacing:-.04em;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .car-track-copy p{margin:calc(var(--u)*1) 0 0;color:var(--car-muted);font-size:calc(var(--u)*12.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .car-track-progress{height:calc(var(--u)*3);margin-top:calc(var(--u)*5);border-radius:99px;background:#1c1725;overflow:hidden}
 .car-track-progress i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#7f39e3,var(--car-soft))}
-.car-controls{grid-column:1/-1;align-self:end;display:flex;align-items:center;justify-content:center;gap:calc(var(--u)*4)}
-.car-controls button{display:grid;place-items:center;width:calc(var(--u)*58);height:calc(var(--u)*58);padding:0;border:0;background:transparent;color:#fff}
+.car-controls{grid-column:1/-1;align-self:end;display:flex;align-items:center;justify-content:space-between;gap:calc(var(--u)*2)}
+.car-controls button{display:grid;place-items:center;width:calc(var(--u)*48);height:calc(var(--u)*48);padding:0;border:0;background:transparent;color:#fff}
 .car-controls button svg{width:46%;height:46%}
-.car-controls .car-like{width:calc(var(--u)*44);height:calc(var(--u)*44);border:1px solid var(--car-line);border-radius:50%;background:rgba(14,12,20,.8);color:var(--car-soft)}
+.car-controls .car-like{width:calc(var(--u)*42);height:calc(var(--u)*42);border:1px solid var(--car-line);border-radius:50%;background:rgba(14,12,20,.8);color:var(--car-soft)}
 .car-controls .car-like svg{width:52%;height:52%}
-.car-controls .car-play{width:calc(var(--u)*62);height:calc(var(--u)*62);border:3px solid var(--car-purple);border-radius:50%;background:rgba(155,77,255,.1);box-shadow:0 0 calc(var(--u)*22) rgba(155,77,255,.22)}
+.car-controls .car-play{width:calc(var(--u)*56);height:calc(var(--u)*56);border:3px solid var(--car-purple);border-radius:50%;background:rgba(155,77,255,.1);box-shadow:0 0 calc(var(--u)*22) rgba(155,77,255,.22)}
 .car-controls .car-play svg{width:42%;height:42%}
-.car-drive>.car-toast{z-index:8;top:calc(var(--top) + var(--u)*12);bottom:auto;max-width:calc(100vw - var(--side) - var(--u)*90)}
+/* Meldingen: boven alles (behalve het menu), op het rijscherm midden boven in de kaart. Eerder hing .car-toast zonder
+   z-index in de overlay en viel hij achter #carScreen, met alleen wat schemerende tekst onder de muziek. */
+.mair-car-wave-overlay>.car-toast{z-index:8}
+.car-drive>.car-toast,.mair-car-wave-overlay:is([data-screen="drive"],[data-screen="music"])>.car-toast{z-index:8;top:calc(var(--top) + var(--u)*52);bottom:auto;left:calc(var(--el) + var(--mapw)/2);max-width:calc(var(--mapw) - var(--u)*24);padding:calc(var(--u)*10) calc(var(--u)*16);font-size:calc(var(--u)*14);font-weight:700;text-align:center;border-color:rgba(155,77,255,.6)}
+/* de verkeersmelding (mair-traffic-journey-toast.js) viel over de rijstroken in de bovenbalk */
+#mairCarWaveOverlay:is([data-screen="drive"],[data-screen="music"]) .mair-traffic-journey-toast{top:calc(var(--top) + var(--u)*10);left:calc(var(--el) + var(--mapw)/2);max-width:calc(var(--mapw) - var(--u)*24)}
 @media(max-width:760px){.car-lane-head{display:none}}

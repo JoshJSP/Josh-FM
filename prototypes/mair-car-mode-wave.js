@@ -41,7 +41,27 @@ async function ensureLocation({force=false}={}){
     setGeo('granted');render();return s.pos;
   }catch(e){const status=geoStatusOf(e);setGeo(status,GEO_TEXT[status]||GEO_TEXT.error);render();return null}
 }
-async function search(q){q=String(q||'').trim();if(q.length<2)return[];if(!token)throw Error('Mapbox-token ontbreekt.');searchAbort?.abort();searchAbort=new AbortController();const prox=s.pos?`&proximity=${s.pos.longitude},${s.pos.latitude}`:'';const r=await fetch(`https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(q)}&country=nl&language=nl&limit=6${prox}&access_token=${encodeURIComponent(token)}`,{signal:searchAbort.signal});if(!r.ok)throw Error(`Adres zoeken mislukt (${r.status}).`);const d=await r.json();return(d.features||[]).map(f=>{const c=f.geometry?.coordinates||[],p=f.properties||{};return{name:p.name||p.full_address||f.place_name||q,address:p.full_address||p.place_formatted||f.place_name||'',longitude:Number(c[0]),latitude:Number(c[1])}}).filter(x=>Number.isFinite(x.longitude)&&Number.isFinite(x.latitude))}
+// Zoeken op naam van een plek (winkel, restaurant, school) en op adres. Search Box kent plekken; Geocode v6 alleen adressen
+// en blijft de terugval. Een keten (Albert Heijn) geeft met alleen proximity eerst grote steden, dus ook een aanvraag
+// binnen ~20 km rond je positie. Samenvoegen, dubbele eruit, dichtbij eerst.
+const SEARCH_LAT=.18,SEARCH_LON=.29;
+const toItem=(f,q)=>{const c=f.geometry?.coordinates||[],p=f.properties||{};return{id:p.mapbox_id||'',name:p.name||p.full_address||f.place_name||q,address:p.full_address||p.place_formatted||f.place_name||'',longitude:Number(c[0]),latitude:Number(c[1])}};
+async function search(q){
+  q=String(q||'').trim();if(q.length<2)return[];if(!token)throw Error('Mapbox-token ontbreekt.');
+  searchAbort?.abort();searchAbort=new AbortController();const sig=searchAbort.signal,p=s.pos,tk=encodeURIComponent(token),qq=encodeURIComponent(q);
+  const box=`https://api.mapbox.com/search/searchbox/v1/forward?q=${qq}&country=nl&language=nl&limit=8&access_token=${tk}`;
+  const urls=p?[`${box}&proximity=${p.longitude},${p.latitude}`,`${box}&bbox=${p.longitude-SEARCH_LON},${p.latitude-SEARCH_LAT},${p.longitude+SEARCH_LON},${p.latitude+SEARCH_LAT}`]:[box];
+  const got=await Promise.all(urls.map(u=>fetch(u,{signal:sig}).then(r=>r.ok?r.json():null,e=>{if(e?.name==='AbortError')throw e;return null})));
+  const seen=new Set();let items=got.flatMap(d=>(d?.features||[]).map(f=>toItem(f,q))).filter(x=>{const k=x.id||`${x.name}|${x.longitude.toFixed(4)},${x.latitude.toFixed(4)}`;if(!Number.isFinite(x.longitude)||!Number.isFinite(x.latitude)||seen.has(k))return false;seen.add(k);return true});
+  if(!items.length){
+    const prox=p?`&proximity=${p.longitude},${p.latitude}`:'',r=await fetch(`https://api.mapbox.com/search/geocode/v6/forward?q=${qq}&country=nl&language=nl&limit=6${prox}&access_token=${tk}`,{signal:sig});
+    if(!r.ok){if(got.some(Boolean))return[];throw Error(`Zoeken mislukt (${r.status}).`)}
+    items=((await r.json()).features||[]).map(f=>toItem(f,q)).filter(x=>Number.isFinite(x.longitude)&&Number.isFinite(x.latitude))
+  }
+  if(p)for(const x of items)x.km=hav(p,x)/1000;
+  return(p?items.sort((a,b)=>a.km-b.km):items).slice(0,8)
+}
+const resultsHtml=()=>s.searchResults.map((x,i)=>`<button data-result-index="${i}"><b>${esc(x.name)}</b><small>${esc([x.address,Number.isFinite(x.km)?lower(dist(x.km*1000)):''].filter(Boolean).join(' · '))}</small></button>`).join('');
 const routePoints=()=>[s.origin,...s.stops,s.destination].filter(Boolean);
 // Elke aanvraag krijgt een volgnummer: een afgebroken of ingehaalde aanvraag mag niets meer
 // zetten, melden of de laadstatus van een nieuwere aanvraag aanraken. quiet = achtergrond-
@@ -100,18 +120,19 @@ function projectOnRoute(pos,hint){
   const all=windowed(pos,null,null);
   return !w||all.distance<w.distance-30?all:w
 }
-function windowed(pos,from,to){
+// ext: zoveel meter mag de projectie voorbij het einde van de lijn doorlopen (voor een gematchte lijn die achter de auto aan komt).
+function windowed(pos,from,to,line=geom,cum=geomCum,ext=0){
   let best=null;
-  for(let i=1;i<geom.length;i++){
-    if(from!==null&&((geomCum[i]||0)<from||(geomCum[i-1]||0)>to))continue;
-    const a=geom[i-1],b=geom[i];
+  for(let i=1;i<line.length;i++){
+    if(from!==null&&((cum[i]||0)<from||(cum[i-1]||0)>to))continue;
+    const a=line[i-1],b=line[i];
     const mx=111320*Math.cos((a.latitude+b.latitude)/2*Math.PI/180),my=110540;
     const bx=(b.longitude-a.longitude)*mx,by=(b.latitude-a.latitude)*my;
     const px=(pos.longitude-a.longitude)*mx,py=(pos.latitude-a.latitude)*my;
-    const len2=bx*bx+by*by;
-    let u=len2?(px*bx+py*by)/len2:0;if(u<0)u=0;else if(u>1)u=1;
+    const len2=bx*bx+by*by,len=Math.sqrt(len2),top=i===line.length-1&&len?1+ext/len:1;
+    let u=len2?(px*bx+py*by)/len2:0;if(u<0)u=0;else if(u>top)u=top;
     const dx=px-bx*u,dy=py-by*u,d=Math.sqrt(dx*dx+dy*dy);
-    if(!best||d<best.distance-0.5)best={distance:d,index:i,along:(geomCum[i-1]||0)+Math.sqrt(len2)*u};
+    if(!best||d<best.distance-0.5)best={distance:d,index:i,along:(cum[i-1]||0)+len*u,longitude:a.longitude+(b.longitude-a.longitude)*u,latitude:a.latitude+(b.latitude-a.latitude)*u};
   }
   return best;
 }
@@ -135,6 +156,43 @@ function acceptFix(p){
   if(acc>GPS_MAX_ACCURACY){rejectedFixes++;return false}
   if(s.pos&&lastFixAt){const dt=Math.max(0.5,(at-lastFixAt)/1000);if(hav(s.pos,p)/dt>GPS_MAX_JUMP_MPS){rejectedFixes++;return false}}
   lastFixAt=at;return true
+}
+// --- Weergavepositie: de pijl op de weg ---------------------------------------
+// De pijl stond tussen de straten in: de ruwe GPS-fix ligt vaak 10-30 m naast de weg. De navigatie zelf rekent al met de
+// projectie op de route; de pijl en de kaart volgen nu ook een punt op de weg. Met route: op de route. Zonder route:
+// op de lijn die Map Matching van de laatste fixes maakt (die geeft ook de maximumsnelheid). Lukt geen van beide, dan
+// de GPS-fix, licht afgevlakt met de voorspelling uit snelheid en richting: een losse sprong trekt de pijl maar half mee.
+const MATCH_GAP_MS=4000,MATCH_FRESH_MS=15000,MATCH_AHEAD_M=80,TRAIL_MS=60000;
+let disp=null,trail=[],match=null,matchBusy=false,matchLast=0,matches=0;
+const bearingOf=(a,b)=>{const r=x=>x*Math.PI/180,y=Math.sin(r(b.longitude-a.longitude))*Math.cos(r(b.latitude)),x=Math.cos(r(a.latitude))*Math.sin(r(b.latitude))-Math.sin(r(a.latitude))*Math.cos(r(b.latitude))*Math.cos(r(b.longitude-a.longitude));return y||x?(Math.atan2(y,x)*180/Math.PI+360)%360:null};
+const moveBy=(p,m,deg)=>{const r=deg*Math.PI/180;return{longitude:p.longitude+m*Math.sin(r)/(111320*Math.cos(p.latitude*Math.PI/180)),latitude:p.latitude+m*Math.cos(r)/110540}};
+function place(){
+  const p=s.pos;if(!p)return;
+  const now=Date.now(),off=offLimit(p);let q=null,src='gps',brg=null;
+  if(s.routeActive&&s.proj&&s.proj.distance<=off){q=s.proj;src='route'}
+  else if(!s.routeActive&&match&&now-match.at<MATCH_FRESH_MS){const m=windowed(p,null,null,match.line,match.cum,MATCH_AHEAD_M);if(m&&m.distance<=off){q=m;src='match';brg=bearingOf(match.line[m.index-1],match.line[m.index])}}
+  if(!q){
+    q=p;const v=spd,h=Number.isFinite(p.heading)?p.heading:null,dt=disp?(now-disp.at)/1000:99,acc=Number(p.accuracy||0);
+    if(disp&&v!=null&&h!=null&&dt<3&&acc>10){const pre=moveBy(disp,v*dt,h),k=Math.max(.35,10/acc);q={longitude:pre.longitude+k*(p.longitude-pre.longitude),latitude:pre.latitude+k*(p.latitude-pre.latitude)}}
+  }
+  if(brg==null)brg=Number.isFinite(p.heading)?p.heading:disp&&hav(disp,q)>=8?bearingOf(disp,q):disp?.bearing??null;
+  disp={longitude:q.longitude,latitude:q.latitude,src,bearing:brg,at:now}
+}
+// Map Matching zonder route: de laatste fixes (hooguit een minuut, minstens 25 m gereden), elke 4 s één aanvraag.
+function trackFix(p){
+  const now=Date.now();trail.push({longitude:p.longitude,latitude:p.latitude,acc:Number(p.accuracy||0),t:now});
+  trail=trail.filter(x=>now-x.t<TRAIL_MS).slice(-8);
+  if(s.routeActive||!token||!open||matchBusy||now-matchLast<MATCH_GAP_MS||trail.length<3||hav(trail[0],trail.at(-1))<25)return;
+  matchLast=now;matchBusy=true;const pts=trail.slice();
+  const qs=new URLSearchParams({access_token:token,geometries:'geojson',overview:'full',annotations:'maxspeed',tidy:'true',radiuses:pts.map(x=>Math.round(Math.min(50,Math.max(5,x.acc*1.5)))).join(';'),timestamps:pts.map(x=>Math.round(x.t/1000)).join(';')});
+  fetch(`https://api.mapbox.com/matching/v5/mapbox/driving/${pts.map(x=>`${x.longitude.toFixed(6)},${x.latitude.toFixed(6)}`).join(';')}?${qs}`).then(r=>r.ok?r.json():null).then(d=>{
+    if(s.routeActive)return;
+    const m=d?.code==='Ok'?d.matchings?.at(-1):null,c=m?.geometry?.coordinates;
+    if(!m||!d.tracepoints?.at(-1)||!Array.isArray(c)||c.length<2){match=null;return}
+    const line=c.map(x=>({longitude:Number(x[0]),latitude:Number(x[1])})),cum=[0];for(let i=1;i<line.length;i++)cum.push(cum[i-1]+hav(line[i-1],line[i]));
+    const e=(m.legs||[]).flatMap(l=>l?.annotation?.maxspeed||[]).at(-1),v=Number(e?.speed);
+    match={line,cum,at:Date.now(),limit:Number.isFinite(v)&&v>0?Math.round(e.unit==='mph'?v*1.609344:v):null};matches++;place();render()
+  }).catch(()=>{/* geen bereik: de pijl volgt de GPS tot de volgende poging */}).finally(()=>{matchBusy=false})
 }
 // --- Rotondes ---------------------------------------------------------------
 // Mapbox gebruikt spaties in de types: roundabout, rotary, roundabout turn,
@@ -238,7 +296,7 @@ function nearDistance(){
 const STEP_TOL_M=5,WEAK_GPS_MS=20000;
 function updateNav(){
   if(!s.pos)return;
-  if(!s.routeActive||!s.steps.length){render();return}
+  if(!s.routeActive||!s.steps.length){place();render();return}
   s.proj=projectOnRoute(s.pos,s.proj?.along);
   // Stap pas door als het manoeuvrepunt langs de route bereikt of gepasseerd is (kleine
   // tolerantie voor GPS-ruis), en zo nodig meerdere stappen in één keer als twee manoeuvres
@@ -252,11 +310,11 @@ function updateNav(){
   s.near=Number.isFinite(d)&&d<=(v>22?900:v>12?650:450);
   checkArrival();
   if(!routeDone)checkOffRoute();
-  publish();render()
+  place();publish();render()
 }
 // Geen bruikbare fix gedurende WEAK_GPS_MS (tunnel, alles geweigerd door acceptFix): rustige indicator, geen foutmelding.
 let weakTimer=null;
-function watch(){unwatch();if(!navigator.geolocation)return;s.posAt=Date.now();s.weak=false;weakTimer=setInterval(()=>{const w=!!(s.routeActive&&Date.now()-s.posAt>WEAK_GPS_MS);if(w!==s.weak){s.weak=w;render()}},5000);s.watch=navigator.geolocation.watchPosition(p=>{const fix=fixOf(p.coords);feedSpeed(p.coords);if(s.geo.status!=='granted')setGeo('granted');if(!acceptFix(fix))return;s.pos=fix;s.posAt=Date.now();s.weak=false;updateNav()},e=>{const status=geoStatusOf(e);setGeo(status,GEO_TEXT[status]||GEO_TEXT.error);if(status==='denied')s.error=GEO_TEXT.denied;/* timeout/onbeschikbaar: geen foutbalk, de GPS-zwak-indicator dekt dat */render()},{enableHighAccuracy:true,maximumAge:0,timeout:15000})}
+function watch(){unwatch();if(!navigator.geolocation)return;s.posAt=Date.now();s.weak=false;weakTimer=setInterval(()=>{const w=!!(s.routeActive&&Date.now()-s.posAt>WEAK_GPS_MS);if(w!==s.weak){s.weak=w;render()}},5000);s.watch=navigator.geolocation.watchPosition(p=>{const fix=fixOf(p.coords);feedSpeed(p.coords);if(s.geo.status!=='granted')setGeo('granted');if(!acceptFix(fix))return;s.pos=fix;s.posAt=Date.now();s.weak=false;updateNav();trackFix(fix)},e=>{const status=geoStatusOf(e);setGeo(status,GEO_TEXT[status]||GEO_TEXT.error);if(status==='denied')s.error=GEO_TEXT.denied;/* timeout/onbeschikbaar: geen foutbalk, de GPS-zwak-indicator dekt dat */render()},{enableHighAccuracy:true,maximumAge:0,timeout:15000})}
 function unwatch(){if(s.watch!=null&&navigator.geolocation)navigator.geolocation.clearWatch(s.watch);s.watch=null;clearInterval(weakTimer);weakTimer=null;s.weak=false}
 function startRefresh(){stopRefresh();if(!s.routeActive)return;refreshTimer=setInterval(()=>{if(!open||!s.routeActive||document.visibilityState!=='visible'||!s.pos||s.loading||Date.now()-s.posAt>30000)return;s.origin={name:'Huidige locatie',latitude:s.pos.latitude,longitude:s.pos.longitude};route(true,{quiet:true}).catch(()=>{})},120000)}
 function stopRefresh(){if(refreshTimer){clearInterval(refreshTimer);refreshTimer=null}}
@@ -319,7 +377,7 @@ function geoMarkup(){
   const note=!ok&&s.geo.message?`<small>${esc(s.geo.message)}</small>`:'';
   return`<div class="car-geo" data-geo="${esc(st)}"><span>⌖ ${esc(label)}</span>${note}${action}</div>`;
 }
-function searchMarkup(){const rs=s.searchResults.map((x,i)=>`<button data-result-index="${i}"><b>${esc(x.name)}</b><small>${esc(x.address)}</small></button>`).join('');const title=s.searchPurpose==='stop'?'Tussenstop toevoegen':'Waar wil je heen?';return`<section class="car-search"><header><button class="car-back" data-act="searchback">‹</button><div><small>CAR MODE</small><strong>${title}</strong></div></header><label class="car-searchbox"><span>⌕</span><input id="carSearchInput" autocomplete="off" placeholder="Adres of plaats" value="${esc(s.searchQuery)}"></label>${s.error?`<div class="car-search-error">${esc(s.error)}</div>`:''}<div id="carSearchStatus" class="car-search-status"></div><div id="carSearchResults" class="car-search-results">${rs}</div><button class="car-text-action" data-act="music">Verder zonder route</button></section>`}
+function searchMarkup(){const rs=resultsHtml();const title=s.searchPurpose==='stop'?'Tussenstop toevoegen':'Waar wil je heen?';return`<section class="car-search"><header><button class="car-back" data-act="searchback">‹</button><div><small>CAR MODE</small><strong>${title}</strong></div></header><label class="car-searchbox"><span>⌕</span><input id="carSearchInput" autocomplete="off" placeholder="Plek, winkel of adres" value="${esc(s.searchQuery)}"></label>${s.error?`<div class="car-search-error">${esc(s.error)}</div>`:''}<div id="carSearchStatus" class="car-search-status"></div><div id="carSearchResults" class="car-search-results">${rs}</div><button class="car-text-action" data-act="music">Verder zonder route</button></section>`}
 function stopRows(){return s.stops.map((x,i)=>`<div class="car-stop-row"><div><small>TUSSENSTOP ${i+1}</small><b>${esc(x.name)}</b></div><div class="car-stop-actions"><button data-stop-up="${i}" ${i===0?'disabled':''}>↑</button><button data-stop-down="${i}" ${i===s.stops.length-1?'disabled':''}>↓</button><button data-stop-remove="${i}">×</button></div></div>`).join('')}
 function previewMarkup(){const m=metrics();return`<section class="car-preview"><header><button class="car-back" data-act="search">‹</button><div><small>ROUTE</small><strong>${esc(s.destination?.name||'Bestemming')}</strong></div></header><div class="car-preview-card"><div><small>VAN</small><b>Huidige locatie</b></div><div><small>NAAR</small><b>${esc(s.destination?.name||'')}</b></div><div><small>AANKOMST</small><b>${eta(m.duration)}</b></div></div><div class="car-stops-list">${stopRows()}<button class="car-add-stop" data-act="addstop">＋ Tussenstop toevoegen</button></div><div class="car-preview-metrics"><div><small>TIJD</small><b>${dur(m.duration)}</b></div><div><small>AFSTAND</small><b>${dist(m.distance)}</b></div><div><small>VERKEER</small><b>LIVE</b></div></div><button class="car-route-start" data-act="start">ROUTE STARTEN</button></section>`}
 const weakChip=()=>s.weak?'<div class="car-gps-weak">GPS-signaal zwak</div>':'';
@@ -330,6 +388,7 @@ const durShort=x=>{if(!Number.isFinite(x))return'—';const m=Math.max(0,Math.ro
 const kmhNow=()=>spd!=null&&Date.now()-spdAt<10000?Math.round(spd*3.6):null;
 // Maximumsnelheid van het routesegment waar je nu op zit (limits staan gelijk aan de geometrie). Onbekend of "geen" = null.
 function limitNow(){
+  if(!s.routeActive)return match&&Date.now()-match.at<30000?match.limit:null;
   if(!limits.length||!s.proj)return null;
   const e=limits[Math.max(0,Math.min(limits.length-1,s.proj.index-1))],v=Number(e?.speed);
   return Number.isFinite(v)&&v>0?Math.round(e.unit==='mph'?v*1.609344:v):null
@@ -368,7 +427,7 @@ function navCards(){
    +`<aside class="car-speed-card"><div class="car-speed-box"><b class="car-speed${lim&&k>lim?' over':''}">${k??'--'}</b><small>KM/U</small></div>${lim?`<div class="car-limit" aria-label="Maximumsnelheid ${lim}">${lim}</div>`:''}</aside>`
    +weakChip()
 }
-const speedCard=()=>{const k=kmhNow();return`<aside class="car-speed-card"><div class="car-speed-box"><b class="car-speed">${k??'--'}</b><small>KM/U</small></div></aside>`+weakChip()};
+const speedCard=()=>{const k=kmhNow(),lim=limitNow();return`<aside class="car-speed-card"><div class="car-speed-box"><b class="car-speed${lim&&k>lim?' over':''}">${k??'--'}</b><small>KM/U</small></div>${lim?`<div class="car-limit" aria-label="Maximumsnelheid ${lim}">${lim}</div>`:''}</aside>`+weakChip()};
 function driveMarkup(withNav){
   const p=play(),pct=p.duration>0?Math.max(0,Math.min(100,p.progress/p.duration*100)):0;
   const bar=`<div class="car-music-bar"><img class="car-artwork" src="${esc(p.image||'mair-icon-512.png')}" alt=""><div class="car-track-copy"><h1>${esc(p.title)}</h1><p>${esc(p.artist)}</p><div class="car-track-progress"><i style="width:${pct}%"></i></div></div><div class="car-controls"><button type="button" class="car-like" data-like aria-label="Meer van dit">${IC.heart}</button><button type="button" data-tr="prev" aria-label="Vorige">${IC.prev}</button><button type="button" class="car-play" data-tr="play" aria-label="${p.isPlaying?'Pauzeren':'Afspelen'}">${p.isPlaying?IC.pause:IC.play}</button><button type="button" data-tr="next" aria-label="Volgende">${IC.next}</button></div></div>`;
@@ -377,11 +436,8 @@ function driveMarkup(withNav){
 // Kaart: één instantie per sessie (zie mair-car-map.js). Alleen zichtbaar als er een rijdende route is.
 let mapEl=null,mapRoute=null;
 function routeBearing(){
-  if(s.proj&&geom.length>1&&s.proj.distance<=offLimit(s.pos)){
-    const i=Math.max(1,Math.min(geom.length-1,s.proj.index)),a=geom[i-1],b=geom[Math.min(geom.length-1,i+2)],r=x=>x*Math.PI/180,y=Math.sin(r(b.longitude-a.longitude))*Math.cos(r(b.latitude)),x=Math.cos(r(a.latitude))*Math.sin(r(b.latitude))-Math.sin(r(a.latitude))*Math.cos(r(b.latitude))*Math.cos(r(b.longitude-a.longitude));
-    if(y||x)return(Math.atan2(y,x)*180/Math.PI+360)%360
-  }
-  return s.pos?.heading??undefined
+  if(s.proj&&geom.length>1&&s.proj.distance<=offLimit(s.pos)){const i=Math.max(1,Math.min(geom.length-1,s.proj.index)),b=bearingOf(geom[i-1],geom[Math.min(geom.length-1,i+2)]);if(b!=null)return b}
+  return disp?.bearing??s.pos?.heading??undefined
 }
 function syncMap(){
   const M=window.MAIRCarMap;if(!M||!overlay)return;
@@ -393,7 +449,8 @@ function syncMap(){
   if(!M.status().failed)overlay.classList.add('has-map');
   const key=nav?s.route:null,fresh=mapRoute!==key;mapRoute=key;
   M.show({el:mapEl,token,center:s.pos?[s.pos.longitude,s.pos.latitude]:geom[0]?[geom[0].longitude,geom[0].latitude]:undefined,coords:fresh?(nav?geom.map(g=>[g.longitude,g.latitude]):[]):undefined}).then(ok=>{overlay.classList.toggle('has-map',!!ok&&!M.status().failed)});
-  if(s.pos)M.follow({lon:s.pos.longitude,lat:s.pos.latitude,bearing:nav?routeBearing():s.pos.heading??undefined,kmh:s.pos.kmh});
+  const at=disp||s.pos;
+  if(at)M.follow({lon:at.longitude,lat:at.latitude,bearing:nav?routeBearing():disp?.bearing??s.pos?.heading??undefined,kmh:s.pos?.kmh});
   if(nav)M.setProgress?.(progress())
 }
 function menu(){return`<div class="car-menu-backdrop"><section class="car-menu">${s.routeActive?'<button data-act="addstop">Tussenstop toevoegen</button><button data-act="search">Bestemming wijzigen</button><button data-act="waze">Open in Waze</button><button data-act="music">Verder zonder route</button>':'<button data-act="search">Bestemming toevoegen</button>'}<button class="danger" data-act="close">Car Mode sluiten</button><button class="muted" data-act="menuclose">Annuleren</button></section></div>`}
@@ -405,7 +462,7 @@ function openSearch(purpose='destination'){closeMenu();s.searchPurpose=purpose;s
 async function recalcAfterStops(quiet=false){if(!s.origin||!s.destination)return;try{await route(true,{quiet})}catch{}}
 function ensure(){if(overlay)return overlay;overlay=document.createElement('div');overlay.id='mairCarWaveOverlay';overlay.className='mair-car-wave-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');mapEl=document.createElement('div');mapEl.id='carMap';overlay.appendChild(mapEl);screenHost=document.createElement('div');screenHost.id='carScreen';overlay.appendChild(screenHost);document.body.appendChild(overlay);overlay.addEventListener('click',async e=>{const tr=e.target.closest('[data-tr]');if(tr){transport(tr.dataset.tr);return}if(e.target.closest('[data-like]')){like();return}const rr=e.target.closest('[data-recent]');if(rr){const d=recents[Number(rr.dataset.recent)];if(d){s.destination=d;s.error='';await prepare()}return}const up=e.target.closest('[data-stop-up]');if(up){const i=Number(up.dataset.stopUp);if(i>0){[s.stops[i-1],s.stops[i]]=[s.stops[i],s.stops[i-1]];await recalcAfterStops();render()}return}const down=e.target.closest('[data-stop-down]');if(down){const i=Number(down.dataset.stopDown);if(i>=0&&i<s.stops.length-1){[s.stops[i],s.stops[i+1]]=[s.stops[i+1],s.stops[i]];await recalcAfterStops();render()}return}const rem=e.target.closest('[data-stop-remove]');if(rem){s.stops.splice(Number(rem.dataset.stopRemove),1);await recalcAfterStops();render();return}const res=e.target.closest('[data-result-index]');if(res){const d=s.searchResults[Number(res.dataset.resultIndex)];if(d){if(s.searchPurpose==='stop'){s.stops.push({...d});s.error='';if(s.routeActive){s.screen='drive';if(s.pos)s.origin={name:'Huidige locatie',latitude:s.pos.latitude,longitude:s.pos.longitude};await recalcAfterStops()}else{s.screen='preview';await recalcAfterStops()}render()}else{s.destination={...d};s.error='';await prepare()}}return}const a=e.target.closest('[data-act]')?.dataset.act;if(!a)return;if(a!=='menu')closeMenu();if(a==='home'){s.routeActive=false;s.screen='home';unwatch();stopRefresh();publish();render()}else if(a==='search'){openSearch('destination')}else if(a==='searchback'){s.screen=s.destination?'preview':'home';render()}else if(a==='addstop'){openSearch('stop')}else if(a==='music'){s.routeActive=false;s.screen='music';watch();stopRefresh();publish();render()}else if(a==='start'){s.routeActive=true;s.screen='drive';if(s.destination)recents=[s.destination,...recents.filter(x=>x.longitude!==s.destination.longitude||x.latitude!==s.destination.latitude)].slice(0,5);watch();startRefresh();publish();render()}else if(a==='menu'){if(!overlay.querySelector('.car-menu-backdrop'))overlay.insertAdjacentHTML('beforeend',menu())}else if(a==='menuclose')closeMenu();else if(a==='dismiss'){s.error='';render()}else if(a==='locate'){ensureLocation({force:true}).catch(()=>{})}else if(a==='waze'){if(s.destination)location.href=`https://waze.com/ul?ll=${encodeURIComponent(`${s.destination.latitude},${s.destination.longitude}`)}&navigate=yes`}else if(a==='close'){closeMenu();setOpen(false)}});return overlay}
 function closeMenu(){overlay?.querySelector('.car-menu-backdrop')?.remove()}
-function bindSearch(){const input=$('carSearchInput'),out=$('carSearchResults'),status=$('carSearchStatus');if(!input||input.dataset.bound)return;input.dataset.bound='1';input.focus();input.addEventListener('input',()=>{clearTimeout(searchTimer);const q=input.value.trim();s.searchQuery=q;s.error='';if(q.length<2){s.searchResults=[];out.innerHTML='';status.textContent='';return}searchTimer=setTimeout(async()=>{status.textContent='Zoeken…';try{const items=await search(q);if(q!==s.searchQuery)return;s.searchResults=items;status.textContent=items.length?'':'Geen bestemmingen gevonden.';out.innerHTML=items.map((x,i)=>`<button data-result-index="${i}"><b>${esc(x.name)}</b><small>${esc(x.address)}</small></button>`).join('')}catch(e){if(e?.name!=='AbortError')status.textContent=e?.message||'Zoeken mislukt.'}},350)})}
+function bindSearch(){const input=$('carSearchInput'),out=$('carSearchResults'),status=$('carSearchStatus');if(!input||input.dataset.bound)return;input.dataset.bound='1';input.focus();input.addEventListener('input',()=>{clearTimeout(searchTimer);const q=input.value.trim();s.searchQuery=q;s.error='';if(q.length<2){s.searchResults=[];out.innerHTML='';status.textContent='';return}searchTimer=setTimeout(async()=>{status.textContent='Zoeken…';try{const items=await search(q);if(q!==s.searchQuery)return;s.searchResults=items;status.textContent=items.length?'':'Geen bestemmingen gevonden.';out.innerHTML=resultsHtml()}catch(e){if(e?.name!=='AbortError')status.textContent=e?.message||'Zoeken mislukt.'}},350)})}
 async function prepare(){
   // Locatie eerst, en als aparte stap: een geweigerde of trage fix moet een eigen
   // uitleg geven in plaats van te verdwijnen achter "Route voorbereiden mislukt".
@@ -420,7 +477,7 @@ async function prepare(){
 // resultaten en de statusregel worden dan ververst.
 function patchSearch(){
   const out=$('carSearchResults');
-  if(out)out.innerHTML=s.searchResults.map((x,i)=>`<button data-result-index="${i}"><b>${esc(x.name)}</b><small>${esc(x.address)}</small></button>`).join('');
+  if(out)out.innerHTML=resultsHtml();
   const err=overlay?.querySelector('.car-search-error');
   if(err){err.textContent=s.error||'';err.hidden=!s.error}
   return true;
@@ -450,7 +507,10 @@ function mount(key,html){
   if(html===lastHtml)return;lastHtml=html;
   const tpl=document.createElement('template');tpl.innerHTML=html;morphKids(screenHost,tpl.content)
 }
-function render(){ensure();if(!open)return;if(s.screen==='search'&&$('carSearchInput'))return void patchSearch();
+// In de iOS-app (contentInset) laat de webview de veilige zijkanten al vrij, maar env(safe-area-inset-*) telt ze nog een
+// keer: dubbele zwarte randen. Is het venster smaller dan het scherm, dan zijn de zijkanten al vrij.
+const insetByShell=()=>innerWidth<Math.max(screen.width,screen.height)-20;
+function render(){ensure();if(!open)return;overlay.dataset.screen=s.screen;overlay.classList.toggle('car-inset',insetByShell());if(s.screen==='search'&&$('carSearchInput'))return void patchSearch();
   if(s.screen==='home')mount('home',startMarkup());
   else if(s.screen==='search'){mount('search',searchMarkup());queueMicrotask(bindSearch)}
   else if(s.screen==='preview')mount('preview',s.loading?`<section class="car-loading"><b>${esc(s.destination?.name||'Bestemming geselecteerd')}</b><span>GPS en verkeer ophalen…</span></section>`:previewMarkup());
@@ -460,7 +520,7 @@ function render(){ensure();if(!open)return;if(s.screen==='search'&&$('carSearchI
 const wakeSupported=()=>!!navigator.wakeLock?.request;function wakeRetryStart(){if(wakeRetry)clearTimeout(wakeRetry);if(open&&document.visibilityState==='visible'&&wakeSupported())wakeRetry=setTimeout(()=>requestWake(),1500)}async function requestWake(){if(!open||document.visibilityState!=='visible'||!wakeSupported())return false;if(wake&&!wake.released)return true;try{const l=await navigator.wakeLock.request('screen');wake=l;l.addEventListener('release',()=>{if(wake===l)wake=null;wakeRetryStart()},{once:true});return true}catch{wake=null;return false}}async function releaseWake(){if(wakeRetry){clearTimeout(wakeRetry);wakeRetry=null}const l=wake;wake=null;if(l&&!l.released)try{await l.release()}catch{}}
 // Eén lay-out, ook na een update: de stylesheet meldt zijn lay-out via --car-layout. Komt dat niet overeen met
 // deze JS (oude CSS uit een halve cache), dan wordt de CSS één keer vers opgehaald.
-const LAYOUT='c2-20261016';
+const LAYOUT='c2-20261016b';
 function healLayout(){
   try{
     if(getComputedStyle(document.documentElement).getPropertyValue('--car-layout').trim().replace(/"/g,'')===LAYOUT)return;
@@ -468,7 +528,7 @@ function healLayout(){
     if(l&&!l.dataset.healed){l.dataset.healed='1';l.href=l.getAttribute('href').split('?')[0]+'?v='+LAYOUT}
   }catch{/* geen stylesheet-info: onschuldig */}
 }
-function setOpen(v){ensure();open=!!v;overlay.classList.toggle('is-open',open);document.body.classList.toggle('mair-car-mode-open',open);if(open){healLayout();document.body.dataset.mairCarMode='1';s.screen=s.routeActive?'drive':'home';if(s.routeActive){watch();startRefresh()}config().then(render);requestWake();render()}else{delete document.body.dataset.mairCarMode;unwatch();stopRefresh();closeMenu();releaseWake();try{window.MAIRCarMap?.destroy?.()}catch{/* kaart al weg: onschuldig */}mapRoute=null}try{window.dispatchEvent(new CustomEvent('mair:car-mode',{detail:{open}}))}catch{}}
+function setOpen(v){ensure();open=!!v;overlay.classList.toggle('is-open',open);document.body.classList.toggle('mair-car-mode-open',open);if(open){healLayout();document.body.dataset.mairCarMode='1';s.screen=s.routeActive?'drive':'home';if(s.routeActive){watch();startRefresh()}config().then(render);requestWake();render()}else{delete document.body.dataset.mairCarMode;unwatch();stopRefresh();closeMenu();releaseWake();try{window.MAIRCarMap?.destroy?.()}catch{/* kaart al weg: onschuldig */}mapRoute=null;disp=null;trail=[];match=null}try{window.dispatchEvent(new CustomEvent('mair:car-mode',{detail:{open}}))}catch{}}
 document.addEventListener('keydown',e=>{if(open&&e.key==='Escape')setOpen(false)});document.addEventListener('visibilitychange',()=>{if(!open)return;document.visibilityState==='visible'?requestWake():releaseWake()});window.addEventListener('pageshow',()=>{if(open)requestWake()});window.addEventListener('pagehide',()=>releaseWake());['jfm:trackchange','jfm:playback-state','jfm:upcoming-invalidated','mair:director-replanned','mair:channelchange'].forEach(n=>window.addEventListener(n,()=>{if(open)render()}));
-window.MAIRCarModePrototype={version:'journey-nav-v7-c2-2026-10-16',open:()=>setOpen(true),close:()=>setOpen(false),toggle:()=>setOpen(!open),render,chooseDestination:()=>openSearch('destination'),addStop:()=>openSearch('stop'),status:()=>({open,screen:s.screen,routeActive:s.routeActive,destination:s.destination,stops:s.stops.slice(),wakeLockSupported:wakeSupported(),wakeLockActive:!!(wake&&!wake.released),geo:{...s.geo},hasPosition:!!s.pos,legMetrics:legMetric(),kmh:kmhNow(),limit:limitNow(),lanes:(bannerNow()?.sub?.components||[]).filter(x=>x?.type==='lane').length,rem:nearDistance(),stepIndex:s.step,layout:LAYOUT,map:window.MAIRCarMap?.status?.()||null,journey:window.MAIRJourneyContext||null}),requestLocation:()=>ensureLocation({force:true}),maneuverKind,arrowSvg};
+window.MAIRCarModePrototype={version:'journey-nav-v8-c2-2026-10-16',open:()=>setOpen(true),close:()=>setOpen(false),toggle:()=>setOpen(!open),render,chooseDestination:()=>openSearch('destination'),addStop:()=>openSearch('stop'),status:()=>({open,screen:s.screen,routeActive:s.routeActive,destination:s.destination,stops:s.stops.slice(),wakeLockSupported:wakeSupported(),wakeLockActive:!!(wake&&!wake.released),geo:{...s.geo},hasPosition:!!s.pos,legMetrics:legMetric(),kmh:kmhNow(),limit:limitNow(),lanes:(bannerNow()?.sub?.components||[]).filter(x=>x?.type==='lane').length,rem:nearDistance(),stepIndex:s.step,layout:LAYOUT,display:disp?{...disp}:null,matches,map:window.MAIRCarMap?.status?.()||null,journey:window.MAIRJourneyContext||null}),requestLocation:()=>ensureLocation({force:true}),toast,maneuverKind,arrowSvg};
 })();

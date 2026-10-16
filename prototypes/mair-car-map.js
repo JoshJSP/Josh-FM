@@ -2,12 +2,15 @@
 // - mapbox-gl komt uit vendor/mapbox-gl (CSP: script-src 'self') en wordt pas geladen als het rijscherm open is.
 // - Eén kaart per Car Mode-sessie: hide() verbergt hem alleen, destroy() (Car Mode dicht) ruimt hem op.
 //   Elke `new Map` telt als een betaalde kaartlading bij Mapbox, dus nooit opnieuw opbouwen tijdens het rijden.
+//   Eén uitzondering: de WebGL-context is kwijt en komt niet terug (iOS in de achtergrond). Dan is de kaart zwart
+//   en is opnieuw opbouwen de enige weg terug.
 // - Valt de kaart uit (geen token, geen netwerk, geen WebGL), dan blijft de rest van Car Mode gewoon werken.
 (()=>{
 'use strict';
 if(window.MAIRCarMap)return;
-const BASE='vendor/mapbox-gl/',STYLE='mapbox://styles/mapbox/navigation-night-v1',PITCH=55;
-let libP=null,creating=null,map=null,host=null,puck=null,ready=false,failed='',loads=0,route=null,cam=null,shown=false;
+const BASE='vendor/mapbox-gl/',STYLE='mapbox://styles/mapbox/navigation-night-v1',PITCH=55,FREE_MS=6000,LOST_MS=3000;
+let libP=null,creating=null,map=null,host=null,puck=null,back=null,ready=false,failed='',loads=0,route=null,cam=null,shown=false,tok='';
+let free=false,freeTimer=null,lost=false,lostTimer=null,rebuilds=0,tileReloads=0,reloadTimer=null,reloadAt=0,hiddenAt=0;
 function loadLib(){
   if(libP)return libP;
   libP=new Promise((ok,no)=>{
@@ -22,13 +25,20 @@ function loadLib(){
 }
 // De pijl staat vast op het punt waar de camera naartoe kijkt (padding), de kaart draait eromheen.
 const PUCK='<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6 54 54 32 44 10 54z" fill="#fff" stroke="#9b4dff" stroke-width="4" stroke-linejoin="round"/></svg>';
-// Niets ligt over het kaartvak: de pijl staat midden, op ~70% van de hoogte, zodat je vooral de weg vóór je ziet.
-const pad=()=>{const h=host.clientHeight;return{left:0,top:Math.round(h*.45),bottom:Math.round(h*.05),right:0}};
+// De pijl staat vast midden onder in het kaartvak (75% van de hoogte), zodat je vooral de weg vóór je ziet.
+const pad=()=>{const h=host.clientHeight;return{left:0,top:Math.round(h*.55),bottom:Math.round(h*.05),right:0}};
 function placePuck(){if(!host||!puck)return;const w=host.clientWidth,h=host.clientHeight,p=pad();puck.style.left=(p.left+(w-p.left-p.right)/2)+'px';puck.style.top=(p.top+(h-p.top-p.bottom)/2)+'px'}
+// De route ligt boven alle wegen, ook bruggen en kruisingen; alleen tekst en iconen mogen erboven. De stijl heeft
+// al vroeg symbol-lagen (eenrichtingspijlen) met daarna nog weg- en bruglagen, dus: na de laatste niet-symbol-laag.
+function labelsFrom(){
+  const ls=map.getStyle().layers||[];let last=-1;
+  ls.forEach((l,i)=>{if(l.type!=='symbol'&&!/^car-route/.test(l.id))last=i});
+  return ls.slice(last+1).find(l=>l.type==='symbol')?.id
+}
 function addLayers(){
   if(!map||map.getSource('car-route'))return;
   map.addSource('car-route',{type:'geojson',lineMetrics:true,data:{type:'Feature',geometry:{type:'LineString',coordinates:route||[]}}});
-  const before=(map.getStyle().layers||[]).find(l=>l.type==='symbol')?.id;
+  const before=labelsFrom();
   // Route: dikke lichtpaarse lijn met donkere rand, de enige gekleurde lijn op de kaart. De verkeerslagen van de
   // navigatiestijl kleuren elke weg groen/oranje en verstopten de route, dus die gaan uit. Het gereden stuk vervaagt.
   for(const l of map.getStyle().layers||[])if(/traffic|congestion/i.test(l.id))map.setLayoutProperty(l.id,'visibility','none');
@@ -44,25 +54,62 @@ async function show({el,token,center,coords}){
   if(map){if(ready&&!was){map.resize();placePuck()}return true}
   if(!el||!token||failed)return false;
   if(creating)return creating;
-  host=el;
+  host=el;tok=token;
   creating=create(el,token,center).finally(()=>{creating=null});
   return creating
 }
+// Wegschuiven en zoomen mag. Dan volgt de kaart even niet, verschijnt "Terug" en na FREE_MS gaat hij vanzelf terug.
+function release(e){if(!e?.originalEvent)return;free=true;if(back)back.hidden=false;clearTimeout(freeTimer);freeTimer=setTimeout(recenter,FREE_MS)}
+function recenter(){clearTimeout(freeTimer);free=false;if(back)back.hidden=true;if(cam)follow(cam)}
 async function create(el,token,center){
   try{
     const gl=await loadLib();if(!shown)return false;
     if(map)return true;
     gl.accessToken=token;loads++;
-    map=new gl.Map({container:el,style:STYLE,center:center||[5.1,52.1],zoom:15,pitch:PITCH,bearing:0,interactive:false,attributionControl:false,fadeDuration:0,maxPitch:60,localIdeographFontFamily:false});
+    map=new gl.Map({container:el,style:STYLE,center:center||[5.1,52.1],zoom:15,pitch:PITCH,bearing:0,interactive:true,dragRotate:false,pitchWithRotate:false,keyboard:false,doubleClickZoom:false,touchPitch:false,attributionControl:false,fadeDuration:0,maxPitch:60,localIdeographFontFamily:false});
+    map.touchZoomRotate.disableRotation();
     map.addControl(new gl.AttributionControl({compact:true}),'bottom-right');
     puck=document.createElement('div');puck.className='car-map-puck';puck.innerHTML=PUCK;el.appendChild(puck);placePuck();
+    back=document.createElement('button');back.type='button';back.className='car-map-back';back.hidden=true;back.textContent='⌖ Terug';back.setAttribute('aria-label','Kaart terug naar je positie');
+    back.addEventListener('click',e=>{e.stopPropagation();recenter()});el.appendChild(back);
+    for(const n of ['dragstart','drag','zoomstart','dragend','zoomend'])map.on(n,release);
     map.on('style.load',()=>{ready=true;map.resize();addLayers();if(cam)follow(cam);placePuck()});
-    map.on('error',e=>{const m=String(e?.error?.message||e?.message||'');if(!ready&&/style|401|403|access token|webgl/i.test(m))failed=m.slice(0,120)||'kaartfout'});
+    map.on('error',e=>{const m=String(e?.error?.message||e?.message||'');if(!ready&&/style|401|403|access token|webgl/i.test(m))failed=m.slice(0,120)||'kaartfout';else if(ready&&e?.sourceId&&!/^car-/.test(e.sourceId))reloadTiles()});
+    // Mapbox herstelt een teruggegeven context zelf. Komt hij niet terug, dan blijft de kaart zwart: opnieuw opbouwen.
+    map.on('webglcontextlost',()=>{lost=true;clearTimeout(lostTimer);lostTimer=setTimeout(()=>{if(lost&&document.visibilityState==='visible')rebuild()},LOST_MS)});
+    map.on('webglcontextrestored',()=>{lost=false;clearTimeout(lostTimer);try{map.triggerRepaint()}catch{/* kaart al weg: onschuldig */}});
     // Het kaartvak wordt groter of kleiner (bovenbalk weg/terug, draaien): kaart en pijl lopen mee.
-    new ResizeObserver(()=>{if(map&&ready){map.resize();placePuck();if(cam)follow(cam)}}).observe(el);
+    new ResizeObserver(()=>{if(map&&ready){map.resize();placePuck();if(cam&&!free)follow(cam)}}).observe(el);
     return true
   }catch(e){failed=String(e?.message||e).slice(0,120);return false}
 }
+// Zwarte kaart: alles weg en opnieuw, met dezelfde route, voortgang en camera.
+function rebuild(){
+  if(!host||!tok||!shown)return;
+  const el=host;clearTimeout(lostTimer);lost=false;rebuilds++;
+  try{map?.remove?.()}catch{/* context al weg: onschuldig */}
+  map=null;ready=false;puck=null;back=null;free=false;el.textContent='';
+  creating=create(el,tok,cam?[cam.lon,cam.lat]:undefined).finally(()=>{creating=null})
+}
+// Tegels die mislukten (geen bereik) blijven anders leeg. Even later alle tegels opnieuw ophalen, hooguit eens per 15 s.
+function reloadTiles(){
+  if(reloadTimer)return;
+  reloadTimer=setTimeout(()=>{
+    reloadTimer=null;if(!map||!ready)return;
+    if(!navigator.onLine)return void window.addEventListener('online',reloadTiles,{once:true});
+    if(Date.now()-reloadAt<15000)return void reloadTiles();
+    reloadAt=Date.now();tileReloads++;
+    for(const id of Object.keys(map.getStyle().sources||{}))if(!/^car-/.test(id))try{map.getSource(id)?.reload?.()}catch{/* bron zonder reload: onschuldig */}
+  },4000)
+}
+const glLost=()=>{try{const c=map?.getCanvas?.(),g=c&&(c.getContext('webgl2')||c.getContext('webgl'));return!!g&&g.isContextLost()}catch{return false}};
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible'){hiddenAt=Date.now();return}
+  if(!map||!shown)return;
+  if(lost||glLost()){lost=true;clearTimeout(lostTimer);lostTimer=setTimeout(()=>{if(lost)rebuild()},1000);return}
+  try{map.resize();map.triggerRepaint()}catch{/* kaart al weg: onschuldig */}
+  if(hiddenAt&&Date.now()-hiddenAt>60000)reloadTiles()
+});
 let progressNow=0;
 function setProgress(f){
   progressNow=Math.max(0,Math.min(.999,Number(f)||0));
@@ -77,10 +124,10 @@ function setRoute(coords){
 const zoomFor=kmh=>!Number.isFinite(kmh)||kmh<25?16.2:kmh<60?15.6:kmh<95?15:14.4;
 function follow({lon,lat,bearing,kmh}){
   cam={lon,lat,bearing,kmh};
-  if(!map||!ready||!shown||!Number.isFinite(lon)||!Number.isFinite(lat))return;
+  if(free||!map||!ready||!shown||!Number.isFinite(lon)||!Number.isFinite(lat))return;
   map.easeTo({center:[lon,lat],bearing:Number.isFinite(bearing)?bearing:map.getBearing(),zoom:zoomFor(kmh),pitch:PITCH,padding:pad(),duration:900,easing:t=>t,essential:true})
 }
 function hide(){shown=false;try{map?.stop?.()}catch{/* kaart al weg: onschuldig */}}
-function destroy(){shown=false;progressNow=0;ready=false;cam=null;route=null;try{map?.remove?.()}catch{/* kaart al weg: onschuldig */}map=null;puck=null;if(host)host.textContent='';host=null}
-window.MAIRCarMap={show,hide,destroy,follow,setRoute,setProgress,project:(lon,lat)=>{try{return map&&ready?map.project([lon,lat]):null}catch{return null}},puckAt:()=>puck?{x:puck.offsetLeft+puck.offsetWidth/2,y:puck.offsetTop+puck.offsetHeight/2}:null,status:()=>({created:!!map,ready,shown,failed,loads,bearing:map&&ready?map.getBearing():null,zoom:map&&ready?map.getZoom():null,hasRoute:!!(route&&route.length),routeLayers:map&&ready?['car-route-done','car-route-glow','car-route-casing','car-route-line'].filter(id=>map.getLayer(id)).length:0})};
+function destroy(){shown=false;progressNow=0;ready=false;cam=null;route=null;free=false;lost=false;clearTimeout(freeTimer);clearTimeout(lostTimer);clearTimeout(reloadTimer);reloadTimer=null;try{map?.remove?.()}catch{/* kaart al weg: onschuldig */}map=null;puck=null;back=null;if(host)host.textContent='';host=null}
+window.MAIRCarMap={show,hide,destroy,follow,setRoute,setProgress,recenter,project:(lon,lat)=>{try{return map&&ready?map.project([lon,lat]):null}catch{return null}},puckAt:()=>puck?{x:puck.offsetLeft+puck.offsetWidth/2,y:puck.offsetTop+puck.offsetHeight/2}:null,status:()=>({created:!!map,ready,shown,failed,loads,free,lost,rebuilds,tileReloads,tilesLoaded:map&&ready?map.areTilesLoaded():null,bearing:map&&ready?map.getBearing():null,zoom:map&&ready?map.getZoom():null,hasRoute:!!(route&&route.length),layers:map&&ready?(map.getStyle().layers||[]).map(l=>l.id):[],routeLayers:map&&ready?['car-route-done','car-route-glow','car-route-casing','car-route-line'].filter(id=>map.getLayer(id)).length:0})};
 })();
