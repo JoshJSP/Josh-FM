@@ -424,7 +424,8 @@ async function scenarioNativeSession(){
     r=await sess(h.page);
     c.ok('native: refresh na meer dan 24 uur blijft ingelogd',r.refresh&&r.token.startsWith('mock-token-')&&r.setupHidden,JSON.stringify(r));
     // invalid_grant op de actuele token is een echte uitlog en wist ook native.
-    await expire(h.page);await h.page.evaluate(()=>{localStorage.__mock_token_mode='invalid_grant'});await reopen(h.page);await sleep(3500);
+    // Nieuw sinds de stille her-koppeling: een reload zou hier door de redirect naar Spotify worden onderbroken, dus we laten de app in dezelfde pagina verversen (authorize wordt met 204 afgevangen).
+    authNavs(h.page);await h.page.evaluate(async()=>{localStorage.__mock_token_mode='invalid_grant';window.JFMAuth.invalidateAccessToken();await window.connectSession()});await sleep(1500);
     r=await sess(h.page);b=await nativeBlob(h.page);
     c.ok('native: invalid_grant wist de sessie ook in de native opslag',!r.refresh&&!b,JSON.stringify({r,b}));
     noErrors('native: geen page errors',h);
@@ -460,12 +461,46 @@ async function scenarioSessionNetworkError(){
     noErrors('sessie: geen page errors bij netwerkfout',h);
   }finally{await h.close()}
 }
+// Navigaties naar Spotify's authorize-pagina (stille her-koppeling); wordt met 204 beantwoord, zodat de pagina blijft staan (een afgebroken navigatie zou een foutpagina geven).
+const authNavs=page=>{const n=[];page.route(/^https:\/\/accounts\.spotify\.com\/authorize/,r=>r.fulfill({status:204,body:''}));page.on('request',r=>{if(r.isNavigationRequest()&&/^https:\/\/accounts\.spotify\.com\/authorize/.test(r.url()))n.push(r.url())});return n};
+const carMode=(page,open)=>page.evaluate(o=>{if(o)document.body.dataset.mairCarMode='1';else delete document.body.dataset.mairCarMode;window.dispatchEvent(new CustomEvent('mair:car-mode',{detail:{open:o}}))},open);
 async function scenarioSessionInvalidGrant(){
-  const h=await launch({trackMs:30000});
+  // (a) buiten Car Mode: invalid_grant wist de sessie en start een stille her-koppeling (zelfde PKCE-login, zelfde redirect_uri).
+  let h=await launch({trackMs:30000});
   try{
-    await boot(h);await expire(h.page);await h.page.evaluate(()=>{localStorage.__mock_token_mode='invalid_grant'});await reopen(h.page);await sleep(3500);
+    const navs=authNavs(h.page);
+    await boot(h);await h.page.evaluate(async()=>{localStorage.__mock_token_mode='invalid_grant';window.JFMAuth.invalidateAccessToken();await window.connectSession()});await sleep(1500);
     const r=await sess(h.page);
-    c.ok('sessie: invalid_grant is wél een echte uitlog (refresh-token weg, inlogscherm terug)',!r.refresh&&!r.setupHidden,JSON.stringify(r));
+    c.ok('sessie: invalid_grant is wél een echte uitlog (refresh-token weg); het inlogscherm blijft het vangnet',!r.refresh&&!r.setupHidden,JSON.stringify(r));
+    c.ok('sessie: invalid_grant buiten Car Mode start een stille her-koppeling naar accounts.spotify.com/authorize',navs.length===1&&/redirect_uri=/.test(navs[0])&&/code_challenge_method=S256/.test(navs[0]),navs.join(' | '));
+    const st=await h.page.evaluate(()=>JSON.parse(localStorage.getItem('jfm_silent_relink_v1')||'null'));
+    c.ok('sessie: teller jfm_silent_relink_v1 bijgehouden',st&&st.count===1&&Date.now()-st.at<60000,JSON.stringify(st));
+  }finally{await h.close()}
+  // (b) Car Mode open: geen redirect; pas als Car Mode dicht gaat.
+  h=await launch({trackMs:30000});
+  try{
+    const navs=authNavs(h.page);
+    await boot(h);await carMode(h.page,true);await h.page.evaluate(()=>{localStorage.__mock_token_mode='invalid_grant';window.JFMAuth.invalidateAccessToken()});
+    const out=await h.page.evaluate(async()=>{try{await window.JFMAuth.ensure();return 'ok'}catch(e){return e.message}});await sleep(1500);
+    c.ok('sessie: invalid_grant in Car Mode geeft geen redirect',navs.length===0&&/verlopen/.test(out),out+' | '+navs.join(' | '));
+    await carMode(h.page,false);await sleep(1500);
+    c.ok('sessie: Car Mode dicht, dan pas de stille her-koppeling',navs.length===1,navs.join(' | '));
+  }finally{await h.close()}
+  // (c) tweede invalid_grant binnen 30 min: geen tweede redirect, gewoon inlogscherm.
+  h=await launch({trackMs:30000});
+  try{
+    const navs=authNavs(h.page);
+    await boot(h);await h.page.evaluate(()=>{localStorage.jfm_silent_relink_v1=JSON.stringify({at:Date.now()-60000,count:1})});
+    await h.page.evaluate(async()=>{localStorage.__mock_token_mode='invalid_grant';window.JFMAuth.invalidateAccessToken();await window.connectSession()});await sleep(1500);
+    const r=await sess(h.page);
+    c.ok('sessie: tweede invalid_grant binnen 30 min geeft geen nieuwe redirect maar het inlogscherm',navs.length===0&&!r.refresh&&!r.setupHidden,JSON.stringify(r)+' | '+navs.join(' | '));
+  }finally{await h.close()}
+  // (d) bewust uitloggen start nooit een stille her-koppeling (ook niet als er daarna invalid_grant komt).
+  h=await launch({trackMs:30000});
+  try{
+    const navs=authNavs(h.page);
+    await boot(h);await h.page.evaluate(()=>{localStorage.__mock_token_mode='invalid_grant';window.logout()});await sleep(1500);
+    c.ok('sessie: uitloggen start geen stille her-koppeling',navs.length===0&&!(await sess(h.page)).refresh,navs.join(' | '));
   }finally{await h.close()}
 }
 async function scenarioSessionOtherTab(){
