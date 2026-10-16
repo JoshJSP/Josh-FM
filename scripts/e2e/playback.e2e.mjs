@@ -223,7 +223,7 @@ async function scenarioTokenRefresh(){
 // Echte Spotify kan dit anders afhandelen (autoplay). Daarom opt-in en op een echt toestel natrekken.
 async function scenarioSoak(){
   const h=await launch({trackMs:3200});
-  await h.page.addInitScript(()=>{window.__mock.rolling=true});
+  await h.page.addInitScript(()=>{window.__mock.rolling=true;localStorage.setItem('mair_dj_enabled_v1','0')}); // DJ uit: een break (pauze, praten, verder) is anders een geplande stilte van ~4 s en telt als stilvallen
   try{
     await startStation(h);
     const played=[];let stalled=0;
