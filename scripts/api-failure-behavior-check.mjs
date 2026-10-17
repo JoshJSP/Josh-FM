@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {withAI,primeAIGuard} from './_ai-guard-test.mjs';
-import tts from '../api/tts.js';
+import tts,{sayText} from '../api/tts.js';
 import writer from '../api/dj-writer.js';
 
 const originalFetch=globalThis.fetch,originalWebSocket=globalThis.WebSocket;
@@ -16,6 +16,9 @@ await primeAIGuard();
 function fishResponse(body,{status=200,type='audio/mpeg'}={}){const data=Buffer.isBuffer(body)?body:Buffer.from(String(body));return{ok:status>=200&&status<300,status,headers:{get:name=>name.toLowerCase()==='content-type'?type:null},text:async()=>data.toString(),arrayBuffer:async()=>data}}
 function writerBody(id='api-test'){return{breakId:id,breakType:'FORWARD_ANNOUNCE',targetWords:16,energy:'NORMAL',context:{schemaVersion:'1.0.0',break:{breakType:'FORWARD_ANNOUNCE',targetWords:16,maxDurationSeconds:10,energy:'NORMAL',mustMention:[],permittedTopics:['music'],prohibitedTopics:[]},onAir:{previous:{id:'a',name:'Eerste',artists:['Artiest A']},next:{id:'b',name:'Tweede',artists:['Artiest B']},future:[],relationship:null},session:{station:'MAIR',localTime:'10:15',day:'woensdag',daypart:'ochtend',durationMinutes:20,narrative:{}},memory:{revision:0,recentBreaks:[],usedFactIds:[]},allowedFacts:[],doNot:[]}}}
 function restoreEnv(){for(const key of Object.keys(process.env))if(!(key in originalEnv))delete process.env[key];Object.assign(process.env,originalEnv)}
+
+// Uitspraaklijst: alleen hele woorden, voor Edge en Fish.
+assert.equal(sayText('Froukje met Davina Michelle en S10.'),'Frauwkje met Davina Missjel en Es-tien.');assert.equal(sayText('Froukjes S100'),'Froukjes S100');
 
 try{
   delete process.env.FISH_AUDIO_API_KEY;
