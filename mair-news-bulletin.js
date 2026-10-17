@@ -18,9 +18,9 @@ const truth=()=>window.JFMPlaybackState?.get?.()||null;
 const AMS=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Amsterdam',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 function ams(date=clock()){const p=Object.fromEntries(AMS.formatToParts(new Date(date)).map(x=>[x.type,x.value]));return{date:`${p.year}-${p.month}-${p.day}`,hour:p.hour,minute:Number(p.minute)}}
 function hourSlot(date=clock()){const a=ams(date);return`${a.date}T${a.hour}`}
-// Voorbereiden mag alleen vlak na het hele uur. Uitzenden mag het hele uur door: valt het uur midden in een
-// nummer, dan komt het nieuws na dat nummer, ook als dat pas na minuut 12 eindigt. Overslaan was de oude fout.
 function withinWindow(date=clock()){return ams(date).minute<=GRACE_MINUTE}
+// Hierboven: voorbereiden mag alleen vlak na het hele uur. Uitzenden mag het hele uur door: valt het uur midden in een
+// nummer, dan komt het nieuws na dat nummer, ook als dat pas na minuut 12 eindigt. Overslaan was de oude fout.
 function due(){return !!prepared&&enabled()&&prepared.slot===hourSlot()&&!alreadyAired(prepared.slot)}
 function alreadyAired(slot=hourSlot()){return localStorage.getItem(LAST_SLOT)===slot}
 function safeText(x=''){return String(x||'').replace(/\s+/g,' ').trim()}
