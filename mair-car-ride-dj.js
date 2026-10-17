@@ -39,7 +39,9 @@ function line({destination,duration,track,change}){
   const song=track?.name?` en we beginnen met ${track.name}${artists(track)?` van ${artists(track)}`:''}`:'';
   return`We zijn onderweg naar ${where}, de rit duurt ongeveer ${dur}${song}.`;
 }
-function someoneTalking(){const d=window.MAIRDJ?.diagnostics?.()||{},lock=window.MAIRAudioTransitionLock;return!!(window.MAIRDJ?.busy||['HANDOFF','SPEAKING','RESTORING'].includes(d.phase)||window.MAIRNewsBulletin?.airing||window.MAIRNewsBulletin?.due?.()||lock?.breakId)}
+// Uurnieuws dat klaarstaat houdt de ritstart niet tegen (keuze van Josh, 17-10-2026): het wacht op de lock
+// en komt pas na het eerste ritnummer, want het nieuws airt alleen bij een natuurlijk einde.
+function someoneTalking(){const d=window.MAIRDJ?.diagnostics?.()||{},lock=window.MAIRAudioTransitionLock;return!!(window.MAIRDJ?.busy||['HANDOFF','SPEAKING','RESTORING'].includes(d.phase)||window.MAIRNewsBulletin?.airing||lock?.breakId)}
 // Het eerste nummer van de rit: wat na het lopende nummer in de wachtrij staat nadat de journey-director herplande.
 function waitReplan(){return new Promise(res=>{const done=()=>{clearTimeout(t);removeEventListener('mair:director-replanned',on);res()},on=e=>{if(/journey/.test(String(e.detail?.reason||'')))done()},t=setTimeout(done,REPLAN_WAIT_MS);addEventListener('mair:director-replanned',on)})}
 function firstRideTrack(){const q=window.JFMQueue?.current?.()||[],id=String(truth()?.trackId||''),i=q.findIndex(t=>t?.id===id);return q[i+1]||null}

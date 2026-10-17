@@ -940,6 +940,12 @@ async function scenarioRideIntro(){
     await sleep(2500);
     c.ok('DJ of nieuws al bezig: geen tweede stem',(await page.evaluate(()=>window.__said)).length===n0);
     await page.evaluate(()=>{window.MAIRAudioTransitionLock=null});
+    // uurnieuws staat klaar (minuut 0-12): de ritstart gaat voor, het nieuws airt niet tegelijk (Josh 17-10-2026)
+    await page.evaluate(()=>{const N=window.MAIRNewsBulletin;window.__newsDue=N?.due;if(N)N.due=()=>true;window.__newsDuring=false;const o=window.speakText;window.speakText=async(...a)=>{if(window.MAIRNewsBulletin?.airing)window.__newsDuring=true;return o(...a)};dispatchEvent(new CustomEvent('mair:car-route-start',{detail:{destination:{name:'Nog verder',address:'Dijk 2, 8888 AA Leeuwarden',latitude:53.1,longitude:5.8},duration:900,change:true}}))});
+    await until(page,()=>window.__intros.length>=3,null,20000,'ritstart terwijl het nieuws klaarstaat');
+    await until(page,()=>window.__mock.playing,null,10000,'muziek weer aan');
+    c.ok('nieuws staat klaar: ritstart gaat toch, nieuws praat er niet doorheen',(await page.evaluate(()=>window.__said)).length===n0+1&&!(await page.evaluate(()=>window.__newsDuring)));
+    await page.evaluate(()=>{if(window.MAIRNewsBulletin)window.MAIRNewsBulletin.due=window.__newsDue});
     c.ok('ritstart: muziek speelt aan het eind',await page.evaluate(()=>window.__mock.playing));
     c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
   }finally{await h.close()}
