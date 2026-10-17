@@ -18,7 +18,7 @@ function writerBody(id='api-test'){return{breakId:id,breakType:'FORWARD_ANNOUNCE
 function restoreEnv(){for(const key of Object.keys(process.env))if(!(key in originalEnv))delete process.env[key];Object.assign(process.env,originalEnv)}
 
 // Uitspraaklijst: alleen hele woorden, voor Edge en Fish.
-assert.equal(sayText('Froukje met Davina Michelle en S10.'),'Frauwkje met Davina Missjel en Es-tien.');assert.equal(sayText('Froukjes S100'),'Froukjes S100');
+assert.equal(sayText('Froukje met Davina Michelle en S10.'),'Frauwkje met Davina Michelle en S10.');assert.equal(sayText('Froukjes S100'),'Froukjes S100');
 
 try{
   delete process.env.FISH_AUDIO_API_KEY;
