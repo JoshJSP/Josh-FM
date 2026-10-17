@@ -132,7 +132,8 @@ async function air(expectedTrackId='',pack=prepared,{rewind=true}={}){
 async function naturalTransition(detail={}){
   const endedId=String(detail.endedTrackId||''),newId=String(detail.newTrackId||'');if(!endedId||!newId)return false;const sig=`${endedId}>${newId}`;if(sig===lastNaturalSig)return false;lastNaturalSig=sig;setTimeout(()=>{if(lastNaturalSig===sig)lastNaturalSig=''},2500);if(busy)return false;
   if(manualArmed){const pack=prepared;if(pack&&pack.manual&&pack.originTrackId===endedId)return air(newId,pack,{rewind:true});memory()?.observeTrack?.({id:newId,name:newId,artists:[]},'NATURAL_END');return rebasePreparation(newId,{manual:true,reason:'manual-preparation-late'})}
-  if(prepared&&!prepared.manual&&prepared.originTrackId===endedId){if(skipNextBreak){skipNextBreak=false;miss('break-skipped-by-user');return false}return air(newId,prepared,{rewind:true})}
+  // Het uurjournaal gaat voor: staat het klaar voor dit uur, dan praat de DJ deze overgang niet (anders schoof het nieuws een nummer op).
+  if(prepared&&!prepared.manual&&prepared.originTrackId===endedId){if(skipNextBreak){skipNextBreak=false;miss('break-skipped-by-user');return false}if(window.MAIRNewsBulletin?.due?.()){miss('news-bulletin-due');return false}return air(newId,prepared,{rewind:true})}
   if(preparePromise&&activeBreak?.originTrackId===endedId){count++;memory()?.observeTrack?.({id:newId,name:newId,artists:[]},'NATURAL_END');return rebasePreparation(newId,{manual:false,reason:'automatic-preparation-late'})}
   count++;memory()?.observeTrack?.({id:newId,name:newId,artists:[]},'NATURAL_END');emit();if(skipNextBreak){skipNextBreak=false;memory()?.metric?.('breaksNoTalk');setPhase('COUNTING','break-skipped-by-user');return false}if(!prepared&&!preparePromise)prepare({manual:false,originTrackId:newId}).catch(()=>{});return true
 }

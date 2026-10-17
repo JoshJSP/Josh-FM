@@ -1,5 +1,5 @@
 // Car Mode (ontwerp C2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
-//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth|viberide)
+//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth|viberide|rideintro)
 // Route: rechte lijn naar het oosten, rotonde op 1,5 km (2e afslag), afrit rechts op 25 km (met rijstroken-banner op
 // 800 m ervoor), 25,5 km in totaal. Maximumsnelheid: 100 tot 5 km, 130 tot 8 km, onbekend tot 9 km, daarna 80.
 // Het GPS-filter weigert sprongen sneller dan 110 m/s; Date.now() krijgt daarom een instelbare voorsprong
@@ -884,7 +884,68 @@ async function scenarioVibeRide(){
   }finally{await h.close()}
 }
 
-const scenarios={viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
+// ---- scenario 15: de DJ begint de rit ----------------------------------------------
+// Josh 17-10-2026: route starten = DJ zegt meteen waar we heen gaan, hoe lang het duurt en met welk nummer we beginnen.
+// Het lopende nummer stopt, de DJ praat, dan start precies het aangekondigde nummer. Nieuwe bestemming tijdens de rit:
+// korte zin zonder nummer. DJ uit of al iemand aan het woord: niks.
+async function scenarioRideIntro(){
+  const t=await setup(),{page,h}=t;
+  try{
+    // Opgeslagen plek "School" op de testbestemming (zelfde opslag als Car Mode-locaties).
+    await page.evaluate(([lat,lon])=>localStorage.setItem('mair_car_places_v1',JSON.stringify({saved:[{name:'School',address:'Schoolstraat 1, 1234 AB Ergens, Nederland',latitude:lat,longitude:lon}],recents:[]})),[LAT0,lonAt(DEST_M)]);
+    const u=await page.evaluate(()=>{const D=window.MAIRCarRideDJ;return{
+      adres:D.spokenPlace({name:'Oudegracht 12',address:'Oudegracht 12, 3511 AB Utrecht, Nederland',latitude:1,longitude:1}),
+      toev:D.spokenPlace({name:'Lange Nieuwstraat 4-bis',address:'Lange Nieuwstraat 4-bis, 3512 PH Utrecht, Nederland',latitude:1,longitude:1}),
+      poi:D.spokenPlace({name:'Albert Heijn',address:'Kerkweg 3, 3451 AA Vleuten, Nederland',latitude:1,longitude:1}),
+      d:[D.spokenDuration(89),D.spokenDuration(1020),D.spokenDuration(3600),D.spokenDuration(3900),D.spokenDuration(7200),D.spokenDuration(5460)]}});
+    c.ok('ritstart: adres wordt straat en plaats, zonder huisnummer en postcode',u.adres==='Oudegracht in Utrecht'&&u.toev==='Lange Nieuwstraat in Utrecht',JSON.stringify(u));
+    c.ok('ritstart: winkel of plek met naam blijft de naam, met plaats',u.poi==='Albert Heijn in Vleuten',u.poi);
+    c.ok('ritstart: duur in minuten, boven 60 in uren en minuten',u.d.join('|')==='1 minuut|17 minuten|60 minuten|1 uur en 5 minuten|2 uur|1 uur en 31 minuten',u.d.join('|'));
+    await page.locator('nav button, [role=tab]',{hasText:'Stations'}).locator('visible=true').first().click();await sleep(500);
+    await page.locator('[data-mair-station]').locator('visible=true').first().click();
+    await until(page,()=>window.__mock.state().playing&&window.__mock.state().uris>=10&&queue.length>=10,null,25000,'station speelt');
+    await sleep(2500);
+    await page.evaluate(()=>{window.__said=[];window.__intros=[];const o=window.speakText;window.speakText=async(x,...a)=>{window.__said.push({x,playing:window.__mock.playing,idx:window.__mock.idx});return o(x,...a)};addEventListener('mair:car-ride-intro',e=>window.__intros.push(e.detail))});
+    const before=await page.evaluate(()=>({idx:window.__mock.idx,uri:window.__mock.uris[window.__mock.idx]}));
+    await startRoute(t);
+    await until(page,()=>window.__intros.length>=1,null,25000,'DJ kondigt de rit aan');
+    await until(page,()=>window.__mock.playing,null,10000,'muziek weer aan');await sleep(600);
+    const said=await page.evaluate(()=>window.__said),intro=(await page.evaluate(()=>window.__intros))[0];
+    const now=await page.evaluate(()=>{const m=window.__mock,id=m.uris[m.idx].split(':').pop(),q=(window.JFMQueue.current()||[]).find(x=>x.id===id);return{idx:m.idx,uri:m.uris[m.idx],pos:m.state().position,playing:m.playing,name:q?.name||'',artists:(q?.artists||[]).map(a=>a?.name||a)}});
+    const mm=/^We zijn onderweg naar School, de rit duurt ongeveer 17 minuten en we beginnen met (.+) van (.+)\.$/.exec(intro.text||'');
+    console.log('  DJ zegt:',intro.text);
+    c.ok('ritstart: DJ zegt bestemming (opgeslagen naam), duur uit de route en het eerste nummer',!!mm,intro.text);
+    c.ok('ritstart: precies één keer gepraat',said.length===1,JSON.stringify(said.map(x=>x.x)));
+    c.ok('ritstart: muziek staat stil terwijl de DJ praat',said[0]?.playing===false,JSON.stringify(said[0]));
+    c.ok('ritstart: daarna speelt het aangekondigde nummer, vanaf het begin',!!mm&&now.playing&&mm[1]===now.name&&now.uri!==before.uri&&now.pos<8000,JSON.stringify(now));
+    c.ok('ritstart: het afgebroken nummer telt niet als skip',!Object.keys(JSON.parse(await page.evaluate(()=>localStorage.getItem('jfm_skips')||'{}'))).includes(before.uri.split(':').pop()));
+    // nieuwe bestemming tijdens de rit
+    const mid=await page.evaluate(()=>({uri:window.__mock.uris[window.__mock.idx]}));
+    await page.evaluate(()=>window.MAIRCarModePrototype.chooseDestination());
+    await page.fill('#carSearchInput','albert heijn');await page.locator('[data-result-index="0"]').first().waitFor({timeout:8000});await page.locator('[data-result-index="0"]').first().click();
+    await page.locator('[data-act="start"]').waitFor({timeout:8000});await page.locator('[data-act="start"]').click();
+    await until(page,()=>window.__intros.length>=2,null,20000,'DJ noemt de nieuwe bestemming');
+    await until(page,()=>window.__mock.playing,null,10000,'muziek weer aan');await sleep(600);
+    const second=(await page.evaluate(()=>window.__intros))[1],after2=await page.evaluate(()=>({uri:window.__mock.uris[window.__mock.idx],playing:window.__mock.playing}));
+    console.log('  DJ zegt:',second.text);
+    c.ok('nieuwe bestemming: korte zin met bestemming en duur, zonder nummer',/^Nieuwe bestemming: we gaan naar Albert Heijn Dichtbij, nog ongeveer (1 minuut|\d+ minuten)\.$/.test(second.text)&&!/beginnen met/.test(second.text),second.text);
+    c.ok('nieuwe bestemming: hetzelfde nummer speelt daarna door',after2.playing&&after2.uri===mid.uri,JSON.stringify(after2));
+    // DJ uit: niks
+    const n0=(await page.evaluate(()=>window.__said)).length;
+    await page.evaluate(()=>{window.MAIR_DJ_ENABLED=false;dispatchEvent(new CustomEvent('mair:car-route-start',{detail:{destination:{name:'Ver weg',address:'Verweg 1, 9999 ZZ Groningen',latitude:53.2,longitude:6.5},duration:600,change:false}}))});
+    await sleep(2500);
+    c.ok('DJ uit in de instellingen: DJ zegt niks bij een rit',(await page.evaluate(()=>window.__said)).length===n0);
+    // al iemand aan het woord: niet dubbel
+    await page.evaluate(()=>{window.MAIR_DJ_ENABLED=true;window.MAIRAudioTransitionLock={breakId:'e2e-andere-break'};dispatchEvent(new CustomEvent('mair:car-route-start',{detail:{destination:{name:'Nog verder',address:'Dijk 2, 8888 AA Leeuwarden',latitude:53.1,longitude:5.8},duration:900,change:true}}))});
+    await sleep(2500);
+    c.ok('DJ of nieuws al bezig: geen tweede stem',(await page.evaluate(()=>window.__said)).length===n0);
+    await page.evaluate(()=>{window.MAIRAudioTransitionLock=null});
+    c.ok('ritstart: muziek speelt aan het eind',await page.evaluate(()=>window.__mock.playing));
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+}
+
+const scenarios={rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);

@@ -662,7 +662,44 @@ async function scenarioLearnManyBans(){
     noErrors('leren veel bans: geen page errors',h);
   }finally{await h.close()}
 }
- const scenarios={learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// 17-10-2026: om 15:00 zei de DJ niks. Nepklok rond 15:00 (alleen voor het nieuws, Spotify loopt op echte tijd).
+// Nummers van 10 minuten: het hele uur valt midden in een nummer, en het nummer loopt door tot na minuut 12.
+// Het nieuws moet dan direct na dat nummer komen, niet vervallen. Nieuws staat niet apart aan: het volgt de DJ.
+// NEWS_ON=1 zet de oude schakelaar wel aan (om op oude code de andere oorzaken te laten zien).
+async function scenarioNewsHour(){
+  const T=Date.UTC(2026,9,17,12,59,40);// 14:59:40 in Amsterdam (zomertijd, UTC+2)
+  const h=await launch({trackMs:600000});
+  try{
+    await h.page.addInitScript(({t,on})=>{let shift=t-Date.now();window.__mairNewsClock=()=>Date.now()+shift;window.__setNewsClock=x=>{shift=x-Date.now()};if(on)localStorage.setItem('mair_news_enabled_v1','1')},{t:T,on:process.env.NEWS_ON==='1'});
+    const heads=Array.from({length:5},(_,i)=>({title:`Nepbericht nummer ${i+1} van vandaag`,summary:'Korte samenvatting.',source:'NOS',publishedAt:new Date().toISOString(),link:''}));
+    await h.page.route(ORIGIN+'/api/live-headlines',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({headlines:heads,fetchedAt:new Date().toISOString(),sourceLabel:'NOS Nieuws'})}));
+    await h.page.route(ORIGIN+'/api/news-bulletin',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({text:'Dit is MAIR Nieuws. De berichten komen van NOS Nieuws. Nepbericht nummer 1. Dit was MAIR Nieuws. Je luistert naar MAIR.',provider:'mock'})}));
+    await startStation(h);
+    const idx0=(await mock(h.page)).idx;
+    await h.page.evaluate(t=>window.__setNewsClock(t),Date.UTC(2026,9,17,13,0,5));
+    await until(h.page,()=>!!window.MAIRNewsBulletin.status().prepared,null,40000,'nieuws voorbereid na 15:00');
+    let st=await mock(h.page);
+    c.ok('nieuws: voorbereid tijdens het nummer, nummer loopt door',st.playing&&st.idx===idx0,JSON.stringify(st));
+    await h.page.evaluate(()=>{window.__newsLog=[];addEventListener('mair:news-bulletin-aired',e=>window.__aired=e.detail);const t=setInterval(()=>{const n=window.MAIRNewsBulletin.status();if(n.airing)window.__newsLog.push({playing:window.__mock.state().playing,dj:window.MAIRDJ?.state?.().phase||''})},150);setTimeout(()=>clearInterval(t),90000)});
+    await h.page.evaluate(t=>window.__setNewsClock(t),Date.UTC(2026,9,17,13,14,0));// 15:14, voorbij het oude venster van 12 minuten
+    await sleep(16500);// minstens één tick van 15 s
+    const mid=await h.page.evaluate(()=>window.MAIRNewsBulletin.status());st=await mock(h.page);
+    c.ok('nieuws: om 15:14 midden in het nummer niet overgeslagen',!!mid.prepared&&!mid.alreadyAired&&mid.due,JSON.stringify(mid).slice(0,300));
+    c.ok('nieuws: nummer wordt niet onderbroken voor het nieuws',st.playing&&st.idx===idx0&&!(await h.page.evaluate(()=>window.__aired)),JSON.stringify(st));
+    await h.page.evaluate(()=>window.__mock.finishTrack(1500));
+    await until(h.page,()=>!!window.__aired,null,45000,'nieuws uitgezonden na het nummer');
+    const aired=await h.page.evaluate(()=>window.__aired),log=await h.page.evaluate(()=>window.__newsLog);
+    c.ok('nieuws: komt direct na het nummer, voor slot 15:00',aired.slot==='2026-10-17T15'&&!aired.partial,JSON.stringify(aired));
+    c.ok('nieuws: muziek staat stil tijdens het nieuws',log.length>2&&log.slice(1,-1).every(x=>x.playing===false),JSON.stringify(log.map(x=>x.playing)));
+    c.ok('nieuws: DJ praat niet tegelijk',log.every(x=>x.dj!=='SPEAKING'),JSON.stringify(log.slice(0,8)));
+    await sleep(2500);st=await mock(h.page);
+    c.ok('nieuws: daarna speelt het volgende nummer',st.playing&&st.idx===idx0+1,JSON.stringify(st));
+    c.ok('nieuws: één keer per uur',(await h.page.evaluate(()=>window.MAIRNewsBulletin.status().alreadyAired))===true);
+    noErrors('nieuws: geen page errors',h);
+  }finally{await h.close()}
+}
+
+ const scenarios={newsHour:scenarioNewsHour,learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);

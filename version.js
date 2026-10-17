@@ -22,6 +22,7 @@ window.JFM_ASSET_VERSION='81';
     addSyncScript('mair-imaging-js','./mair-imaging.js');
     addSyncScript('mair-live-news-js','./mair-live-news.js');
     addSyncScript('mair-news-bulletin-js','./mair-news-bulletin.js');
+    addSyncScript('mair-car-ride-dj-js','./mair-car-ride-dj.js');
     addSyncScript('mair-reload-audibility-js','./mair-reload-audibility.js');
     addSyncScript('mair-background-guard-js','./mair-background-guard.js?v=81');
     addSyncScript('mair-voice-lab-js','./mair-voice-lab.js');

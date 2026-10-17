@@ -3,7 +3,8 @@
 'use strict';
 if(window.MAIRLiveNews)return;
 const $=id=>document.getElementById(id),ENABLED='mair_news_enabled_v1',CACHE='mair_news_cache_v1',LAST='mair_news_last_used_v1',LAST_SLOT='mair_news_last_slot_v1',LAST_TITLE='mair_news_last_title_v1',COOLDOWN=27*60*1000,FEED_MAX_AGE=20*60*1000;let data=null,lastError='',loading=false;
-const isEnabled=()=>localStorage.getItem(ENABLED)==='1';
+// Volgt de DJ-schakelaar (zie mair-news-bulletin.js); alleen een expliciete '0' zet het nieuws uit.
+const isEnabled=()=>window.MAIR_DJ_ENABLED===true&&localStorage.getItem(ENABLED)!=='0';
 function cached(){try{return JSON.parse(localStorage.getItem(CACHE)||'null')}catch{return null}}
 function save(d){try{localStorage.setItem(CACHE,JSON.stringify(d))}catch{/* opslag geblokkeerd: dan zonder opslag */}}
 function fresh(h){if(!h?.title)return false;if(!h.publishedAt)return true;const at=new Date(h.publishedAt).getTime();return Number.isFinite(at)&&Date.now()-at<12*60*60*1000}
