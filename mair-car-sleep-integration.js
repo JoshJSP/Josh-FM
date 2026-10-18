@@ -20,6 +20,7 @@ const RUNTIME_ASSETS=[
   ['script','prototypes/mair-sleep-landscape.js','mairSleepLandscapeRuntime'],
   ['script','prototypes/mair-car-mode-wave.js','mairCarModeRuntime'],
   ['script','prototypes/mair-car-map.js','mairCarMapRuntime'],
+  ['script','prototypes/mair-car-cams.js','mairCarCamsRuntime'],
   ['script','mair-journey-director.js','mairJourneyDirectorRuntime'],
   ['script','mair-traffic-journey-toast.js','mairTrafficJourneyToastRuntime'],
   ['script','mair-passenger-mode.js','mairPassengerModeRuntime'],

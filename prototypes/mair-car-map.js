@@ -10,6 +10,7 @@
 if(window.MAIRCarMap)return;
 const BASE='vendor/mapbox-gl/',STYLE='mapbox://styles/mapbox/navigation-night-v1',PITCH=55,FREE_MS=6000,LOST_MS=3000,MIN_ZOOM=3;
 let libP=null,creating=null,map=null,host=null,puck=null,back=null,ready=false,failed='',loads=0,route=null,cam=null,shown=false,tok='';
+let camData={type:'FeatureCollection',features:[]};
 let free=false,freeTimer=null,lost=false,lostTimer=null,rebuilds=0,tileReloads=0,reloadTimer=null,reloadAt=0,hiddenAt=0;
 function loadLib(){
   if(libP)return libP;
@@ -65,6 +66,26 @@ function addLayers(){
   map.addLayer({id:'car-route-line',type:'line',source:'car-route',layout:L,paint:{'line-color':'#c98bff','line-width':W(8,15)}},before);
   setProgress(progressNow);
 }
+// Flitsers (mair-car-cams.js): een klein rood icoon per vaste flitser of begin/einde van een trajectcontrole, boven de route.
+function camImage(){
+  const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');
+  x.fillStyle='#d62f3a';x.strokeStyle='#fff';x.lineWidth=5;x.beginPath();x.roundRect(5,5,54,54,15);x.fill();x.stroke();
+  x.strokeStyle='#fff';x.lineWidth=4.5;x.lineJoin='round';x.beginPath();x.moveTo(15,25);x.lineTo(24,25);x.lineTo(27,19);x.lineTo(37,19);x.lineTo(40,25);x.lineTo(49,25);x.lineTo(49,47);x.lineTo(15,47);x.closePath();x.stroke();
+  x.beginPath();x.arc(32,36,6.5,0,7);x.stroke();
+  return x.getImageData(0,0,64,64)
+}
+function addCams(){
+  if(!map||!ready||map.getSource('car-cams'))return;
+  try{
+    if(!map.hasImage('car-cam'))map.addImage('car-cam',camImage(),{pixelRatio:2});
+    map.addSource('car-cams',{type:'geojson',data:camData});
+    map.addLayer({id:'car-cams',type:'symbol',source:'car-cams',layout:{'icon-image':'car-cam','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-pitch-alignment':'viewport','icon-size':['interpolate',['linear'],['zoom'],11,['case',['==',['get','on'],1],.75,.55],17,['case',['==',['get','on'],1],1.35,1]]}})
+  }catch(e){try{window.MAIRRuntime?.caught?.('carmode.cams-layer',e)}catch{/* log kapot: onschuldig */}/* de kaart zelf blijft werken */}
+}
+function setCams(f){
+  camData={type:'FeatureCollection',features:Array.isArray(f)?f:[]};
+  if(!map||!ready)return;addCams();map.getSource('car-cams')?.setData(camData)
+}
 async function show({el,token,center,coords}){
   const was=shown;shown=true;if(Array.isArray(coords)){route=coords;setRoute(route)}
   if(map){if(ready&&!was){map.resize();placePuck()}return true}
@@ -90,7 +111,7 @@ async function create(el,token,center){
     back.addEventListener('click',e=>{e.stopPropagation();recenter()});el.appendChild(back);
     for(const n of ['dragstart','drag','zoomstart','zoom','dragend','zoomend'])map.on(n,release);
     map.on('zoom',flatten);map.on('move',()=>{if(free)placePuck()});
-    map.on('style.load',()=>{ready=true;map.resize();addLayers();if(cam)follow(cam);placePuck()});
+    map.on('style.load',()=>{ready=true;map.resize();addLayers();addCams();if(cam)follow(cam);placePuck()});
     map.on('error',e=>{const m=String(e?.error?.message||e?.message||'');if(!ready&&/style|401|403|access token|webgl/i.test(m))failed=m.slice(0,120)||'kaartfout';else if(ready&&e?.sourceId&&!/^car-/.test(e.sourceId))reloadTiles()});
     // Mapbox herstelt een teruggegeven context zelf. Komt hij niet terug, dan blijft de kaart zwart: opnieuw opbouwen.
     map.on('webglcontextlost',()=>{lost=true;clearTimeout(lostTimer);lostTimer=setTimeout(()=>{if(lost&&document.visibilityState==='visible')rebuild()},LOST_MS)});
@@ -147,5 +168,5 @@ function follow({lon,lat,bearing,kmh}){
 }
 function hide(){shown=false;try{map?.stop?.()}catch{/* kaart al weg: onschuldig */}}
 function destroy(){shown=false;progressNow=0;ready=false;cam=null;route=null;free=false;lost=false;clearTimeout(freeTimer);clearTimeout(lostTimer);clearTimeout(reloadTimer);reloadTimer=null;try{map?.remove?.()}catch{/* kaart al weg: onschuldig */}map=null;puck=null;back=null;if(host)host.textContent='';host=null}
-window.MAIRCarMap={show,hide,destroy,follow,setRoute,setProgress,recenter,project:(lon,lat)=>{try{return map&&ready?map.project([lon,lat]):null}catch{return null}},puckAt:()=>puck?{x:puck.offsetLeft+puck.offsetWidth/2,y:puck.offsetTop+puck.offsetHeight/2}:null,status:()=>({created:!!map,ready,shown,failed,loads,free,lost,rebuilds,tileReloads,tilesLoaded:map&&ready?map.areTilesLoaded():null,bearing:map&&ready?map.getBearing():null,zoom:map&&ready?map.getZoom():null,pitch:map&&ready?map.getPitch():null,hasRoute:!!(route&&route.length),layers:map&&ready?(map.getStyle().layers||[]).map(l=>l.id):[],routeLayers:map&&ready?['car-route-done','car-route-glow','car-route-casing','car-route-line'].filter(id=>map.getLayer(id)).length:0})};
+window.MAIRCarMap={show,hide,destroy,follow,setRoute,setProgress,setCams,recenter,project:(lon,lat)=>{try{return map&&ready?map.project([lon,lat]):null}catch{return null}},puckAt:()=>puck?{x:puck.offsetLeft+puck.offsetWidth/2,y:puck.offsetTop+puck.offsetHeight/2}:null,status:()=>({created:!!map,ready,shown,failed,loads,free,lost,rebuilds,tileReloads,tilesLoaded:map&&ready?map.areTilesLoaded():null,bearing:map&&ready?map.getBearing():null,zoom:map&&ready?map.getZoom():null,pitch:map&&ready?map.getPitch():null,hasRoute:!!(route&&route.length),layers:map&&ready?(map.getStyle().layers||[]).map(l=>l.id):[],camLayer:!!(map&&ready&&map.getLayer('car-cams')),camCount:camData.features.length,routeLayers:map&&ready?['car-route-done','car-route-glow','car-route-casing','car-route-line'].filter(id=>map.getLayer(id)).length:0})};
 })();

@@ -1,5 +1,5 @@
 // Car Mode (ontwerp C2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
-//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth|viberide|rideintro)
+//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth|viberide|rideintro|cams|camsroute)
 // Route: rechte lijn naar het oosten, rotonde op 1,5 km (2e afslag), afrit rechts op 25 km (met rijstroken-banner op
 // 800 m ervoor), 25,5 km in totaal. Maximumsnelheid: 100 tot 5 km, 130 tot 8 km, onbekend tot 9 km, daarna 80.
 // Het GPS-filter weigert sprongen sneller dan 110 m/s; Date.now() krijgt daarom een instelbare voorsprong
@@ -64,7 +64,7 @@ const STYLE_JSON=()=>({version:8,name:'e2e-nacht',sources:{decor:{type:'geojson'
   {id:'bridge-street',type:'line',source:'decor',filter:['==',['get','cls'],'main'],paint:{'line-color':'#3b4772','line-width':5}},
   {id:'road-label',type:'symbol',source:'decor',filter:['==',['get','cls'],'none'],layout:{'icon-image':'label'}}]});
 async function mapbox(h,{token=process.env.REAL_MM_TOKEN||'pk.test'}={}){
-  const m={directions:0,delayNext:0,failNext:false,roundabout:true,annotate:true,queries:[],params:[],styleReq:0,otherReq:[],box:[],geocode:[],matching:[],failMatch:false,hangMatch:false,matchHttp:0,overpass:[],ovSpeed:'80',failOverpass:false,failBox:false,failTiles:false,tiles:{ok:0,fail:0}};
+  const m={directions:0,delayNext:0,failNext:false,roundabout:true,annotate:true,queries:[],params:[],styleReq:0,otherReq:[],box:[],geocode:[],matching:[],failMatch:false,hangMatch:false,matchHttp:0,overpass:[],camQueries:[],camEls:[],failHost:'',ovSpeed:'80',failOverpass:false,failBox:false,failTiles:false,tiles:{ok:0,fail:0}};
   await h.page.route(ORIGIN+'/api/config',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({spotifyClientId:'mockclientid0123456789abcdef',mapboxPublicToken:token})}));
   await h.page.route('https://api.mapbox.com/**',async route=>{
     const u=new URL(route.request().url());
@@ -109,8 +109,16 @@ async function mapbox(h,{token=process.env.REAL_MM_TOKEN||'pk.test'}={}){
   });
   // OpenStreetMap (Overpass): een weg met maxspeed ter plekke van de vraag (lat=LAT0), plus een verdere weg met 30 als lokaas.
   await h.page.route(/https:\/\/overpass[^/]*\/api\/interpreter/,route=>{
-    const q=new URL(route.request().url()).searchParams.get('data')||'',pos=/around:\d+,([\d.-]+),([\d.-]+)/.exec(q)||[];m.overpass.push({q,url:route.request().url().split('?')[0]});
-    const H={'access-control-allow-origin':'*'};
+    const q=new URL(route.request().url()).searchParams.get('data')||'',pos=/around:\d+,([\d.-]+),([\d.-]+)/.exec(q)||[],H={'access-control-allow-origin':'*'};
+    // flitsers (mair-car-cams.js): per vak één aanvraag met een bbox; de nep-Overpass geeft de elementen die in dat vak liggen
+    if(/speed_camera/.test(q)){
+      m.camQueries.push({q,url:route.request().url().split('?')[0]});
+      if(m.failOverpass||(m.failHost&&route.request().url().includes(m.failHost)))return route.fulfill({status:502,body:'busy',headers:H}).catch(()=>{});
+      const bb=/\(([\d.-]+),([\d.-]+),([\d.-]+),([\d.-]+)\)/.exec(q)||[],[s,w,n,e]=bb.slice(1).map(Number);
+      const inb=x=>x.type==='relation'?x.members.some(k=>k.lat>=s&&k.lat<=n&&k.lon>=w&&k.lon<=e):x.lat>=s&&x.lat<=n&&x.lon>=w&&x.lon<=e;
+      return route.fulfill({status:200,contentType:'application/json',headers:H,body:JSON.stringify({elements:m.camEls.filter(inb)})}).catch(()=>{});
+    }
+    m.overpass.push({q,url:route.request().url().split('?')[0]});
     if(m.failOverpass)return route.fulfill({status:502,body:'busy',headers:H}).catch(()=>{});
     const lon=Number(pos[2]),way=(dlat,speed,id)=>({type:'way',id,tags:{highway:'residential',...(speed?{maxspeed:speed}:{})},geometry:[{lat:LAT0+dlat,lon:lon-0.01},{lat:LAT0+dlat,lon:lon+0.01}]});
     return route.fulfill({status:200,contentType:'application/json',headers:H,body:JSON.stringify({elements:m.ovSpeed===null?[]:[way(.00015,'30',2),way(0,m.ovSpeed,1)]})}).catch(()=>{});
@@ -951,7 +959,131 @@ async function scenarioRideIntro(){
   }finally{await h.close()}
 }
 
-const scenarios={rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
+
+// ---- scenario 15+16: flitsmeldingen ---------------------------------------------
+// Vaste flitsers en trajectcontroles uit een nep-Overpass, rijdend langs de weg (rechte lijn naar het oosten). Zonder route (alleen
+// positie en rijrichting) en met route (de flitser moet op de route liggen). x = meter oostwaarts van de start, dy = meter noordelijk.
+const camNode=(id,x,dy,max)=>({type:'node',id,lat:LAT0+dy/M_LAT,lon:lonAt(x),tags:{highway:'speed_camera',...(max?{maxspeed:String(max)}:{})}});
+const camMem=(role,ref,x,dy)=>({type:'node',ref,role,lat:LAT0+dy/M_LAT,lon:lonAt(x)});
+const camSec=(id,max,x0,x1,dy)=>[camNode(id*10+1,x0,dy,max),camNode(id*10+2,x1,dy,max),{type:'relation',id,tags:{type:'enforcement',enforcement:'average_speed',maxspeed:String(max)},members:[camMem('device',id*10+1,x0,dy),camMem('device',id*10+2,x1,dy),camMem('from',id*10+1,x0,dy),camMem('to',id*10+2,x1,dy)]}];
+const CAMS=()=>[
+  camNode(1,3000,0,100),     // A: op de weg, 100
+  camNode(2,1500,60,100),    // B: andere weg, 60 m ernaast
+  camNode(3,-100,0,100),     // C: achter de start
+  camNode(4,5000,40,70),     // D: andere kant van de weg, 40 m ernaast
+  camNode(5,6200,0,null),    // E: op de weg, maximumsnelheid onbekend
+  camNode(6,2700,30,60),     // F: andere rijbaan, 30 m ernaast (met route buiten de 20 m)
+  ...camSec(10,80,8000,10000,0),   // trajectcontrole in jouw richting
+  ...camSec(20,80,14000,12000,15)  // trajectcontrole de andere kant op (van oost naar west)
+];
+const camCard=page=>page.evaluate(()=>{const e=document.querySelector('#mairCarWaveOverlay .car-cam-card');return e?{t:e.querySelector('b').textContent,s:e.querySelector('small')?.textContent||'',lim:e.querySelector('.car-cam-limit')?.textContent||'',k:e.dataset.kind}:null});
+async function scenarioCams(){
+  const t=await setup(),{page,h,mb}=t;
+  try{
+    mb.camEls=CAMS();mb.failHost='overpass-api.de'; // de eerste server is stuk: de terugval moet het overnemen
+    await page.evaluate(()=>window.MAIRCarModePrototype.open());await sleep(300);
+    await page.locator('#mairCarWaveOverlay [data-act="music"]').first().click();await sleep(300);
+    await page.evaluate(()=>{window.__speed=25;window.__heading=90});
+    c.ok('flitsmeldingen staan standaard aan',await page.evaluate(()=>window.MAIRCarCams?.isOn()===true));
+    const at=async(x,want,label)=>{await t.at(x,{acc:6});const k=await camCard(page);c.ok(label,want==null?k==null:!!k&&k.t===want,`x=${x} ${JSON.stringify(k)}`);return k};
+    // niets in de buurt: geen kaartje, ook niet voor de flitser op een andere weg (B), achter je (C) of aan de overkant (D)
+    for(const x of [0,500,1000,1500,2000,2250])await at(x,null,`zonder route: x=${x} geen flitser voor je`);
+    await at(2400,null,'zonder route: A nog 600 m, buiten het meldbereik');
+    let k=await at(2550,'Flitser over 450 m','zonder route: flitser op de weg voor je meldt "Flitser over 450 m"');
+    c.ok('met de maximumsnelheid van de flitser (100)',k?.lim==='100',JSON.stringify(k));
+    await at(2700,'Flitser over 300 m','zonder route: telt af (300 m)');
+    await at(2850,'Flitser over 150 m','zonder route: telt af (150 m)');
+    await at(3050,null,'zonder route: A voorbij, het kaartje is weg');
+    const st1=await page.evaluate(()=>({cams:window.MAIRCarCams.status(),map:window.MAIRCarMap.status()}));
+    c.ok('de vakken zijn opgehaald met de terugvalserver (eerste server gaf 502)',st1.cams.tiles>=1&&mb.camQueries.some(q=>/overpass\.private\.coffee/.test(q.url))&&mb.camQueries.some(q=>/overpass-api\.de/.test(q.url)),JSON.stringify({q:mb.camQueries.map(q=>q.url),st:st1.cams}));
+    c.ok('de vraag zoekt alleen vaste flitsers en trajectcontroles (geen mobiele)',mb.camQueries.length>0&&mb.camQueries.every(q=>/\["highway"="speed_camera"\]/.test(q.q)&&/average_speed/.test(q.q)&&/\(\d+\.\d+,\d+\.\d+,\d+\.\d+,\d+\.\d+\)/.test(q.q)),mb.camQueries[0]?.q);
+    c.ok('flitsericoon op de kaart (laag car-cams met flitsers rond de auto)',st1.map.camLayer&&st1.map.camCount>=4,JSON.stringify({l:st1.map.camLayer,n:st1.map.camCount}));
+    for(const x of [3250,3500,4000,4500,4750,4900])await at(x,null,`zonder route: x=${x} D (andere kant, 40 m) geeft geen melding`);
+    await at(5100,null,'zonder route: D voorbij, niets');
+    await at(5500,null,'zonder route: E nog 700 m');
+    k=await at(5800,'Flitser over 400 m','zonder route: flitser zonder bekende maximumsnelheid meldt wel de afstand');
+    c.ok('zonder bekende maximumsnelheid staat er geen bordje',k&&k.lim==='',JSON.stringify(k));
+    await at(6100,'Flitser over 100 m','zonder route: E telt af (100 m)');
+    await at(6300,null,'zonder route: E voorbij');
+    // trajectcontrole in jouw richting: aankondiging, "Trajectcontrole" zolang je erin zit, weg na het einde
+    await at(7600,'Trajectcontrole over 400 m','trajectcontrole: aankondiging 400 m ervoor');
+    k=await camCard(page);c.ok('trajectcontrole met maximumsnelheid 80',k?.lim==='80'&&k?.k==='secahead',JSON.stringify(k));
+    await at(7800,'Trajectcontrole over 200 m','trajectcontrole: telt af');
+    await at(7950,'Trajectcontrole over 50 m','trajectcontrole: 50 m voor het begin');
+    for(const x of [8050,8500,9000,9500,9900])await at(x,'Trajectcontrole',`trajectcontrole: x=${x} "Trajectcontrole" zolang je erin zit`);
+    await at(10000,null,'trajectcontrole: aan het einde (binnen 60 m van het eindpunt) is het kaartje weg');
+    await at(10100,null,'trajectcontrole: voorbij, niets');
+    const camsOk=await page.evaluate(()=>window.MAIRCarCams.status());
+    c.ok('de camera\'s van de trajectcontrole zelf geven geen aparte melding (A, E, begin en binnenin = 4 pieptonen)',camsOk.beeps===4,String(camsOk.beeps));
+    // Overpass valt uit (alle servers): onbekende vakken geven niets, en nooit "geen flitsers"
+    mb.failOverpass=true;
+    // trajectcontrole de andere kant op (van oost naar west): richting klopt niet, dus geen melding
+    for(const x of [12500,13200,13600,13850,14100])await at(x,null,`trajectcontrole andere richting: x=${x} geen melding`);
+    for(const x of [14600,15200,15800,16400,17000,17600,18200])await at(x,null,`Overpass uit: x=${x} niets te melden`);
+    await sleep(4500);await at(18400,null,'Overpass uit: nog steeds niets');
+    const fail=await page.evaluate(()=>({cams:window.MAIRCarCams.status(),text:document.getElementById('mairCarWaveOverlay').innerText}));
+    c.ok('Overpass uit: fout geregistreerd, geen "geen flitsers" op het scherm',fail.cams.errs>=1&&!/geen flitsers/i.test(fail.text),JSON.stringify(fail.cams));
+    c.ok('Overpass wordt niet gehamerd (hooguit 14 aanvragen in de hele rit)',mb.camQueries.length<=14,String(mb.camQueries.length));
+    c.ok('de flitsers gebruiken niet de maximumsnelheid-terugval (dat blijft een aparte vraag)',mb.overpass.every(q=>!/speed_camera/.test(q.q)),String(mb.overpass.length));
+    mb.failOverpass=false;
+    // schakelaar in het menu: uit = niets, ook niet op de kaart
+    await page.evaluate(()=>{window.__skew+=800000}); // terug naar 2300 m: ruim genoeg tijd, anders weigert het gps-filter de sprong (>110 m/s)
+    await t.at(2300,{acc:6});
+    await page.evaluate(()=>document.querySelector('#mairCarWaveOverlay [data-act="menu"]').click());await sleep(250);
+    const lab=()=>page.evaluate(()=>document.querySelector('#mairCarWaveOverlay .car-menu [data-act="cams"]')?.textContent?.trim()||'');
+    c.ok('menu heeft "Flitsers: aan"',(await lab())==='Flitsers: aan',await lab());
+    {const r=await rect(page,'.car-menu');c.ok('menu past met de extra knop in het scherm (844x390)',!!r&&r.y>=0&&r.b<=390+0.5,JSON.stringify(r))}
+    if(outDir)await page.screenshot({path:outDir+'/carmode-flitser-menu.png'});
+    await page.locator('#mairCarWaveOverlay .car-menu [data-act="cams"]').click();await sleep(400);
+    c.ok('schakelaar zet flitsers uit: menu toont "Flitsers: uit", opgeslagen',(await lab())==='Flitsers: uit'&&await page.evaluate(()=>localStorage.getItem('mair_car_cams_on_v1')==='0'),await lab());
+    await page.locator('#mairCarWaveOverlay .car-menu [data-act="menuclose"]').click();await sleep(250);
+    const n0=mb.camQueries.length;
+    for(const x of [2450,2550,2700,2850])await at(x,null,`schakelaar uit: x=${x} geen melding`);
+    const off=await page.evaluate(()=>({m:window.MAIRCarMap.status().camCount,on:window.MAIRCarCams.isOn()}));
+    c.ok('schakelaar uit: geen iconen op de kaart en geen nieuwe aanvragen',off.m===0&&!off.on&&mb.camQueries.length===n0,JSON.stringify({off,n0,n:mb.camQueries.length}));
+    await page.evaluate(()=>document.querySelector('#mairCarWaveOverlay [data-act="menu"]').click());await sleep(250);
+    await page.locator('#mairCarWaveOverlay .car-menu [data-act="cams"]').click();await sleep(400);
+    c.ok('schakelaar weer aan',(await lab())==='Flitsers: aan',await lab());
+    await page.locator('#mairCarWaveOverlay .car-menu [data-act="menuclose"]').click();await sleep(250);
+    await at(2700,'Flitser over 300 m','weer aan: melding is er weer (vak zat nog in het geheugen)');
+    if(outDir){await sleep(500);await page.screenshot({path:outDir+'/carmode-flitser.png'})}
+    const keys=await page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('mair_car_cams_v1')||'{}')).length);
+    c.ok('de vakken staan in localStorage (7 dagen)',keys>=2,String(keys));
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+}
+async function scenarioCamsRoute(){
+  const t=await setup(),{page,h,mb}=t;
+  try{
+    mb.camEls=CAMS();
+    await startRoute(t);
+    await page.evaluate(()=>{window.__speed=25;window.__heading=90});
+    const at=async(x,want,label)=>{await t.at(x,{acc:6});const k=await camCard(page);c.ok(label,want==null?k==null:!!k&&k.t===want,`x=${x} ${JSON.stringify(k)}`);return k};
+    for(const x of [100,1000,2000,2400])await at(x,null,`met route: x=${x} geen flitser voor je`);
+    let k=await at(2550,'Flitser over 450 m','met route: flitser op de route meldt "Flitser over 450 m" (F, 30 m naast de route en dichterbij, telt niet mee)');
+    c.ok('met route: maximumsnelheid 100',k?.lim==='100',JSON.stringify(k));
+    await at(2850,'Flitser over 150 m','met route: telt af, F (andere rijbaan) telt nog steeds niet');
+    await at(3050,null,'met route: voorbij, kaartje weg');
+    for(const x of [3500,4500,4750,4900,5100])await at(x,null,`met route: x=${x} geen melding (D en B liggen niet op de route)`);
+    await at(5800,'Flitser over 400 m','met route: E zonder maximumsnelheid');
+    await at(6300,null,'met route: E voorbij');
+    await at(7600,'Trajectcontrole over 400 m','met route: aankondiging trajectcontrole');
+    await at(8100,'Trajectcontrole','met route: erin');
+    k=await camCard(page);c.ok('met route: "nog ~1,9 km" erbij',/^nog 1,[89] km$/.test(k?.s||''),JSON.stringify(k));
+    await at(9900,'Trajectcontrole','met route: nog steeds erin');
+    await at(10100,null,'met route: voorbij het einde, weg');
+    for(const x of [12500,13200,13600,13850,14100])await at(x,null,`met route: andere-richting-trajectcontrole x=${x} geen melding`);
+    await page.evaluate(()=>document.querySelector('#mairCarWaveOverlay [data-act="menu"]').click());await sleep(250);
+    {const r=await rect(page,'.car-menu'),sc=await page.evaluate(()=>{const e=document.querySelector('#mairCarWaveOverlay .car-menu');return e?e.scrollHeight-e.clientHeight:-1});c.ok('menu met route en de extra knop past of scrolt (844x390)',!!r&&r.y>=0&&r.b<=390.5,JSON.stringify({r,sc}))}
+    if(outDir)await page.screenshot({path:outDir+'/carmode-flitser-menu-route.png'});
+    await page.locator('#mairCarWaveOverlay .car-menu [data-act="menuclose"]').click();await sleep(250);
+    await page.evaluate(()=>{window.__skew+=800000;window.MAIRCarCams.toggle()});
+    await at(2700,null,'met route, schakelaar uit: geen melding');
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+}
+
+const scenarios={cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);

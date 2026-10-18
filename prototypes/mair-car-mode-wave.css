@@ -131,3 +131,14 @@
 .car-vibe-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .car-menu .car-vibe-grid button{min-height:72px;padding:0 8px;text-align:center;font-size:17px;font-weight:800;line-height:1.15}
 .car-menu .car-vibe-grid button.on{background:var(--car-purple);color:#fff}
+/* Flitsmelding (mair-car-cams.js): kaartje linksboven in de kaart, onder de GPS-zwak-chip. Rood, zodat het niet op de afslagkaart lijkt. */
+.car-cam-card{position:absolute;z-index:6;left:calc(var(--el) + var(--u)*12);top:calc(var(--top) + var(--u)*40);max-width:calc(var(--mapw) - var(--u)*24);display:flex;align-items:center;gap:calc(var(--u)*10);padding:calc(var(--u)*7) calc(var(--u)*12) calc(var(--u)*7) calc(var(--u)*8);border:2px solid #d62f3a;border-radius:calc(var(--u)*16);background:linear-gradient(150deg,#1d0b0f,#0d0709);box-shadow:0 calc(var(--u)*10) calc(var(--u)*28) rgba(0,0,0,.5);color:#fff;pointer-events:none}
+.car-cam-ico{flex:none;display:grid;place-items:center;width:calc(var(--u)*34);height:calc(var(--u)*34);border-radius:calc(var(--u)*10);background:#d62f3a}
+.car-cam-ico svg{width:66%;height:66%}
+.car-cam-card b{display:block;font-size:calc(var(--u)*19);font-weight:900;letter-spacing:-.03em;line-height:1.1;white-space:nowrap}
+.car-cam-card small{display:block;margin-top:calc(var(--u)*2);color:#e0aab0;font-size:calc(var(--u)*12);font-weight:800;letter-spacing:.04em}
+.car-cam-limit{flex:none;display:grid;place-items:center;width:calc(var(--u)*38);height:calc(var(--u)*38);border-radius:50%;background:#fff;border:calc(var(--u)*4) solid #d62f3a;color:#111;font-size:calc(var(--u)*15);font-weight:900;letter-spacing:-.04em}
+.car-cam-card.over{background:#d62f3a}
+.car-cam-card.over .car-cam-ico{background:#fff}.car-cam-card.over .car-cam-ico svg path,.car-cam-card.over .car-cam-ico svg circle{stroke:#d62f3a}.car-cam-card.over small{color:#fff}
+/* Het menu is met route hoger dan een liggende telefoon (8 knoppen): scrollen in plaats van onderaan afgekapt, anders waren Car Mode sluiten en Annuleren niet te bereiken. */
+.car-menu{max-height:calc(100dvh - 48px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
