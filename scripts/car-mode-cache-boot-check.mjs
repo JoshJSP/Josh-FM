@@ -192,7 +192,7 @@ check('d/e. boot gaat door na een ontbrekende module en bereikt altijd ensureLau
   assert.ok(await waitForBoot(broken), 'de integratie-API moet ook bestaan als modules ontbreken');
   const status = broken.context.MAIRCarSleepIntegration.status();
   assert.deepEqual(Array.from(status.bootFailures, x => x.stage).sort(), ['mair-car-autofit.js', 'mair-sleep.js'], 'elke fout moet per module worden gerapporteerd');
-  assert.equal(broken.loaded.length, 10, 'de overige tien assets moeten alsnog geladen zijn');
+  assert.equal(broken.loaded.length, 11, 'de overige elf assets moeten alsnog geladen zijn');
   assert.ok(broken.loaded.includes('mair-car-menu-sticky.js'), 'modules na de fout moeten nog steeds laden');
   assert.ok(broken.loaded.includes('prototypes/mair-car-mode-wave.js'), 'de Car Mode-runtime zelf moet nog steeds laden');
   assert.ok(broken.elements.mairCarModeOpen, 'ensureLauncher moet ook na een mislukte module worden bereikt');
