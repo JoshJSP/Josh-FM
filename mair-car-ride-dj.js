@@ -53,8 +53,8 @@ async function announce(detail={}){
   // De lock gaat er meteen bij de routestart op: zo stuurt de herplanning geen play naar Spotify terwijl wij gaan pauzeren.
   // Die play kwam op de iPhone soms pas aan als de DJ al praatte: de Spotify-app nam de audio over en de stem brak af.
   // Wat de director daardoor niet naar Spotify stuurde (held), sturen we na afloop alsnog.
-  busy=true;let op=0,paused=false,uri='',error='',track=null,started=false,held=false;const lock={breakId:'car-ride',acquiredAt:Date.now()};
-  window.MAIRAudioTransitionLock=lock;const onReplan=e=>{if(e.detail?.held)held=true};addEventListener('mair:director-replanned',onReplan);
+  busy=true;let op=0,paused=false,uri='',error='',track=null,started=false,heldAt=0,nextAt=0;const lock={breakId:'car-ride',acquiredAt:Date.now()};
+  window.MAIRAudioTransitionLock=lock;const onReplan=e=>{if(e.detail?.held)heldAt=Date.now()};addEventListener('mair:director-replanned',onReplan);
   try{
     if(!change)await waitReplan();
     // Pas na het herplannen kijken: in die seconden kan de DJ of het nieuws net begonnen zijn.
@@ -74,11 +74,11 @@ async function announce(detail={}){
   finally{
     // Muziek gaat altijd weer aan: na de aankondiging het eerste ritnummer vanaf het begin, met één play-opdracht en de
     // nieuwe ritvolgorde erachter. Anders (of als dat mislukt) het oude nummer.
-    if(paused){const p=window.JFMPlayback;try{started=!error&&!!track?.uri&&await p?.djNext?.('dj-ride-intro',track.uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.next',e)}if(!started)try{await p?.djResume?.(uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.resume',e)}}
+    if(paused){const p=window.JFMPlayback;try{nextAt=Date.now();started=!error&&!!track?.uri&&await p?.djNext?.('dj-ride-intro',track.uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.next',e)}if(!started)try{await p?.djResume?.(uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.resume',e)}}
     try{if(op)window.JFMPlaybackState?.end?.(op,{error})}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.end',e)}
     removeEventListener('mair:director-replanned',onReplan);
     if(window.MAIRAudioTransitionLock===lock)window.MAIRAudioTransitionLock=null;busy=false;
-    if(held&&!started)window.JFMProgramDirector?.replan?.('journey',true)?.catch?.(()=>{})
+    if(heldAt&&(!started||heldAt>=nextAt))window.JFMProgramDirector?.replan?.('journey',true)?.catch?.(()=>{})
   }
 }
 addEventListener('mair:car-route-start',e=>{announce(e.detail||{}).catch(()=>{})});
