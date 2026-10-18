@@ -23,7 +23,7 @@ const runtimeAssets = [...(/const RUNTIME_ASSETS=\[([\s\S]*?)\n\];/.exec(integra
   .matchAll(/\['(?:style|script)','([^']+)','[^']+'\]/g)].map(m => m[1]);
 
 check('a. elke Car Mode/Sleep/Passenger-asset uit RUNTIME_ASSETS staat in CORE', () => {
-  assert.equal(runtimeAssets.length, 12, 'de tabel moet alle twaalf bijgeladen assets bevatten');
+  assert.equal(runtimeAssets.length, 13, 'de tabel moet alle dertien bijgeladen assets bevatten');
   for (const asset of runtimeAssets) {
     assert.ok(exists(asset), `gedeclareerde asset bestaat niet op schijf: ${asset}`);
     assert.ok(CORE.has(asset), `RUNTIME_ASSETS-asset ontbreekt in de service-worker CORE-cache: ${asset}`);
@@ -184,7 +184,7 @@ check('d/e. boot gaat door na een ontbrekende module en bereikt altijd ensureLau
   const healthy = bootHarness();
   assert.ok(await waitForBoot(healthy), 'de integratie-API moet bestaan na een gezonde boot');
   assert.equal(healthy.context.MAIRCarSleepIntegration.status().bootFailures.length, 0, 'een gezonde boot kent geen failures');
-  assert.equal(healthy.loaded.length, 12, 'alle twaalf assets moeten geladen zijn');
+  assert.equal(healthy.loaded.length, 13, 'alle dertien assets moeten geladen zijn');
   assert.ok(healthy.elements.mairCarModeOpen, 'ensureLauncher moet de Car Mode-knop plaatsen');
 
   // een module die vroeg in de reeks faalt mag de rest niet stoppen
@@ -202,7 +202,7 @@ check('d2. zelfs als elke bijgeladen module faalt, blijft de launcher bereikbaar
   const dead = bootHarness({ unavailable: runtimeAssets });
   assert.ok(await waitForBoot(dead), 'de integratie-API moet bestaan');
   const status = dead.context.MAIRCarSleepIntegration.status();
-  assert.equal(status.bootFailures.length, 12, 'alle twaalf fouten moeten zichtbaar zijn');
+  assert.equal(status.bootFailures.length, 13, 'alle dertien fouten moeten zichtbaar zijn');
   assert.equal(dead.loaded.length, 0, 'er mag niets geladen zijn in dit scenario');
   assert.ok(dead.elements.mairCarModeOpen, 'de Car Mode-ingang mag nooit verdwijnen door ontbrekende modules');
 });
