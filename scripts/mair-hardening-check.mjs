@@ -21,7 +21,7 @@ for(const file of runtimeAssets){
 if(!sw.includes("'./channel-click-fix.js'"))throw Error('Autoritatieve stationcontroller ontbreekt in PWA CORE-cache');
 if(!sw.includes(RELEASE_CACHE_DECLARATION))throw Error('PWA cacheversie klopt niet met de huidige MAIRFM-release');
 if(!sw.includes("'./mair-background-guard.js'"))throw Error('Background guard ontbreekt in PWA CORE-cache');
-if(!background.includes("recover?.('foreground-return')")||!primary.includes('if(backgrounded()||reloadNeedsGesture)return false'))throw Error('Foreground-only background recovery guard ontbreekt');
+if(!background.includes("recover?.('foreground-return')")||!primary.includes("if((backgrounded()&&reason!=='device-rebuilt')||reloadNeedsGesture)return false"))throw Error('Foreground-only background recovery guard ontbreekt');
 if(!dj.includes('ensureVoiceReady')||dj.indexOf('await ensureVoiceReady()')>dj.indexOf('await pauseMusic(uri)'))throw Error('DJ voice-ready gate moet vóór Spotify-pauze staan');
 if(dj.includes('schedulePendingRetry')||dj.includes('retryTimer')||dj.includes('retryAfter'))throw Error('DJ mag een mislukte handoff niet binnen dezelfde track blijven retryen');
 if(!dj.includes("truthApi()?.begin?.('dj-handoff'")||!dj.includes('endHandoff'))throw Error('DJ-handoff moet playback recovery expliciet blokkeren');

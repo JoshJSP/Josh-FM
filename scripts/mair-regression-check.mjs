@@ -66,7 +66,7 @@ expect(dj.includes("truthApi()?.begin?.('dj-handoff'")&&dj.includes('endHandoff'
 expect(dj.includes('restoreMusic(uri,{rewind:false})'),'Mislukte DJ-handoff moet muziek veilig herstellen zonder retry/rewindlus');
 expect(resume.includes('__mairLegacyDJSchedulerDisabled=true')&&resume.includes('legacyAutomaticBreaks:false'),'Legacy app.js DJ-scheduler is niet vroeg genoeg geneutraliseerd');
 expect(primary.includes('fastNaturalAdvance')&&primary.includes('await wait(120)'),'Natural-next fast path ontbreekt');
-expect(primary.includes('if(backgrounded()||reloadNeedsGesture)return false'),'Playback recovery mag niet in de achtergrond of vóór de vereiste gebruikersinteractie vechten');
+expect(primary.includes("if((backgrounded()&&reason!=='device-rebuilt')||reloadNeedsGesture)return false"),'Playback recovery mag niet in de achtergrond of vóór de vereiste gebruikersinteractie vechten');
 expect(background.includes("setExpectedLive?.(true,'background-preserve')")&&background.includes("recover?.('foreground-return')"),'Background guard bewaart/herstelt live state niet correct');
 expect(bootstrap.includes('mair-dj-v2.js')&&bootstrap.includes('mair-background-guard.js')&&!bootstrap.includes('dj-authoritative-v226.js'),'Legacy DJ scheduler of background bootstrap is fout');
 expect(handoff.includes('legacy-shim-to-mair-dj-v2')&&!handoff.includes('/me/player/pause'),'Legacy handoff bezit nog playbacklogica');

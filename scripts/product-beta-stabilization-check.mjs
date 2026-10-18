@@ -22,7 +22,7 @@ const checks=[
   // mair-background-guard.js, zodat hij nooit voor de muziek gaat.
   ['PWA update checks recover on foreground',pwa.includes("'mair:wake'")&&pwa.includes("phase==='paint'")&&pwa.includes('checkForUpdate')&&pwa.includes('pageshow')],
   ['single MediaSession owner remains',pwa.includes("setActionHandler('play'")||pwa.includes("bind('play'")],
-  ['background recovery is foreground-only',primary.includes('if(backgrounded()||reloadNeedsGesture)return false')&&background.includes("recover?.('foreground-return')")],
+  ['background recovery is foreground-only',primary.includes("if((backgrounded()&&reason!=='device-rebuilt')||reloadNeedsGesture)return false")&&background.includes("recover?.('foreground-return')")],
   ['long-session health detects stalls',health.includes('playback-stall')&&health.includes('stalls++')&&health.includes('deviceFlaps')],
   ['beta readiness observes runtime health',beta.includes('JFMBetaStatus')&&beta.includes('failures<5')&&beta.includes('stalls<2')],
   ['beta readiness loaded at runtime',boot.includes("load('./beta-status.js','jfm-beta-status-v8')")],

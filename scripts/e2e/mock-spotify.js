@@ -45,6 +45,7 @@ window.fetch=async function(input,init){
   if(S.failNext&&S.failNext.test(method+' '+p)){const f=S.failNext;S.failNext=null;return json({error:{status:f.status||429,message:f.message||'mock failure'}},f.status||429,f.retryAfter?{'Retry-After':String(f.retryAfter)}:{})}
   if(p==='/me'&&method==='GET')return json({id:'mock-user',display_name:'Test',product:'premium',country:'NL',email:'test@example.invalid'});
   if(p==='/me/player/devices')return json({devices:S.deviceId&&S.registered?[{id:S.deviceId,name:S.deviceName,type:'Computer',is_active:S.active,is_restricted:false,volume_percent:Math.round(S.volume*100)}]:[]});
+  if(p==='/me/player'&&method==='GET'&&S.otherDevice&&!S.active)return json({device:{id:'iphone-spotify-app',name:'iPhone',type:'Smartphone',is_active:true,volume_percent:80},is_playing:true,progress_ms:1000,item:byUri(S.uris[0]),timestamp:now(),currently_playing_type:'track',actions:{}});
   if(p==='/me/player'&&method==='GET'){const t=cur();if(!S.active||!t)return empty();return json({device:{id:S.deviceId,name:S.deviceName,type:'Computer',is_active:true,volume_percent:Math.round(S.volume*100)},is_playing:S.playing,progress_ms:Math.round(position()),item:t,shuffle_state:S.shuffle,repeat_state:S.repeat,timestamp:now(),currently_playing_type:'track',actions:{}})}
   if(p==='/me/player'&&method==='PUT'){S.active=true;if(body?.play)S.playing=true;if(S.playing){setPos(position());schedule()}emit();return empty()}
   if(p==='/me/player/play'){startPlay(body,q);return empty()}

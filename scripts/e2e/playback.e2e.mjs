@@ -699,7 +699,7 @@ async function scenarioNewsHour(){
   }finally{await h.close()}
 }
 
- const scenarios={newsHour:scenarioNewsHour,learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,bgDeviceRebuild:scenarioBgDeviceRebuild,bgDeviceGone:scenarioBgDeviceGone,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+ const scenarios={newsHour:scenarioNewsHour,learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,bgDeviceRebuild:scenarioBgDeviceRebuild,bgDeviceGone:scenarioBgDeviceGone,bgOtherDevice:scenarioBgOtherDevice,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 // iOS verbreekt de Web Playback SDK met het scherm uit of bij een netwerkwissel; de app krijgt alleen not_ready.
 // Voor de fix bleef het daarna stil tot je de app weer opende (recover weigerde in de achtergrond, niets bouwde het device opnieuw).
 const hide=(page,v)=>page.evaluate(x=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>x});Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>x?'hidden':'visible'});document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event(x?'pagehide':'pageshow'))},v);
@@ -728,6 +728,19 @@ async function scenarioBgDeviceGone(){
     c.ok('geen device: begrensd aantal pogingen',st.connects>=2&&st.connects<=6,JSON.stringify(st));
     c.ok('geen device: duidelijke melding',/weggevallen/.test(info),info);
     noErrors('geen device: geen page errors',h);
+  }finally{await h.close()}
+}
+// Speelt Spotify intussen op een ander apparaat (Spotify-app, speaker), dan pakt het herstel dat niet af.
+async function scenarioBgOtherDevice(){
+  const h=await launch({trackMs:30000});
+  try{
+    await startStation(h);
+    await hide(h.page,true);await sleep(1000);
+    await h.page.evaluate(()=>{window.__mock.otherDevice=true;window.Spotify.Player.drop()});
+    await sleep(8000);
+    const st=await mock(h.page);
+    c.ok('ander apparaat speelt: herstel pakt het niet af',st.registered===true&&st.active===false&&st.playing===false,JSON.stringify(st));
+    noErrors('ander apparaat speelt: geen page errors',h);
   }finally{await h.close()}
 }
 const optIn=new Set(['soak']);
