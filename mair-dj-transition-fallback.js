@@ -22,6 +22,8 @@
   }
   window.addEventListener('jfm:natural-next-ready',e=>mark(e.detail||{}));
   window.addEventListener('jfm:trackchange',e=>onTrackChange(e.detail||{}));
+  // djNext na een DJ-break of ritstart is RECOVERY: geen natuurlijk einde, anders begon het uurnieuws 2 s in het volgende nummer.
+  window.addEventListener('mair:track-transition',e=>{if(e.detail?.cause==='RECOVERY')mark({endedTrackId:e.detail.fromTrackId,newTrackId:e.detail.toTrackId})});
   window.addEventListener('pagehide',cancel);
   window.MAIRDJTransitionFallback={version:VERSION,state:()=>({pending:pending?{sig:pending.sig,previous:pending.previous,current:pending.current}:null,seen:[...seen.keys()].slice(-12),lastTrackId})};
 })();

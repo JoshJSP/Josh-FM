@@ -311,7 +311,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     return advance({record:false,source:'primary-natural-end'})
   }
   // Door de DJ, niet door de luisteraar (Car Mode ritstart): telt niet als skip en leert dus niets over het afgebroken nummer.
-  async function djNext(source='dj-next'){return withBusy(async()=>{try{markTransitionAction('RECOVERY',{source});await advance({record:false,source});return true}catch(e){return rememberError(e,'Volgende na DJ mislukt: ')}})}
+  async function djNext(source='dj-next',uri=''){return withBusy(async()=>{try{markTransitionAction('RECOVERY',{source});if(uri){const{id}=await ensureActive();await playContextDirect(uri,id,source)}else await advance({record:false,source});return true}catch(e){return rememberError(e,'Volgende na DJ mislukt: ')}})}
   async function skip(delta){
     activateNow();return withBusy(async()=>{
       try{

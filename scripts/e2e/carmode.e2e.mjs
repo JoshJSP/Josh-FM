@@ -1,5 +1,5 @@
 // Car Mode (ontwerp C2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
-//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth|viberide|rideintro|cams|camsroute|places)
+//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=rideaudio|nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth|viberide|rideintro|cams|camsroute|places)
 // Route: rechte lijn naar het oosten, rotonde op 1,5 km (2e afslag), afrit rechts op 25 km (met rijstroken-banner op
 // 800 m ervoor), 25,5 km in totaal. Maximumsnelheid: 100 tot 5 km, 130 tot 8 km, onbekend tot 9 km, daarna 80.
 // Het GPS-filter weigert sprongen sneller dan 110 m/s; Date.now() krijgt daarom een instelbare voorsprong
@@ -132,8 +132,9 @@ async function mapbox(h,{token=process.env.REAL_MM_TOKEN||'pk.test'}={}){
 }
 
 // ---- hulpjes ----------------------------------------------------------------
-async function setup({width=844,height=390}={}){
+async function setup({width=844,height=390,init=null}={}){
   const h=await launch({trackMs:900000,width,height});
+  if(init)await h.page.addInitScript(init);
   await h.ctx.grantPermissions(['geolocation'],{origin:ORIGIN});
   await h.ctx.setGeolocation({latitude:LAT0,longitude:LON0,accuracy:10});
   await h.page.addInitScript(()=>{
@@ -1012,6 +1013,59 @@ async function scenarioRideIntro(){
   }finally{await h.close()}
 }
 
+// Ritstart met een stem van ~8 s zoals op de iPhone (18-10-2026: "brak midden in het eerste woord af").
+// Op de iPhone komt de muziek uit de Spotify-app. Gaat die spelen, dan neemt hij de audiosessie over en pauzeert iOS de stem
+// in de webview (hier nagebootst). Spotify Connect neemt een play aan (204) en het toestel speelt pas later (playLagMs).
+// Op main stuurde de journey-herplanning bij de routestart een play, de DJ pauzeerde vlak daarna, de late play kwam binnen
+// terwijl de DJ praatte: stem weg na 0,7 s en de ritstart hing daarna 45 s. Uurnieuws staat klaar (03:01, zoals bij Josh).
+async function scenarioRideAudio(){
+  const t=await setup({init:()=>{
+    Object.defineProperty(Navigator.prototype,'userAgent',{get:()=>'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148'});
+    window.Capacitor={isNativePlatform:()=>true,getPlatform:()=>'ios'};
+    const live=new Set(),pl=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){if(!this.loop)live.add(this);return pl.call(this)};
+    setInterval(()=>{if(!window.__mock?.playing)return;for(const a of live)if(!a.paused&&a.src){a.pause();(window.__takeovers=window.__takeovers||[]).push(Date.now())}},40);
+    const T=Date.UTC(2026,9,18,1,1,0),shift=T-Date.now();window.__mairNewsClock=()=>Date.now()+shift;
+  }}),{page,h}=t;
+  try{
+    const {silentMp3}=await import('./harness.mjs');
+    await page.route(ORIGIN+'/api/tts',r=>r.request().method()==='POST'?r.fulfill({status:200,contentType:'audio/mpeg',body:silentMp3(300)}):r.fallback());
+    const heads=Array.from({length:5},(_,i)=>({title:`Nepbericht nummer ${i+1} van vandaag`,summary:'Korte samenvatting.',source:'NOS',publishedAt:new Date().toISOString(),link:''}));
+    await page.route(ORIGIN+'/api/live-headlines',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({headlines:heads,fetchedAt:new Date().toISOString(),sourceLabel:'NOS Nieuws'})}));
+    await page.route(ORIGIN+'/api/news-bulletin',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({text:'Dit is MAIR Nieuws. Nepbericht nummer 1. Dit was MAIR Nieuws.',provider:'mock'})}));
+    await page.locator('nav button, [role=tab]',{hasText:'Stations'}).locator('visible=true').first().click();await sleep(500);
+    await page.locator('[data-mair-station]').locator('visible=true').first().click();
+    await until(page,()=>window.__mock.playing&&window.__mock.state().uris>=10&&queue.length>=10,null,25000,'station speelt');
+    await sleep(2500);
+    await page.evaluate(()=>window.MAIRNewsBulletin.prepare(true));await until(page,()=>!!window.MAIRNewsBulletin.status().prepared,null,40000,'uurnieuws klaar');
+    await page.evaluate(()=>{
+      const L=window.__alog=[];window.__mock.playLagMs=1500;
+      const calls=window.__mock.calls,push=calls.push.bind(calls);calls.push=(...a)=>{a.forEach(c=>L.push({at:Date.now(),k:'spotify',v:c.m+' '+c.p}));return push(...a)};
+      addEventListener('mair:dj-speaking',e=>L.push({at:Date.now(),k:'speaking',v:e.detail}));
+      addEventListener('mair:car-ride-intro',e=>L.push({at:Date.now(),k:'intro',v:e.detail}));
+      addEventListener('mair:news-bulletin',e=>{if(e.detail?.airing)L.push({at:Date.now(),k:'news'})});
+    });
+    await startRoute(t);
+    await until(page,()=>window.__alog.some(x=>x.k==='speaking'&&!x.v.active),null,70000,'stem klaar');
+    await until(page,()=>!window.MAIRCarRideDJ.status().busy,null,60000,'ritstart klaar');
+    await until(page,()=>window.__mock.playing,null,10000,'muziek weer aan');await sleep(6000);
+    const log=await page.evaluate(()=>window.__alog),start=log.find(x=>x.k==='speaking'&&x.v.active),end=log.find(x=>x.k==='speaking'&&!x.v.active),intro=log.find(x=>x.k==='intro');
+    const ms=end.v.playbackEndedAt-end.v.playbackStartedAt;console.log('  ritstart:',JSON.stringify({ms,err:end.v.error,lastError:await page.evaluate(()=>window.MAIRCarRideDJ.status().lastError)}));
+    c.ok('ritstart iPhone: de stem speelt helemaal uit (~7,8 s), niet afgekapt',ms>7000&&end.v.success!==false&&!(await page.evaluate(()=>window.__takeovers?.length)),JSON.stringify({ms,err:end.v.error}));
+    c.ok('ritstart iPhone: geen play naar Spotify tussen routestart en het einde van de stem',!log.some(x=>x.k==='spotify'&&x.at<end.v.playbackEndedAt&&/PUT \/me\/player\/play|POST \/me\/player\/next/.test(x.v)),JSON.stringify(log.filter(x=>x.k==='spotify'&&/play|next/.test(x.v)).map(x=>[x.at-start.at,x.v])));
+    const now=await page.evaluate(()=>{const m=window.__mock;return{id:m.uris[m.idx].split(':').pop(),pos:m.state().position,playing:m.playing}});
+    c.ok('ritstart iPhone: daarna speelt het aangekondigde nummer vanaf het begin',!!intro&&now.playing&&now.id===intro.v.trackId&&now.pos<10000,JSON.stringify({now,intro:intro?.v.trackId}));
+    c.ok('ritstart: het uurnieuws begint niet in het eerste ritnummer',!!intro&&!log.some(x=>x.k==='news'&&x.at>intro.at)&&!(await page.evaluate(()=>window.MAIRNewsBulletin.airing)),JSON.stringify(log.filter(x=>x.k==='news').map(x=>x.at-(intro?.at||0))));
+    // De Spotify-app neemt het toch over (bijv. iemand tikt play in Spotify): de stem geeft het meteen op, muziek speelt, geen 45 s hangen.
+    await page.evaluate(()=>{window.__mock.playLagMs=0;window.__alog.length=0;window.__takeovers=[];const o=window.speakText;window.speakText=(...a)=>{setTimeout(()=>window.__mock.player.resume(),1200);window.speakText=o;return o(...a)};
+      dispatchEvent(new CustomEvent('mair:car-route-start',{detail:{destination:{name:'Ver weg',address:'Verweg 1, 9999 ZZ Groningen',latitude:53.2,longitude:6.5},duration:600,change:true}}))});
+    const t0=Date.now();
+    await until(page,()=>!window.MAIRCarRideDJ.status().busy&&window.__alog.some(x=>x.k==='speaking'&&!x.v.active),null,30000,'onderbroken stem afgehandeld');
+    const st=await page.evaluate(()=>({rd:window.MAIRCarRideDJ.status(),tk:window.__takeovers.length,playing:window.__mock.playing,lock:!!window.MAIRAudioTransitionLock}));
+    c.ok('onderbroken stem: ritstart geeft binnen enkele seconden op (niet 45 s) en laat de lock los',Date.now()-t0<8000&&st.tk>0&&!st.lock&&/onderbroken/.test(st.rd.lastError),JSON.stringify({ms:Date.now()-t0,...st}));
+    c.ok('onderbroken stem: muziek speelt',st.playing);
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+}
 
 // ---- scenario 15+16: flitsmeldingen ---------------------------------------------
 // Vaste flitsers en trajectcontroles uit een nep-Overpass, rijdend langs de weg (rechte lijn naar het oosten). Zonder route (alleen
@@ -1263,7 +1317,7 @@ async function scenarioPlaces(){
   }finally{await p.h.close()}
 }
 
-const scenarios={places:scenarioPlaces,vibeall:scenarioVibeAll,vibeallnr:scenarioVibeAllNoRoute,vibeslow:scenarioVibeSlow,cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
+const scenarios={rideaudio:scenarioRideAudio,places:scenarioPlaces,vibeall:scenarioVibeAll,vibeallnr:scenarioVibeAllNoRoute,vibeslow:scenarioVibeSlow,cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);

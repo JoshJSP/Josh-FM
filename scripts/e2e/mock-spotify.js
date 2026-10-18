@@ -48,7 +48,8 @@ window.fetch=async function(input,init){
   if(p==='/me/player'&&method==='GET'&&S.otherDevice&&!S.active)return json({device:{id:'iphone-spotify-app',name:'iPhone',type:'Smartphone',is_active:true,volume_percent:80},is_playing:true,progress_ms:1000,item:byUri(S.uris[0]),timestamp:now(),currently_playing_type:'track',actions:{}});
   if(p==='/me/player'&&method==='GET'){const t=cur();if(!S.active||!t)return empty();return json({device:{id:S.deviceId,name:S.deviceName,type:'Computer',is_active:true,volume_percent:Math.round(S.volume*100)},is_playing:S.playing,progress_ms:Math.round(position()),item:t,shuffle_state:S.shuffle,repeat_state:S.repeat,timestamp:now(),currently_playing_type:'track',actions:{}})}
   if(p==='/me/player'&&method==='PUT'){S.active=true;if(body?.play)S.playing=true;if(S.playing){setPos(position());schedule()}emit();return empty()}
-  if(p==='/me/player/play'){startPlay(body,q);return empty()}
+  // __mock.playLagMs: Spotify Connect neemt de opdracht aan (204) en het toestel speelt pas later (de Spotify-app op de iPhone laadt eerst).
+  if(p==='/me/player/play'){if(S.playLagMs){S.lagged=(S.lagged||0)+1;setTimeout(()=>startPlay(body,q),S.playLagMs)}else startPlay(body,q);return empty()}
   if(p==='/me/player/pause'){setPos(position());S.playing=false;clearTimeout(timer);emit();return empty()}
   if(p==='/me/player/next'){advance();return empty()}
   if(p==='/me/player/previous'){if(position()>3000||S.idx===0){setPos(0)}else S.idx--;S.playing=true;schedule();emit();return empty()}

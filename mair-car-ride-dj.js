@@ -41,7 +41,7 @@ function line({destination,duration,track,change}){
 }
 // Uurnieuws dat klaarstaat houdt de ritstart niet tegen (keuze van Josh, 17-10-2026): het wacht op de lock
 // en komt pas na het eerste ritnummer, want het nieuws airt alleen bij een natuurlijk einde.
-function someoneTalking(){const d=window.MAIRDJ?.diagnostics?.()||{},lock=window.MAIRAudioTransitionLock;return!!(window.MAIRDJ?.busy||['HANDOFF','SPEAKING','RESTORING'].includes(d.phase)||window.MAIRNewsBulletin?.airing||lock?.breakId)}
+function someoneTalking(mine=null){const d=window.MAIRDJ?.diagnostics?.()||{},lock=window.MAIRAudioTransitionLock;return!!(window.MAIRDJ?.busy||['HANDOFF','SPEAKING','RESTORING'].includes(d.phase)||window.MAIRNewsBulletin?.airing||lock?.breakId&&lock!==mine)}
 // Het eerste nummer van de rit: wat na het lopende nummer in de wachtrij staat nadat de journey-director herplande.
 function waitReplan(){return new Promise(res=>{const done=()=>{clearTimeout(t);removeEventListener('mair:director-replanned',on);res()},on=e=>{if(/journey/.test(String(e.detail?.reason||'')))done()},t=setTimeout(done,REPLAN_WAIT_MS);addEventListener('mair:director-replanned',on)})}
 function firstRideTrack(){const q=window.JFMQueue?.current?.()||[],id=String(truth()?.trackId||''),i=q.findIndex(t=>t?.id===id);return q[i+1]||null}
@@ -49,17 +49,21 @@ async function announce(detail={}){
   const change=!!detail.change,dest=detail.destination;
   if(busy||!dest||!djOn()||document.visibilityState==='hidden')return false;
   if(change&&near(dest,lastDest))return false;
-  busy=true;let op=0,paused=false,uri='',error='';const lock={breakId:'car-ride',acquiredAt:Date.now()};
+  if(someoneTalking())return false;
+  // De lock gaat er meteen bij de routestart op: zo stuurt de herplanning geen play naar Spotify terwijl wij gaan pauzeren.
+  // Die play kwam op de iPhone soms pas aan als de DJ al praatte: de Spotify-app nam de audio over en de stem brak af.
+  // Wat de director daardoor niet naar Spotify stuurde (held), sturen we na afloop alsnog.
+  busy=true;let op=0,paused=false,uri='',error='',track=null,started=false,held=false;const lock={breakId:'car-ride',acquiredAt:Date.now()};
+  window.MAIRAudioTransitionLock=lock;const onReplan=e=>{if(e.detail?.held)held=true};addEventListener('mair:director-replanned',onReplan);
   try{
     if(!change)await waitReplan();
     // Pas na het herplannen kijken: in die seconden kan de DJ of het nieuws net begonnen zijn.
-    if(someoneTalking()||!djOn()||document.visibilityState==='hidden')return false;
+    if(someoneTalking(lock)||!djOn()||document.visibilityState==='hidden')return false;
     const t=truth();uri=String(t?.uri||'');const playing=!!(uri&&t?.isPlaying);
-    const track=!change&&playing?firstRideTrack():null,text=line({destination:dest,duration:detail.duration,track,change});
+    track=!change&&playing?firstRideTrack():null;const text=line({destination:dest,duration:detail.duration,track,change});
     if(typeof window.prepareSpeech!=='function'||typeof window.speakText!=='function')throw Error('MAIR Voice Engine is niet klaar');
     if(!await window.prepareSpeech(text,false))throw Error(window.JFMDJAudio?.status?.error||'Rit-aankondiging kon niet worden voorbereid');
-    if(someoneTalking())return false;
-    window.MAIRAudioTransitionLock=lock;
+    if(someoneTalking(lock))return false;
     const p=window.JFMPlayback;
     if(playing){op=window.JFMPlaybackState?.begin?.('dj-handoff',{expectedUri:uri,timeoutMs:60000})||0;if(!await p?.djPause?.(uri))throw Error(p?.health?.lastError||'Muziek pauzeren voor de rit-aankondiging mislukt');paused=true}
     if(!await window.speakText(text,false))throw Error(window.JFMDJAudio?.status?.error||'Rit-aankondiging werd niet hoorbaar afgespeeld');
@@ -68,12 +72,15 @@ async function announce(detail={}){
     return true
   }catch(e){error=String(e?.message||e).slice(0,240);lastError=error;window.MAIRRuntime?.caught?.('mair-car-ride-dj.announce',e);return false}
   finally{
-    // Muziek gaat altijd weer aan: na de aankondiging het eerste ritnummer vanaf het begin, anders (of als dat mislukt) het oude nummer.
-    if(paused){const p=window.JFMPlayback;let ok=false;try{ok=!error&&!change&&await p?.djNext?.('dj-ride-intro')}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.next',e)}if(!ok)try{await p?.djResume?.(uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.resume',e)}}
+    // Muziek gaat altijd weer aan: na de aankondiging het eerste ritnummer vanaf het begin, met één play-opdracht en de
+    // nieuwe ritvolgorde erachter. Anders (of als dat mislukt) het oude nummer.
+    if(paused){const p=window.JFMPlayback;try{started=!error&&!!track?.uri&&await p?.djNext?.('dj-ride-intro',track.uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.next',e)}if(!started)try{await p?.djResume?.(uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.resume',e)}}
     try{if(op)window.JFMPlaybackState?.end?.(op,{error})}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.end',e)}
-    if(window.MAIRAudioTransitionLock===lock)window.MAIRAudioTransitionLock=null;busy=false
+    removeEventListener('mair:director-replanned',onReplan);
+    if(window.MAIRAudioTransitionLock===lock)window.MAIRAudioTransitionLock=null;busy=false;
+    if(held&&!started)window.JFMProgramDirector?.replan?.('journey',true)?.catch?.(()=>{})
   }
 }
 addEventListener('mair:car-route-start',e=>{announce(e.detail||{}).catch(()=>{})});
-window.MAIRCarRideDJ={version:'car-ride-dj-v1',announce,line,spokenPlace,spokenDuration,status:()=>({busy,lastText,lastError,lastAt})};
+window.MAIRCarRideDJ={version:'car-ride-dj-v2',announce,line,spokenPlace,spokenDuration,status:()=>({busy,lastText,lastError,lastAt})};
 })();
