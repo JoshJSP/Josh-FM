@@ -41,6 +41,7 @@ window.fetch=async function(input,init){
   const p=url.pathname.replace(/^\/v1/,''),q=url.searchParams;let body=null;try{body=init?.body?JSON.parse(init.body):null}catch{}
   S.calls.push({m:method,p:p+(url.search||'')});
   if(S.delayMs)await new Promise(r=>setTimeout(r,S.delayMs));
+  if(p==='/search'&&S.searchDelayMs)await new Promise(r=>setTimeout(r,S.searchDelayMs));
   if(S.failNext&&S.failNext.test(method+' '+p)){const f=S.failNext;S.failNext=null;return json({error:{status:f.status||429,message:f.message||'mock failure'}},f.status||429,f.retryAfter?{'Retry-After':String(f.retryAfter)}:{})}
   if(p==='/me'&&method==='GET')return json({id:'mock-user',display_name:'Test',product:'premium',country:'NL',email:'test@example.invalid'});
   if(p==='/me/player/devices')return json({devices:S.deviceId&&S.registered?[{id:S.deviceId,name:S.deviceName,type:'Computer',is_active:S.active,is_restricted:false,volume_percent:Math.round(S.volume*100)}]:[]});

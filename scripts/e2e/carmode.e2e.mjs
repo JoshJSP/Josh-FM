@@ -892,6 +892,54 @@ async function scenarioVibeRide(){
   }finally{await h.close()}
 }
 
+async function vibeAll({withRoute,searchDelay=0,list=['drive','energy','chill','party','discover','forgotten','mair','chill']}){
+  // Josh 18-10-2026: vibe wisselen doet "helemaal niets" op de iPhone. Per vibe, met en zonder route: verandert wat Spotify hierna speelt,
+  // en meldt Car Mode wat er gebeurt? Oorzaak (bewezen): het station bouwen duurt ~7,5 s zonder netwerk (zoekopdrachten lopen één voor
+  // één met 1,5 s ertussen) en meer op een telefoon; na 12 s gaf vibePool het op en dan verandert opnieuw ordenen met een route niets.
+  const tag=`${withRoute?'met':'zonder'} route${searchDelay?`, zoeken ${searchDelay/1000} s per aanvraag`:''}`;
+  const t=await setup(),{page,h}=t;
+  const snap=()=>page.evaluate(()=>{const m=window.__mock;return{cur:m.uris[m.idx],next:m.uris.slice(m.idx+1,m.idx+9),playing:m.playing,mode:window.JFMRotation.state().mode}});
+  try{
+    await page.locator('nav button, [role=tab]',{hasText:'Stations'}).locator('visible=true').first().click();await sleep(500);
+    await page.locator('[data-mair-station]').locator('visible=true').first().click();
+    await until(page,()=>window.__mock.state().playing&&window.__mock.state().uris>=10&&queue.length>=10,null,25000,'station speelt');
+    await sleep(1500);
+    await page.evaluate(()=>queue.forEach((x,i)=>{x.popularity=[15,95,40,85,25,70,10,90,55,30][i%10]}));
+    if(withRoute){await startRoute(t);for(let m=500;m<=6000;m+=500)await t.at(m);await until(page,()=>window.MAIRJourneyDirector?.state?.().active,null,8000,'journey actief');await sleep(9000)}
+    else{await page.evaluate(()=>window.MAIRCarModePrototype.open());await sleep(300);await page.locator('#mairCarWaveOverlay [data-act="music"]').first().click();await sleep(400)}
+    if(searchDelay)await page.evaluate(ms=>{window.__mock.searchDelayMs=ms},searchDelay);
+    let prevV='';
+    for(const v of list){
+      const before=await snap(),name=await page.evaluate(id=>({mair:'MAIR',drive:'Rijden',energy:'Energie',chill:'Chill',party:'Feest',discover:'Ontdekken',forgotten:'Vergeten favorieten'})[id],v);
+      await page.evaluate(()=>{window.__toasts.length=0});
+      await page.locator('#mairCarWaveOverlay [data-act="menu"], #mairCarWaveOverlay .car-music-bar [data-act="vibe"]').first().click();await sleep(300);
+      const vb=page.locator('#mairCarWaveOverlay .car-menu [data-act="vibe"]');if(await vb.count())await vb.first().click();await sleep(300);
+      const t0=Date.now();
+      await page.locator(`#mairCarWaveOverlay [data-vibe="${v}"]`).click();
+      await sleep(400);
+      const early=await page.evaluate(()=>[...window.__toasts]);
+      await until(page,()=>window.__toasts.some(x=>/volgend nummer is|niet overgenomen|lukte niet/.test(x)),null,70000,'eindmelding').catch(()=>{});
+      const secs=Math.round((Date.now()-t0)/1000);await sleep(800);
+      const after=await snap(),toasts=await page.evaluate(()=>[...window.__toasts]),fin=toasts.find(x=>/volgend nummer is|niet overgenomen|lukte niet/.test(x))||'';
+      const reorderOnly=v==='mair'||v==='forgotten';
+      console.log(`  ${tag} ${v.padEnd(9)} ${secs}s volgend ${before.next[0]?.slice(-3)} -> ${after.next[0]?.slice(-3)} melding "${fin}"`);
+      c.ok(`vibe ${v} (${tag}): keuze staat erin, huidige nummer speelt door`,after.mode===v&&after.playing&&after.cur===before.cur);
+      c.ok(`vibe ${v} (${tag}): meteen een melding dat er gewerkt wordt (zoeken) of al klaar`,reorderOnly||early.some(x=>/Vibe: .*zoeken|volgend nummer is/.test(x)),JSON.stringify(early));
+      c.ok(`vibe ${v} (${tag}): eindmelding noemt de vibe en het volgende nummer`,fin.includes('Vibe: '+name)&&/volgend nummer is /.test(fin)&&!/niet overgenomen/.test(fin),fin);
+      c.ok(`vibe ${v} (${tag}): het genoemde nummer is wat Spotify echt hierna speelt`,await page.evaluate(()=>{const m=window.__mock,u=window.JFMSpotifyUpcomingTruth?.items?.[0];return !!u&&u.uri===m.uris[m.idx+1]}));
+      if(searchDelay)c.ok(`vibe ${v} (${tag}): de komende nummers komen uit het nieuwe station (minstens 5 van de eerste 8 nieuw)`,after.next.filter(u=>!before.next.includes(u)).length>=5,`nieuw ${after.next.filter(u=>!before.next.includes(u)).length}/8`);
+      const sameStation=({drive:'hits',energy:'hits'})[v]&&({drive:'hits',energy:'hits'})[prevV]===({drive:'hits',energy:'hits'})[v];
+      if(!reorderOnly&&!sameStation)c.ok(`vibe ${v} (${tag}): Spotify heeft een nieuwe volgorde (ander volgend nummer)`,after.next[0]!==before.next[0],`${before.next[0]} -> ${after.next[0]}`);
+      prevV=v;
+    }
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+}
+const scenarioVibeAll=()=>vibeAll({withRoute:true});
+const scenarioVibeAllNoRoute=()=>vibeAll({withRoute:false});
+// zoeken kost 2,5 s per aanvraag (telefoon, slecht bereik): 5 aanvragen = ~20 s, ruim boven de oude 12 s
+const scenarioVibeSlow=()=>vibeAll({withRoute:true,searchDelay:2500,list:['chill','party']});
+
 // ---- scenario 15: de DJ begint de rit ----------------------------------------------
 // Josh 17-10-2026: route starten = DJ zegt meteen waar we heen gaan, hoe lang het duurt en met welk nummer we beginnen.
 // Het lopende nummer stopt, de DJ praat, dan start precies het aangekondigde nummer. Nieuwe bestemming tijdens de rit:
@@ -1083,7 +1131,7 @@ async function scenarioCamsRoute(){
   }finally{await h.close()}
 }
 
-const scenarios={cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
+const scenarios={vibeall:scenarioVibeAll,vibeallnr:scenarioVibeAllNoRoute,vibeslow:scenarioVibeSlow,cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);

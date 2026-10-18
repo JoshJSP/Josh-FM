@@ -503,11 +503,30 @@ function vibeSheet(){const now=vibeNow();return`<div class="car-menu-backdrop"><
 // Nieuwe vibe: huidige nummer speelt door, de rest van de wachtrij wordt opnieuw gepland en Spotify krijgt de nieuwe volgorde.
 // Alleen opnieuw ordenen veranderde tijdens een rit niets merkbaars (zelfde nummers, de journey-score weegt zwaar). Daarom komen de
 // nummers na het huidige uit het station dat bij de vibe past. MAIR en Vergeten favorieten ordenen de eigen wachtrij opnieuw.
-// Lukt het station niet binnen 12 s, dan ook gewoon opnieuw ordenen: de muziek loopt altijd door.
+// Een station bouwen kost tijd: Spotify-zoekopdrachten lopen één voor één met minstens 1,5 s ertussen (spotify-test-config.js), dus
+// 5 zoekopdrachten is al ~7,5 s zonder netwerk, en daarna nog het categoriefilter. 12 s was te krap op een telefoon: dan viel de
+// vibe stil terug op opnieuw ordenen, en dat verandert met een route niets. Nu 30 s, met een melding vooraf en achteraf.
+// Lukt het station niet, dan ook gewoon opnieuw ordenen: de muziek loopt altijd door.
 const VIBE_STATION={drive:'hits',energy:'hits',chill:'chill',party:'party',discover:'new'};
-async function vibePool(id){const st=VIBE_STATION[id];if(!st||!window.MAIRStationController?.buildPool)return null;let timer;try{const b=await Promise.race([window.MAIRStationController.buildPool(st),new Promise(r=>{timer=setTimeout(r,12000)})]);return b?.tracks?.length>=5?b.tracks:null}catch(e){window.MAIRRuntime?.caught?.('carmode.vibe-pool',e);return null}finally{clearTimeout(timer)}}
+const POOL_MS=30000;
+async function vibePool(id){const st=VIBE_STATION[id];if(!st||!window.MAIRStationController?.buildPool)return null;let timer;try{const b=await Promise.race([window.MAIRStationController.buildPool(st),new Promise(r=>{timer=setTimeout(r,POOL_MS)})]);return b?.tracks?.length>=5?b.tracks:null}catch(e){window.MAIRRuntime?.caught?.('carmode.vibe-pool',e);return null}finally{clearTimeout(timer)}}
 let vibeSeq=0;
-function setVibe(id){if(!window.JFMRotation?.setMode?.(id))return;render();const seq=++vibeSeq;vibePool(id).then(pool=>{if(seq===vibeSeq)return window.JFMProgramDirector?.replan?.('vibe',true,pool)}).catch(e=>window.MAIRRuntime?.caught?.('carmode.vibe',e))}
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+// Wat Spotify zelf als volgende klaar heeft staan, niet onze lokale lijst. programNext ververst de wachtrij ook, maar zonder te wachten.
+async function spotifyNext(){const u=window.JFMSpotifyUpcomingTruth;if(!u?.sync)return null;await pause(1400);try{await u.sync(true)}catch(e){window.MAIRRuntime?.caught?.('carmode.vibe-sync',e)}const t=u.items?.[0];return t?{uri:t.uri||'',label:`${t.name}${t.artists?.length?' van '+t.artists.join(', '):''}`}:null}
+async function applyVibe(id,seq){
+  const name=(VIBES.find(v=>v[0]===id)||[id,id])[1],station=!!(VIBE_STATION[id]&&window.MAIRStationController?.buildPool);
+  if(station)toast(`Vibe: ${name}. Nieuwe nummers zoeken…`,POOL_MS);
+  const pool=await vibePool(id);if(seq!==vibeSeq)return;
+  let ok=await window.JFMProgramDirector?.replan?.('vibe',true,pool);
+  // replan geeft false als er al een replan loopt (bijvoorbeeld van de route) en slaat de wissel dan stil over
+  if(!ok){await pause(2500);if(seq!==vibeSeq)return;ok=await window.JFMProgramDirector?.replan?.('vibe',true,pool)}
+  if(seq!==vibeSeq)return;
+  const want=window.JFMQueue?.current?.()?.[1]?.uri||'',next=ok?await spotifyNext():null;if(seq!==vibeSeq)return;
+  if(next&&(!want||next.uri===want))toast(`Vibe: ${name}${station&&!pool?', nieuwe nummers laden lukte niet.':','} volgend nummer is ${next.label}`,9000);
+  else toast(`Vibe: ${name} gekozen, maar Spotify heeft de nieuwe volgorde nog niet overgenomen${next?'. Volgend nummer blijft '+next.label:''}`,9000)
+}
+function setVibe(id){if(!window.JFMRotation?.setMode?.(id))return;render();const seq=++vibeSeq;applyVibe(id,seq).catch(e=>{window.MAIRRuntime?.caught?.('carmode.vibe',e);if(seq===vibeSeq)toast('Vibe wisselen lukte niet. De muziek speelt door.',7000)})}
 const camsButton=()=>window.MAIRCarCams?`<button data-act="cams" aria-pressed="${window.MAIRCarCams.isOn()}">Flitsers: ${window.MAIRCarCams.isOn()?'aan':'uit'}</button>`:'';
 function menu(){return`<div class="car-menu-backdrop"><section class="car-menu"><button data-act="vibe">Vibe: ${esc(vibeLabel())}</button>${camsButton()}${s.routeActive?'<button data-act="addstop">Tussenstop toevoegen</button><button data-act="search">Bestemming wijzigen</button><button data-act="waze">Open in Waze</button><button data-act="music">Verder zonder route</button>':'<button data-act="search">Bestemming toevoegen</button>'}<button class="danger" data-act="close">Car Mode sluiten</button><button class="muted" data-act="menuclose">Annuleren</button></section></div>`}
 function openSearch(purpose='destination'){closeMenu();s.searchPurpose=purpose;s.searchQuery='';s.searchResults=[];s.error='';s.screen='search';render();queueMicrotask(bindSearch);
