@@ -21,7 +21,7 @@ function advance(){S.ended++;if(S.userQueue.length){const u=S.userQueue.shift();
 let timer=0;
 function schedule(){clearTimeout(timer);if(!S.playing)return;const c=cur();if(!c)return;timer=setTimeout(()=>{if(S.playing&&position()>=c.duration_ms-5)advance();else schedule()},Math.max(5,c.duration_ms-position()))}
 S.finishTrack=(leftMs=300)=>{const c=cur();if(c){setPos(Math.max(0,c.duration_ms-leftMs));schedule();emit()}};
-S.state=()=>({disconnects:S.disconnects||0,active:S.active,playing:S.playing,idx:S.idx,uri:S.uris[S.idx]||'',position:position(),volume:S.volume,uris:S.uris.length,ended:S.ended,calls:S.calls.length});
+S.state=()=>({disconnects:S.disconnects||0,connects:S.connects||0,registered:!!S.registered,active:S.active,playing:S.playing,idx:S.idx,uri:S.uris[S.idx]||'',position:position(),volume:S.volume,uris:S.uris.length,ended:S.ended,calls:S.calls.length});
 S.callLog=()=>S.calls.map(c=>c.m+' '+c.p);
 function startPlay(body,q){const uris=Array.isArray(body?.uris)?body.uris:null;if(uris){S.uris=uris.slice();S.idx=Math.max(0,Number.isInteger(body?.offset?.position)?body.offset.position:0);if(body?.offset?.uri){const k=S.uris.indexOf(body.offset.uri);if(k>=0)S.idx=k}}else if(body?.context_uri){S.uris=CAT.slice(0,30).map(c=>'spotify:track:'+c.id);S.idx=0}
   setPos(Number(body?.position_ms)||0);S.playing=true;S.active=true;schedule();emit()}
@@ -71,7 +71,9 @@ class Player{
   constructor(o){this.o=o;this.id=S.deviceId;S.player=this;S.registered=false;S.listeners={};S.getToken=o.getOAuthToken}
   addListener(n,f){(S.listeners[n]=S.listeners[n]||[]).push(f);return true}
   removeListener(n,f){S.listeners[n]=(S.listeners[n]||[]).filter(x=>x!==f);return true}
-  async connect(){await new Promise(r=>S.getToken(r));setTimeout(()=>{S.registered=true;(S.listeners.ready||[]).forEach(f=>f({device_id:S.deviceId}))},30);return true}
+  async connect(){await new Promise(r=>S.getToken(r));S.connects=(S.connects||0)+1;if(S.failConnect)return false;setTimeout(()=>{S.registered=true;(S.listeners.ready||[]).forEach(f=>f({device_id:S.deviceId}))},30);return true}
+  // Nep voor iOS die de verbinding van de SDK verbreekt (scherm uit, netwerkwissel): Spotify ziet het device niet meer, de app krijgt alleen not_ready.
+  static drop(){S.pos=position();S.since=now();S.registered=false;S.active=false;S.playing=false;clearTimeout(timer);(S.listeners.not_ready||[]).forEach(f=>f({device_id:S.deviceId}))}
   disconnect(){S.disconnects=(S.disconnects||0)+1;S.registered=false;S.active=false;S.playing=false;clearTimeout(timer);(S.listeners.not_ready||[]).forEach(f=>f({device_id:S.deviceId}))}
   async getCurrentState(){return sdkState()}
   async setVolume(v){if(S.failVolume>0){S.failVolume--;throw new Error('mock: setVolume mislukt')}S.volume=v;(S.volLog=S.volLog||[]).push([Date.now(),Math.round(v*100)/100])}

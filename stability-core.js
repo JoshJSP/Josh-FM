@@ -43,7 +43,8 @@
       const ready=new Promise((resolve,reject)=>{
         const timer=setTimeout(()=>reject(Error('MAIRFM-speler reageert niet.')),PLAYER_READY_TIMEOUT_MS);
         player.addListener('ready',({device_id})=>{clearTimeout(timer);rememberDevice(device_id);localStorage.setItem(STREAM,'1');message('Spotify gekoppeld · MAIRFM-speler klaar.');setStatus(true,'gekoppeld');enable(true);resolve(device_id)});
-        player.addListener('not_ready',({device_id}={})=>{if(!device_id||device_id===deviceId)rememberDevice('');lastObserved=null;try{window.JFMPlaybackState?.patch?.({deviceId:'',deviceName:'',isPlaying:false},'sdk-not-ready')}catch(e){window.MAIRRuntime?.caught?.('stability-core.initPlayer',e)};message('Spotify-speler is tijdelijk offline.',true)});
+        const me=player;
+        player.addListener('not_ready',({device_id}={})=>{if(!device_id||device_id===deviceId)rememberDevice('');lastObserved=null;try{window.JFMPlaybackState?.patch?.({deviceId:'',deviceName:'',isPlaying:false},'sdk-not-ready')}catch(e){window.MAIRRuntime?.caught?.('stability-core.initPlayer',e)};message('Spotify-speler is tijdelijk offline.',true);if(me===player&&!reconnectPromise)deviceLost()});
         player.addListener('authentication_error',()=>{rememberDevice('');localStorage.removeItem(STREAM);message('Spotify moet één keer opnieuw gekoppeld worden voor afspelen in MAIRFM.',true);enable(false);if($('connect'))$('connect').disabled=false});
         player.addListener('account_error',()=>message('Spotify Premium is nodig om muziek in MAIRFM af te spelen.',true));
         player.addListener('autoplay_failed',()=>message('iPhone blokkeerde autoplay. Tik nogmaals op Start MAIRFM.',true));
@@ -115,6 +116,29 @@
     reconnectPromise=(async()=>{const old=player;rememberDevice('');initPromise=null;player=null;window.jfmSpotifyPlayer=null;try{old?.disconnect?.()}catch{/* oude speler al losgekoppeld */};await new Promise(r=>setTimeout(r,180));const id=await initPlayer();if(!id)throw Error('Spotify-device kon niet opnieuw worden geregistreerd.');return id})().finally(()=>{reconnectPromise=null});
     return reconnectPromise
   }
+  // iOS verbreekt de SDK-verbinding met het scherm uit of bij een netwerkwissel. Daarna kwam
+  // not_ready en verder niets: elke herstelprikkel hierboven wacht op zichtbaar/online, en
+  // initPromise bleef het oude device teruggeven. In de iPhone-app houdt de keep-alive de
+  // pagina in de achtergrond wakker, dus bouw het device hier zelf opnieuw op, begrensd.
+  let rebuilding=false,hiddenSince=document.visibilityState==='hidden'?Date.now():0;
+  document.addEventListener?.('visibilitychange',()=>{hiddenSince=document.visibilityState==='hidden'?(hiddenSince||Date.now()):0});
+  async function deviceLost(){
+    if(rebuilding)return;rebuilding=true;initPromise=null;
+    const hidden=document.visibilityState==='hidden',detail={hidden,hiddenForS:hiddenSince?Math.round((Date.now()-hiddenSince)/1000):0,native:!!window.Capacitor?.isNativePlatform?.()};
+    window.MAIRRuntime?.record?.('spotify.device-lost',detail,'error');
+    try{
+      for(const delay of [1500,...RETRY_DELAYS]){
+        await new Promise(r=>setTimeout(r,delay));
+        if(!sessionAlive())return;
+        let id=deviceId;
+        if(!id){try{id=await reconnect()}catch(e){window.MAIRRuntime?.caught?.('stability-core.deviceLost',e);continue}}
+        try{window.dispatchEvent(new CustomEvent('mair:spotify-device-recovered',{detail:{reason:'sdk-not-ready',deviceId:id,hidden:document.visibilityState==='hidden',at:Date.now()}}))}catch{/* event-listener gooide: onschuldig */}
+        return;
+      }
+      window.MAIRRuntime?.record?.('spotify.device-rebuild-failed',detail,'error');
+      message('De MAIRFM-speler is weggevallen en kwam niet terug. Open MAIRFM en tik op Play.',true);
+    }finally{rebuilding=false}
+  }
   // Een mislukte devices-lookup (429, timeout, offline) is geen bewijs dat het device weg is: dan niet reconnecten, want dat koppelt een werkende speler los.
   async function isAvailable(id=deviceId){if(!id)return false;try{const d=await api('/me/player/devices');if(!Array.isArray(d?.devices))return true;return d.devices.some(x=>x?.id===id&&!x?.is_restricted)}catch{return true}}
   async function ensureDevice(){let id=deviceId;if(id&&await isAvailable(id))return id;return reconnect()}
@@ -130,6 +154,6 @@
   // app.js herstelt de Spotify-sessie zelf na een tijdelijke verversfout; daarna alsnog de speler starten.
   window.addEventListener?.('mair:session-restored',()=>{if(needsPlayer())setTimeout(()=>reconcile(),300)});
   document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='visible'&&needsPlayer())setTimeout(()=>reconcile(),600)});
-  window.JFMSpotifySDK={version:'sdk-core-v8-bounded-cold-start-retry',init:initPlayer,initWithRetry:initPlayerWithRetry,reconnect,isAvailable,ensureDevice,transfer,playUris,get player(){return player},get deviceId(){return deviceId},get health(){return{installed:true,hasPlayer:!!player,deviceId,initializing:!!initPromise,reconnecting:!!reconnectPromise,retrying:bootRetrying,bootAttempts,lastBootError,maxAttempts:RETRY_DELAYS.length+1,timeouts:{sdkLoadMs:SDK_LOAD_TIMEOUT_MS,readyMs:PLAYER_READY_TIMEOUT_MS,connectMs:PLAYER_CONNECT_TIMEOUT_MS}}}};
+  window.JFMSpotifySDK={version:'sdk-core-v8-bounded-cold-start-retry',init:initPlayer,initWithRetry:initPlayerWithRetry,reconnect,isAvailable,ensureDevice,transfer,playUris,get player(){return player},get deviceId(){return deviceId},get health(){return{installed:true,hasPlayer:!!player,deviceId,initializing:!!initPromise,reconnecting:!!reconnectPromise,rebuilding,retrying:bootRetrying,bootAttempts,lastBootError,maxAttempts:RETRY_DELAYS.length+1,timeouts:{sdkLoadMs:SDK_LOAD_TIMEOUT_MS,readyMs:PLAYER_READY_TIMEOUT_MS,connectMs:PLAYER_CONNECT_TIMEOUT_MS}}}};
   window.MAIRRuntime?.register?.('spotify-sdk-core',{version:'sdk-core-v8-bounded-cold-start-retry',owner:'spotify-sdk'});
 })();

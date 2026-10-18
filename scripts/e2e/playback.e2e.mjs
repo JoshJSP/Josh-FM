@@ -699,7 +699,37 @@ async function scenarioNewsHour(){
   }finally{await h.close()}
 }
 
- const scenarios={newsHour:scenarioNewsHour,learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+ const scenarios={newsHour:scenarioNewsHour,learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,bgDeviceRebuild:scenarioBgDeviceRebuild,bgDeviceGone:scenarioBgDeviceGone,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// iOS verbreekt de Web Playback SDK met het scherm uit of bij een netwerkwissel; de app krijgt alleen not_ready.
+// Voor de fix bleef het daarna stil tot je de app weer opende (recover weigerde in de achtergrond, niets bouwde het device opnieuw).
+const hide=(page,v)=>page.evaluate(x=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>x});Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>x?'hidden':'visible'});document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event(x?'pagehide':'pageshow'))},v);
+async function scenarioBgDeviceRebuild(){
+  const h=await launch({trackMs:30000});
+  try{
+    await startStation(h);
+    await hide(h.page,true);await sleep(1000);
+    await h.page.evaluate(()=>window.Spotify.Player.drop());
+    await sleep(8000);
+    const st=await mock(h.page),log=await h.page.evaluate(()=>window.MAIRRuntime.errorLog().map(x=>x.type||x.event||x.name));
+    c.ok('device weg in achtergrond: speelt weer zonder de app te openen',st.playing===true&&st.registered===true,JSON.stringify(st));
+    c.ok('device weg in achtergrond: maar een speler tegelijk (oude losgekoppeld)',st.disconnects===1&&st.connects===2,JSON.stringify(st));
+    c.ok('device weg in achtergrond: staat in het foutlog',JSON.stringify(log).includes('spotify.device-lost'),JSON.stringify(log).slice(0,300));
+    noErrors('device weg in achtergrond: geen page errors',h);
+  }finally{await h.close()}
+}
+async function scenarioBgDeviceGone(){
+  const h=await launch({trackMs:30000});
+  try{
+    await startStation(h);
+    await hide(h.page,true);await sleep(1000);
+    await h.page.evaluate(()=>{window.__mock.failConnect=true;window.Spotify.Player.drop()});
+    await until(h.page,()=>!window.JFMSpotifySDK.health.rebuilding,null,40000,'herstelpogingen klaar');
+    const st=await mock(h.page),info=await h.page.evaluate(()=>document.getElementById('queueInfo')?.textContent||'');
+    c.ok('geen device: begrensd aantal pogingen',st.connects>=2&&st.connects<=6,JSON.stringify(st));
+    c.ok('geen device: duidelijke melding',/weggevallen/.test(info),info);
+    noErrors('geen device: geen page errors',h);
+  }finally{await h.close()}
+}
 const optIn=new Set(['soak']);
 for(const [name,fn] of Object.entries(scenarios)){if(only?only!==name:optIn.has(name))continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,600))}}
 process.exit(c.summary('MAIR e2e playback')?0:1);
