@@ -10,7 +10,7 @@ document.addEventListener('click',e=>{
   const r=root();if(!r||!r.contains(e.target))return;
   const act=e.target.closest('[data-act]')?.dataset.act;
   if(act==='menu'){wanted=true;setTimeout(restore,0);return}
-  if(act==='menuclose'||act==='close'||act==='search'||act==='addstop'||act==='music'||act==='time'||act==='waze'||act==='vibe'){wanted=false;return}
+  if(act==='menuclose'||act==='close'||act==='search'||act==='addstop'||act==='music'||act==='time'||act==='waze'||act==='vibe'||act==='placehere'){wanted=false;return}
   if(e.target.classList?.contains('car-menu-backdrop'))wanted=false;
 },true);
 const obs=new MutationObserver(()=>{if(wanted)restore();else if(!root()?.querySelector('.car-menu-backdrop'))wanted=false});

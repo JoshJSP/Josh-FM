@@ -1,5 +1,5 @@
 // Car Mode (ontwerp C2) in de echte app (headless Chrome) met nep-GPS en een nep-Mapbox.
-//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth|viberide|rideintro|cams|camsroute)
+//   node scripts/e2e/carmode.e2e.mjs [map-voor-screenshots]      (ONLY=nav|stops|concurrent|sizes|arrows|map|map2|search|portrait|snap|noroute|vibe|zoomout|vibewidth|viberide|rideintro|cams|camsroute|places)
 // Route: rechte lijn naar het oosten, rotonde op 1,5 km (2e afslag), afrit rechts op 25 km (met rijstroken-banner op
 // 800 m ervoor), 25,5 km in totaal. Maximumsnelheid: 100 tot 5 km, 130 tot 8 km, onbekend tot 9 km, daarna 80.
 // Het GPS-filter weigert sprongen sneller dan 110 m/s; Date.now() krijgt daarom een instelbare voorsprong
@@ -64,7 +64,7 @@ const STYLE_JSON=()=>({version:8,name:'e2e-nacht',sources:{decor:{type:'geojson'
   {id:'bridge-street',type:'line',source:'decor',filter:['==',['get','cls'],'main'],paint:{'line-color':'#3b4772','line-width':5}},
   {id:'road-label',type:'symbol',source:'decor',filter:['==',['get','cls'],'none'],layout:{'icon-image':'label'}}]});
 async function mapbox(h,{token=process.env.REAL_MM_TOKEN||'pk.test'}={}){
-  const m={directions:0,delayNext:0,failNext:false,roundabout:true,annotate:true,queries:[],params:[],styleReq:0,otherReq:[],box:[],geocode:[],matching:[],failMatch:false,hangMatch:false,matchHttp:0,overpass:[],camQueries:[],camEls:[],failHost:'',ovSpeed:'80',failOverpass:false,failBox:false,failTiles:false,tiles:{ok:0,fail:0}};
+  const m={reverse:[],failReverse:false,directions:0,delayNext:0,failNext:false,roundabout:true,annotate:true,queries:[],params:[],styleReq:0,otherReq:[],box:[],geocode:[],matching:[],failMatch:false,hangMatch:false,matchHttp:0,overpass:[],camQueries:[],camEls:[],failHost:'',ovSpeed:'80',failOverpass:false,failBox:false,failTiles:false,tiles:{ok:0,fail:0}};
   await h.page.route(ORIGIN+'/api/config',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({spotifyClientId:'mockclientid0123456789abcdef',mapboxPublicToken:token})}));
   await h.page.route('https://api.mapbox.com/**',async route=>{
     const u=new URL(route.request().url());
@@ -80,6 +80,11 @@ async function mapbox(h,{token=process.env.REAL_MM_TOKEN||'pk.test'}={}){
       if(/kerkstraat/i.test(q))return J({type:'FeatureCollection',features:[]});
       const x=/stop/i.test(q)?STOP_M:DEST_M,name=/stop/i.test(q)?'Tussenstop A':'Testbestemming';
       return J({type:'FeatureCollection',features:[F(name,x,0,name)]});
+    }
+    if(u.pathname.endsWith('/geocode/v6/reverse')){
+      m.reverse.push({lon:u.searchParams.get('longitude'),lat:u.searchParams.get('latitude')});
+      if(m.failReverse)return J({message:'kapot'},500);
+      return J({features:[{geometry:{coordinates:[Number(u.searchParams.get('longitude')),Number(u.searchParams.get('latitude'))]},properties:{name:'Hoofdstraat 12',full_address:'Hoofdstraat 12, 3441 AA Woerden, Nederland'}}]});
     }
     if(u.pathname.includes('/search/geocode/')){
       m.geocode.push(q);m.queries.push(q);
@@ -1131,7 +1136,134 @@ async function scenarioCamsRoute(){
   }finally{await h.close()}
 }
 
-const scenarios={vibeall:scenarioVibeAll,vibeallnr:scenarioVibeAllNoRoute,vibeslow:scenarioVibeSlow,cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
+// ---- scenario 17: locaties opslaan -------------------------------------------
+// Plekken opslaan (ster bij een zoekresultaat of gekozen bestemming, huidige locatie vanaf de kaart zonder route), een naam geven
+// (Thuis/School/Werk of vrij typen), blijven staan na herladen, met één tik als bestemming kiezen, bewerken en verwijderen.
+// Recents blijven ook staan (max 5).
+async function scenarioPlaces(){
+  const t=await setup(),{page,h,mb}=t;
+  const store=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('mair_car_places_v1')||'{}'));
+  const names=async()=>((await store()).saved||[]).map(x=>x.name);
+  const reload=async()=>{await page.reload({waitUntil:'load'});await until(page,()=>window.MAIRCarModePrototype&&window.MAIRCarMenuSticky&&window.MAIRCarMap,null,15000,'herladen');await sleep(800);await page.evaluate(()=>window.MAIRCarModePrototype.open());await sleep(300)};
+  const sheetOk=async tag=>{const b=await page.evaluate(()=>{const s=document.querySelector('.car-place-sheet'),r=s.getBoundingClientRect(),i=document.getElementById('carPlaceName').getBoundingClientRect(),v=document.querySelector('[data-pl="save"]').getBoundingClientRect();return{fits:r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth,input:document.elementFromPoint(i.left+i.width/2,i.top+i.height/2)===document.getElementById('carPlaceName'),save:document.elementFromPoint(v.left+v.width/2,v.top+v.height/2)===document.querySelector('[data-pl="save"]'),r:[r.top,r.bottom,innerHeight]}});c.ok(`${tag}: naamblad past in het scherm, invoerveld en OPSLAAN staan bovenop`,b.fits&&b.input&&b.save,JSON.stringify(b))};
+  try{
+    await page.evaluate(()=>window.MAIRCarModePrototype.open());await sleep(300);
+    c.ok('startscherm: OPGESLAAN staat boven RECENT, nog leeg',/OPGESLAAN[\s\S]*Nog niets opgeslagen[\s\S]*RECENT/.test(await txt(page,'.car-places')),await txt(page,'.car-places'));
+    // 1. ster bij een zoekresultaat, snelkeuze Thuis
+    await page.locator('[data-act="search"]').first().click();
+    await until(page,()=>window.MAIRCarModePrototype.status().hasPosition,null,8000,'positie');
+    c.ok('zoekblad zonder tekst: OPGESLAAN en RECENT staan er',/OPGESLAAN/.test(await txt(page,'#carSearchResults'))&&/RECENT/.test(await txt(page,'#carSearchResults')));
+    await page.fill('#carSearchInput','Susu Harmelen');await page.locator('[data-place-save="result:0"]').waitFor({timeout:8000});
+    c.ok('zoekresultaat heeft een ster (nog niet opgeslagen)',(await txt(page,'[data-place-save="result:0"]'))==='☆');
+    await page.locator('[data-place-save="result:0"]').click();
+    await page.locator('#carPlaceName').waitFor({timeout:3000});
+    c.ok('naamblad: toont het adres en de naam van de plek',/PLEK OPSLAAN/.test(await txt(page,'.car-place-sheet'))&&await page.inputValue('#carPlaceName')==='Asian Fusion Susu Harmelen');
+    await sheetOk('liggend');
+    if(outDir)await page.screenshot({path:outDir+'/carmode-plek-opslaan.png'});
+    await page.locator('.car-place-chips [data-chip="Thuis"]').click();
+    c.ok('snelkeuze Thuis zet de naam',await page.inputValue('#carPlaceName')==='Thuis');
+    await page.locator('[data-pl="save"]').click();await sleep(200);
+    let st=await store();
+    c.ok('opgeslagen onder mair_car_places_v1 (naam, adres, coördinaten)',st.saved?.length===1&&st.saved[0].name==='Thuis'&&/Susu/.test(st.saved[0].address)&&Math.abs(st.saved[0].latitude-LAT0)<.01&&Math.abs(st.saved[0].longitude-lonAt(3000))<.01,JSON.stringify(st));
+    c.ok('ritstart-DJ (mair-car-ride-dj.js) leest dezelfde plek en noemt hem Thuis',await page.evaluate(p=>window.MAIRCarRideDJ?.spokenPlace?.({name:'Susu',address:'ergens anders',latitude:p.latitude,longitude:p.longitude}),st.saved?.[0]||{})==='Thuis');
+    c.ok('blad dicht en de ster is gevuld',!(await has(page,'.car-place-sheet'))&&(await txt(page,'[data-place-save="result:0"]'))==='★');
+    // 2. vrij typen, tweede plek
+    await page.fill('#carSearchInput','Albert Heijn');await page.locator('[data-place-save="result:1"]').waitFor({timeout:8000});
+    await page.locator('[data-place-save="result:0"]').click();await page.locator('#carPlaceName').waitFor();
+    await page.fill('#carPlaceName','Opa');await page.locator('[data-pl="save"]').click();await sleep(200);
+    c.ok('vrij typen: Opa staat erbij, Thuis blijft voorop',(await names()).join()==='Thuis,Opa',(await names()).join());
+    // zelfde naam = zelfde plek: Thuis opnieuw geven aan een andere plek vervangt de eerste
+    await page.locator('[data-place-save="result:1"]').click();await page.locator('#carPlaceName').waitFor();
+    await page.locator('.car-place-chips [data-chip="Thuis"]').click();await page.locator('[data-pl="save"]').click();await sleep(200);
+    c.ok('Thuis kan maar één keer: nieuwe Thuis vervangt de oude',(await names()).join()==='Thuis,Opa'&&/Vleuten/.test((await store()).saved[0].address),JSON.stringify((await store()).saved.map(x=>x.address)));
+    // 3. leeg zoekveld toont de lijst, tik = bestemming
+    await page.fill('#carSearchInput','');await sleep(200);
+    c.ok('zoekblad: leeg veld toont de opgeslagen plekken met grote tikvakken',await page.evaluate(()=>{const b=document.querySelector('#carSearchResults [data-place="saved:0"]');return !!b&&b.getBoundingClientRect().height>=60&&/Thuis/.test(b.textContent)}));
+    // 4. herladen: blijft staan
+    await reload();
+    c.ok('na herladen: startscherm toont Thuis en Opa onder OPGESLAAN, in die volgorde',await page.evaluate(()=>{const b=[...document.querySelectorAll('.car-start [data-place^="saved:"] b')].map(x=>x.textContent);return b.join()==='Thuis,Opa'}),await txt(page,'.car-places'));
+    if(outDir)await page.screenshot({path:outDir+'/carmode-opgeslagen-start.png'});
+    // 5. tik = route
+    const dir0=mb.directions;
+    await page.locator('.car-start [data-place="saved:1"]').click();
+    await page.locator('[data-act="start"]').waitFor({timeout:8000});
+    st=await status(page);
+    c.ok('tik op een opgeslagen plek: route wordt berekend en staat klaar (voorbeeldscherm)',mb.directions>dir0&&st.screen==='preview'&&/Opa/.test(st.destination?.name||''),JSON.stringify({d:mb.directions-dir0,s:st.screen,n:st.destination?.name}));
+    c.ok('voorbeeldscherm: ster is gevuld, want de plek is opgeslagen',(await txt(page,'[data-place-save="dest"]'))==='★');
+    await page.locator('[data-act="start"]').click();await until(page,()=>window.MAIRCarModePrototype.status().screen==='drive',null,8000,'rijscherm');
+    st=await store();
+    c.ok('route gestart: bestemming staat bij recents (bewaard)',st.recents?.length===1&&/Opa/.test(st.recents[0].name)&&/Albert Heijn/.test(st.recents[0].address),JSON.stringify(st.recents));
+    // 6. huidige locatie opslaan vanaf de kaart zonder route
+    await page.locator('#mairCarWaveOverlay [data-act="menu"]').first().click();
+    await page.locator('#mairCarWaveOverlay .car-menu [data-act="music"]').click();
+    await until(page,()=>window.MAIRCarModePrototype.status().screen==='music',null,5000,'kaart zonder route');await sleep(500);
+    c.ok('kaart zonder route: knop om de huidige locatie op te slaan',await page.locator('.car-here').isVisible());
+    await page.locator('.car-here').click();await page.locator('#carPlaceName').waitFor({timeout:6000});
+    c.ok('huidige locatie: adres via reverse geocode (naam en adres vooraf ingevuld)',mb.reverse.length===1&&await page.inputValue('#carPlaceName')==='Hoofdstraat 12'&&/Woerden/.test(await txt(page,'.car-place-sheet strong')),JSON.stringify({r:mb.reverse.length,v:await page.inputValue('#carPlaceName')}));
+    await sheetOk('huidige locatie');
+    if(outDir)await page.screenshot({path:outDir+'/carmode-huidige-locatie-opslaan.png'});
+    await page.locator('.car-place-chips [data-chip="Werk"]').click();await page.locator('[data-pl="save"]').click();await sleep(200);
+    st=await store();
+    c.ok('huidige locatie opgeslagen als Werk, volgorde Thuis, Werk, Opa',(await names()).join()==='Thuis,Werk,Opa'&&Math.abs(st.saved[1].latitude-LAT0)<.001&&Math.abs(st.saved[1].longitude-LON0)<.001,JSON.stringify(st.saved.map(x=>[x.name,x.latitude,x.longitude])));
+    // zelfde plek nog eens: opent bewerken in plaats van dubbel opslaan
+    await page.locator('.car-here').click();await page.locator('#carPlaceName').waitFor({timeout:6000});
+    c.ok('zelfde plek nog eens opslaan: opent Plek bewerken met de bestaande naam (geen dubbele)',/PLEK BEWERKEN/.test(await txt(page,'.car-place-sheet'))&&await page.inputValue('#carPlaceName')==='Werk');
+    // verwijderen met bevestiging, daarna zonder adres: coördinaten
+    await page.locator('[data-pl="del"]').click();
+    c.ok('verwijderen vraagt eerst om bevestiging',await page.locator('[data-pl="delyes"]').isVisible()&&(await names()).includes('Werk'));
+    await page.locator('[data-pl="delno"]').click();
+    c.ok('NEE: blijft staan',(await names()).includes('Werk')&&await page.locator('[data-pl="del"]').isVisible());
+    await page.locator('[data-pl="del"]').click();await page.locator('[data-pl="delyes"]').click();await sleep(200);
+    c.ok('JA, VERWIJDER: weg uit de lijst en uit de opslag',(await names()).join()==='Thuis,Opa'&&!(await has(page,'.car-place-sheet')));
+    mb.failReverse=true;
+    await page.locator('.car-here').click();await page.locator('#carPlaceName').waitFor({timeout:8000});
+    c.ok('geen adres te vinden: de coördinaten staan erbij',/^\d+\.\d+, \d+\.\d+$/.test(await txt(page,'.car-place-sheet strong')),await txt(page,'.car-place-sheet strong'));
+    await page.locator('[data-pl="cancel"]').click();mb.failReverse=false;
+    c.ok('annuleren slaat niets op',(await names()).join()==='Thuis,Opa'&&!(await has(page,'.car-place-sheet')));
+    // menu: ook daar
+    await page.locator('#mairCarWaveOverlay [data-act="menu"]').first().click();
+    c.ok('menu zonder route heeft Huidige locatie opslaan',/Huidige locatie opslaan/.test(await txt(page,'.car-menu')));
+    await page.locator('.car-menu [data-act="placehere"]').click();await page.locator('#carPlaceName').waitFor({timeout:6000});
+    c.ok('via het menu: menu dicht, naamblad open, menu komt niet terug',!(await has(page,'.car-menu-backdrop'))&&await page.locator('.car-place-sheet').isVisible());
+    await page.locator('[data-pl="cancel"]').click();await sleep(300);
+    c.ok('na annuleren blijft het menu dicht',!(await has(page,'.car-menu-backdrop')));
+    // 7. bewerken (hernoemen) en verwijderen vanaf het startscherm
+    await page.evaluate(()=>window.MAIRCarModePrototype.close());await page.evaluate(()=>window.MAIRCarModePrototype.open());await sleep(300);
+    await page.locator('.car-start [data-place-edit="1"]').click();await page.locator('#carPlaceName').waitFor();
+    c.ok('bewerken: naam staat ingevuld',await page.inputValue('#carPlaceName')==='Opa'&&/PLEK BEWERKEN/.test(await txt(page,'.car-place-sheet')));
+    await page.fill('#carPlaceName','Oma');await page.locator('[data-pl="save"]').click();await sleep(200);
+    c.ok('hernoemd: Oma, niet dubbel',(await names()).join()==='Thuis,Oma'&&/Oma/.test(await txt(page,'.car-places')),(await names()).join());
+    c.ok('hernoemen verandert de plek niet (zelfde coördinaten)',Math.abs((await store()).saved[1].longitude-lonAt(2000))<.01);
+    // 8. recents: max 5 en kapotte opslag
+    await page.evaluate(()=>{const r=Array.from({length:8},(_,i)=>({name:'Plek '+i,address:'Straat '+i,latitude:52+i*.1,longitude:5+i*.1}));localStorage.setItem('mair_car_places_v1',JSON.stringify({saved:[{name:'kapot'},{name:'Thuis',address:'a',latitude:53,longitude:6}],recents:[...r,{name:'zonder coördinaten'}]}))});
+    await reload();
+    c.ok('recents: maximaal 5 na herladen; plekken zonder coördinaten worden genegeerd',await count(page,'.car-start [data-place^="recent:"]')===5&&await count(page,'.car-start [data-place^="saved:"]')===1,`${await count(page,'.car-start [data-place^="recent:"]')}/${await count(page,'.car-start [data-place^="saved:"]')}`);
+    await page.evaluate(()=>localStorage.setItem('mair_car_places_v1','{kapot'));
+    await reload();
+    c.ok('kapotte opslag: startscherm werkt, lijsten leeg',/Nog niets opgeslagen/.test(await txt(page,'.car-places'))&&await count(page,'.car-start [data-place]')===0);
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await h.close()}
+  // rechtop: naam typen werkt
+  const p=await setup({width:390,height:844});
+  try{
+    const {page,h}=p;
+    await page.evaluate(()=>window.MAIRCarModePrototype.open());await sleep(300);
+    await page.locator('[data-act="search"]').first().click();
+    await page.locator('#carSearchInput').click();await page.keyboard.type('Susu Harmelen');
+    await page.locator('[data-place-save="result:0"]').waitFor({timeout:8000});
+    c.ok('rechtop: ster bij het resultaat staat binnen het scherm en het resultaat blijft breed',await page.evaluate(()=>{const s=document.querySelector('[data-place-save="result:0"]').getBoundingClientRect(),b=document.querySelector('[data-result-index="0"]').getBoundingClientRect();return s.right<=innerWidth+1&&s.height>=56&&b.width>innerWidth*.5}));
+    await page.locator('[data-place-save="result:0"]').click();await page.locator('#carPlaceName').waitFor();
+    c.ok('rechtop: invoerveld zichtbaar en bovenop',await page.evaluate(()=>{const i=document.getElementById('carPlaceName'),r=i.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)===i&&r.top>=0&&r.bottom<=innerHeight}));
+    await page.locator('#carPlaceName').click();await page.keyboard.press('Control+A');await page.keyboard.type('School');
+    c.ok('rechtop: typen in het naamveld werkt',await page.inputValue('#carPlaceName')==='School');
+    if(outDir)await page.screenshot({path:outDir+'/carmode-rechtop-plek-opslaan.png'});
+    await page.locator('[data-pl="save"]').click();await sleep(200);
+    c.ok('rechtop: opgeslagen als School',(await page.evaluate(()=>JSON.parse(localStorage.getItem('mair_car_places_v1')).saved.map(x=>x.name))).join()==='School');
+    c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
+  }finally{await p.h.close()}
+}
+
+const scenarios={places:scenarioPlaces,vibeall:scenarioVibeAll,vibeallnr:scenarioVibeAllNoRoute,vibeslow:scenarioVibeSlow,cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);
