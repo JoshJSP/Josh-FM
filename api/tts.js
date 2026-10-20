@@ -1,5 +1,6 @@
-import {createHash,randomBytes,randomUUID} from 'node:crypto';
+import {randomBytes,randomUUID} from 'node:crypto';
 import {guardAI} from './_guard.js';
+import {edgeGecV2} from './_edge-gec.js';
 const DEFAULT_VOICE='b347db033a6549378b48d00acb0d06cd';
 const DEFAULT_VOICES={
   josh:'88e8f699776e4bacbf6ef55c2aecfb36',
@@ -26,15 +27,14 @@ function voiceFor(profile='josh'){const id=String(profile||'josh').toLowerCase()
 function styleFor(profile='josh'){return DJ_STYLE[String(profile||'').toLowerCase()]||DJ_STYLE.josh}
 function config(profile='josh'){const explicit=String(process.env.FISH_AUDIO_MODEL||'').trim();return{key:process.env.FISH_AUDIO_API_KEY||'',voiceId:voiceFor(profile),models:explicit?[explicit]:DEFAULT_MODELS,style:styleFor(profile)}}
 // Edge (Microsoft Read Aloud) is de eerste stem: gratis, zonder sleutel, echte nl-NL-stemmen.
-// Het is een onofficieel endpoint (handshake overgenomen uit edge-tts 7.2.8), dus Fish blijft de terugval.
+// Het is een onofficieel endpoint (handshake overgenomen uit edge-tts 7.3.1), dus Fish blijft de terugval.
 // Max is een vrouw: Colette, iets sneller. Haar Fish-terugval is de vrouwenstem van Maya.
 const EDGE_VOICES={josh:{voice:'nl-NL-MaartenNeural',pitch:'+0Hz',rate:'+0%'},maya:{voice:'nl-NL-FennaNeural',pitch:'+0Hz',rate:'+0%'},max:{voice:'nl-NL-ColetteNeural',pitch:'+2Hz',rate:'+8%'}};
 const EDGE_TOKEN='6A5AA1D4EAFF4E9FB37E23D68491D6F4',EDGE_CHROME='143.0.3650.75',EDGE_MAJOR=EDGE_CHROME.split('.')[0];
 const EDGE_TIMEOUT_MS=7000;
 const edgeId=()=>randomUUID().replace(/-/g,'');
-// Sec-MS-GEC: SHA-256 van Windows-filetime (afgerond op 5 minuten) plus het token.
-function edgeGec(now=Date.now()){let t=Math.floor(now/1000)+11644473600;t-=t%300;return createHash('sha256').update(`${BigInt(t)*10000000n}${EDGE_TOKEN}`,'ascii').digest('hex').toUpperCase()}
-const edgeUrl=()=>`wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${EDGE_TOKEN}&ConnectionId=${edgeId()}&Sec-MS-GEC=${edgeGec()}&Sec-MS-GEC-Version=1-${EDGE_CHROME}`;
+// Sec-MS-GEC v2 (edge-tts 7.3.1, oktober 2026): de oude SHA-256-token gaf alleen nog "non-101", zie api/_edge-gec.js.
+const edgeUrl=()=>`wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${EDGE_TOKEN}&ConnectionId=${edgeId()}&Sec-MS-GEC=${edgeGecV2(EDGE_TOKEN)}&Sec-MS-GEC-Version=2-${EDGE_CHROME}`;
 const edgeHeaders=()=>({'User-Agent':`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${EDGE_MAJOR}.0.0.0 Safari/537.36 Edg/${EDGE_MAJOR}.0.0.0`,Origin:'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',Pragma:'no-cache','Cache-Control':'no-cache','Accept-Language':'en-US,en;q=0.9',Cookie:`muid=${randomBytes(16).toString('hex').toUpperCase()};`});
 const xml=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
 // Edge spelt "MAIR" als losse letters; "Mair" klinkt als de naam.

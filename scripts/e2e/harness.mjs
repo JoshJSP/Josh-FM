@@ -1,6 +1,7 @@
 // e2e-harnas: draait de échte app in headless Chrome tegen een nep-Spotify (mock-spotify.js) en nep-AI-routes.
 // Geen echt Spotify-account, geen netwerk, geen Widevine nodig. Vereist Playwright (global) en Google Chrome.
 //   node scripts/e2e/playback.e2e.mjs
+// Geen Google Chrome (Linux arm64, de VM)? MAIR_E2E_BUNDLED=1 gebruikt de Chromium van Playwright.
 // Niet onderdeel van `npm run predeploy`: het heeft een browser nodig. Draai het na wijzigingen aan playback, queue of DJ.
 import {createRequire} from 'node:module';
 import {execSync} from 'node:child_process';
@@ -25,7 +26,7 @@ export function silentWav(seconds=.6){const rate=8000,n=Math.round(rate*seconds)
 
 export async function launch({trackMs=20000,djWriter='ok',ttsOk=true,tokens=true,width=390,height=844}={}){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mair-e2e-'));
-  const ctx=await chromium.launchPersistentContext(dir,{channel:'chrome',headless:true,viewport:{width,height},serviceWorkers:'block',args:['--autoplay-policy=no-user-gesture-required','--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
+  const ctx=await chromium.launchPersistentContext(dir,{...(process.env.MAIR_E2E_BUNDLED?{}:{channel:'chrome'}),headless:true,viewport:{width,height},serviceWorkers:'block',args:['--autoplay-policy=no-user-gesture-required','--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
   const page=ctx.pages()[0]||await ctx.newPage();
   const log={errors:[],pageErrors:[],csp:[],requests:[],api:{writer:0,tts:0}};
   page.on('pageerror',e=>log.pageErrors.push(e.message));

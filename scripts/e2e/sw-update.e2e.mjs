@@ -31,7 +31,7 @@ const URL_='http://localhost:'+server.address().port+'/';
 
 const t=checker();
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mair-sw-'));
-const ctx=await chromium.launchPersistentContext(dir,{channel:'chrome',headless:true});
+const ctx=await chromium.launchPersistentContext(dir,{...(process.env.MAIR_E2E_BUNDLED?{}:{channel:'chrome'}),headless:true});
 const page=ctx.pages()[0]||await ctx.newPage();
 const seen=()=>page.evaluate(()=>({html:document.body.dataset.html,css:getComputedStyle(document.body).getPropertyValue('--release').trim().replace(/"/g,'')}));
 const controller=()=>page.evaluate(async()=>{await navigator.serviceWorker.ready;return navigator.serviceWorker.controller?.scriptURL||''});

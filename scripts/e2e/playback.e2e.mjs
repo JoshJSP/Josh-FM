@@ -699,7 +699,83 @@ async function scenarioNewsHour(){
   }finally{await h.close()}
 }
 
- const scenarios={newsHour:scenarioNewsHour,learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,bgDeviceRebuild:scenarioBgDeviceRebuild,bgDeviceGone:scenarioBgDeviceGone,bgOtherDevice:scenarioBgOtherDevice,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+// 20-10-2026 om 12:00: de DJ-stem stond in de backoff van dj-audio-guard, het nieuws viel steeds om en vroeg elke 45 s een nieuw journaal.
+// Twee segmenten (journaal langer dan 850 tekens), backoff actief op het hele uur: één journaal-verzoek, en het nieuws speelt.
+async function newsSetup(h,T){
+  await h.page.addInitScript(({t})=>{let shift=t-Date.now();window.__mairNewsClock=()=>Date.now()+shift;window.__setNewsClock=x=>{shift=x-Date.now()}},{t:T});
+  const heads=Array.from({length:5},(_,i)=>({title:`Nepbericht nummer ${i+1} van vandaag`,summary:'Korte samenvatting.',source:'NOS',publishedAt:new Date().toISOString(),link:''}));
+  await h.page.route(ORIGIN+'/api/live-headlines',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({headlines:heads,fetchedAt:new Date().toISOString(),sourceLabel:'NOS Nieuws'})}));
+  const long='Dit is MAIR Nieuws. De berichten komen van NOS Nieuws. '+Array.from({length:14},(_,i)=>`Bericht ${i+1} gaat over iets wat vandaag in het land gebeurde en dat de luisteraar moet weten.`).join(' ')+' Dit was MAIR Nieuws. Je luistert naar MAIR.';
+  const counts={bulletin:0};
+  await h.page.route(ORIGIN+'/api/news-bulletin',r=>{counts.bulletin++;return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({text:long,provider:'mock'})})});
+  return counts;
+}
+async function scenarioNewsGuardBackoff(){
+  const T=Date.UTC(2026,9,20,9,59,40);// 11:59:40 in Amsterdam
+  const h=await launch({trackMs:600000});
+  try{
+    const counts=await newsSetup(h,T);
+    await startStation(h);
+    await h.page.evaluate(()=>{window.JFMDJAudioGuard.failure('e2e: eerdere DJ-stem mislukt','prepare');window.JFMDJAudioGuard.failure('e2e: nog een','prepare')});
+    const tts0=h.log.api.tts;
+    await h.page.evaluate(t=>{window.__setNewsClock(t);addEventListener('mair:news-bulletin-aired',e=>window.__aired=e.detail)},Date.UTC(2026,9,20,10,0,5));
+    await until(h.page,()=>!!window.MAIRNewsBulletin.status().prepared,null,40000,'nieuws voorbereid ondanks backoff');
+    const st=await h.page.evaluate(()=>({n:window.MAIRNewsBulletin.status(),guard:window.JFMDJAudioGuard.state}));
+    c.ok('nieuws backoff: voorbereid terwijl de DJ-stem in backoff staat',st.n.prepared?.segments>=2&&st.guard.retryInMs>0,JSON.stringify(st).slice(0,400));
+    c.ok('nieuws backoff: alle segmenten echt bij de TTS opgehaald',h.log.api.tts-tts0>=st.n.prepared.segments,`${h.log.api.tts-tts0} tts`);
+    await h.page.evaluate(()=>window.__mock.finishTrack(1500));
+    await until(h.page,()=>!!window.__aired,null,45000,'nieuws uitgezonden');
+    const aired=await h.page.evaluate(()=>window.__aired);
+    c.ok('nieuws backoff: hele journaal uitgezonden',!aired.partial&&aired.slot==='2026-10-20T12',JSON.stringify(aired));
+    c.ok('nieuws backoff: maar één journaal-verzoek dit uur',counts.bulletin===1,`${counts.bulletin} verzoeken`);
+    noErrors('nieuws backoff: geen page errors',h);
+  }finally{await h.close()}
+}
+// Scherm uit: voorbereiden en uitzenden in de achtergrond, zonder Spotify te pauzeren (muziek zachter, nieuws eroverheen).
+async function scenarioNewsScreenOff(){
+  const T=Date.UTC(2026,9,20,10,59,40);// 12:59:40 in Amsterdam
+  const h=await launch({trackMs:600000});
+  try{
+    await newsSetup(h,T);
+    await startStation(h);
+    const idx0=(await mock(h.page)).idx,vol0=(await mock(h.page)).volume;
+    await hide(h.page,true);await sleep(800);
+    await h.page.evaluate(t=>{window.__setNewsClock(t);addEventListener('mair:news-bulletin-aired',e=>window.__aired=e.detail);window.__newsLog=[];const i=setInterval(()=>{if(window.MAIRNewsBulletin.status().airing)window.__newsLog.push(window.__mock.state())},150);setTimeout(()=>clearInterval(i),120000)},Date.UTC(2026,9,20,11,0,5));
+    await until(h.page,()=>!!window.MAIRNewsBulletin.status().prepared,null,40000,'nieuws voorbereid met scherm uit');
+    c.ok('scherm uit: nieuws voorbereid in de achtergrond',true);
+    await h.page.evaluate(()=>window.__mock.finishTrack(1500));
+    await until(h.page,()=>!!window.__aired,null,45000,'nieuws uitgezonden met scherm uit');
+    const aired=await h.page.evaluate(()=>window.__aired),log=await h.page.evaluate(()=>window.__newsLog);
+    c.ok('scherm uit: nieuws uitgezonden',aired.background===true&&!aired.partial,JSON.stringify(aired));
+    c.ok('scherm uit: muziek blijft spelen tijdens het nieuws',log.length>0&&log.every(x=>x.playing),JSON.stringify(log.map(x=>x.playing)));
+    c.ok('scherm uit: muziek zachter tijdens het nieuws',Math.min(...log.map(x=>x.volume))<vol0*.2,JSON.stringify(log.map(x=>x.volume)));
+    await sleep(1500);const st=await mock(h.page);
+    c.ok('scherm uit: daarna volume terug en volgende nummer loopt',st.playing&&st.idx===idx0+1&&Math.abs(st.volume-vol0)<.02,JSON.stringify(st));
+    noErrors('scherm uit: geen page errors',h);
+  }finally{await h.close()}
+}
+// iOS weigert het nieuwe geluid met het scherm uit: volume meteen terug, muziek speelt door, nieuws blijft staan.
+async function scenarioNewsScreenOffRefused(){
+  const T=Date.UTC(2026,9,20,10,59,40);
+  const h=await launch({trackMs:600000});
+  try{
+    await newsSetup(h,T);
+    await startStation(h);
+    const vol0=(await mock(h.page)).volume;
+    await hide(h.page,true);await sleep(800);
+    await h.page.evaluate(t=>window.__setNewsClock(t),Date.UTC(2026,9,20,11,0,5));
+    await until(h.page,()=>!!window.MAIRNewsBulletin.status().prepared,null,40000,'nieuws voorbereid');
+    await h.page.evaluate(()=>{const real=window.speakText;window.__restoreSpeak=()=>{window.speakText=real};window.speakText=async()=>false});
+    await h.page.evaluate(()=>window.__mock.finishTrack(1500));
+    await until(h.page,()=>window.MAIRNewsBulletin.status().bgRefused>=1&&!window.MAIRNewsBulletin.status().airing,null,30000,'weigering verwerkt');
+    await sleep(800);const st=await mock(h.page),n=await h.page.evaluate(()=>window.MAIRNewsBulletin.status());
+    c.ok('scherm uit geweigerd: volume terug, muziek speelt',st.playing&&Math.abs(st.volume-vol0)<.02,JSON.stringify(st));
+    c.ok('scherm uit geweigerd: nieuws staat nog klaar',!!n.prepared&&!n.alreadyAired,JSON.stringify(n).slice(0,300));
+    noErrors('scherm uit geweigerd: geen page errors',h);
+  }finally{await h.close()}
+}
+
+ const scenarios={newsHour:scenarioNewsHour,newsGuardBackoff:scenarioNewsGuardBackoff,newsScreenOff:scenarioNewsScreenOff,newsScreenOffRefused:scenarioNewsScreenOffRefused,learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,bgDeviceRebuild:scenarioBgDeviceRebuild,bgDeviceGone:scenarioBgDeviceGone,bgOtherDevice:scenarioBgOtherDevice,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 // iOS verbreekt de Web Playback SDK met het scherm uit of bij een netwerkwissel; de app krijgt alleen not_ready.
 // Voor de fix bleef het daarna stil tot je de app weer opende (recover weigerde in de achtergrond, niets bouwde het device opnieuw).
 const hide=(page,v)=>page.evaluate(x=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>x});Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>x?'hidden':'visible'});document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event(x?'pagehide':'pageshow'))},v);
