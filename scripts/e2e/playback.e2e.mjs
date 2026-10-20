@@ -754,6 +754,23 @@ async function scenarioNewsScreenOff(){
     noErrors('scherm uit: geen page errors',h);
   }finally{await h.close()}
 }
+// Pauzeert iOS de Spotify-speler zodra onze stem begint, dan moet de muziek na het nieuws vanzelf weer spelen.
+async function scenarioNewsScreenOffInterrupt(){
+  const T=Date.UTC(2026,9,20,10,59,40);
+  const h=await launch({trackMs:600000});
+  try{
+    await newsSetup(h,T);
+    await startStation(h);
+    await hide(h.page,true);await sleep(800);
+    await h.page.evaluate(t=>{window.__setNewsClock(t);addEventListener('mair:news-bulletin-aired',e=>window.__aired=e.detail);const real=window.speakText;window.speakText=async(...a)=>{await window.jfmSpotifyPlayer.pause();return real(...a)}},Date.UTC(2026,9,20,11,0,5));
+    await until(h.page,()=>!!window.MAIRNewsBulletin.status().prepared,null,40000,'nieuws voorbereid');
+    await h.page.evaluate(()=>window.__mock.finishTrack(1500));
+    await until(h.page,()=>!!window.__aired&&!window.MAIRNewsBulletin.status().airing,null,45000,'nieuws uitgezonden');
+    await sleep(1500);const st=await mock(h.page);
+    c.ok('scherm uit, iOS pauzeert Spotify: muziek speelt daarna weer',st.playing===true,JSON.stringify(st));
+    noErrors('scherm uit onderbroken: geen page errors',h);
+  }finally{await h.close()}
+}
 // iOS weigert het nieuwe geluid met het scherm uit: volume meteen terug, muziek speelt door, nieuws blijft staan.
 async function scenarioNewsScreenOffRefused(){
   const T=Date.UTC(2026,9,20,10,59,40);
@@ -771,11 +788,13 @@ async function scenarioNewsScreenOffRefused(){
     await sleep(800);const st=await mock(h.page),n=await h.page.evaluate(()=>window.MAIRNewsBulletin.status());
     c.ok('scherm uit geweigerd: volume terug, muziek speelt',st.playing&&Math.abs(st.volume-vol0)<.02,JSON.stringify(st));
     c.ok('scherm uit geweigerd: nieuws staat nog klaar',!!n.prepared&&!n.alreadyAired,JSON.stringify(n).slice(0,300));
+    const elog=await h.page.evaluate(()=>window.MAIRRuntime.errorLog().map(x=>x.type));
+    c.ok('scherm uit geweigerd: staat in het foutlog',elog.includes('news.air-failed'),JSON.stringify(elog));
     noErrors('scherm uit geweigerd: geen page errors',h);
   }finally{await h.close()}
 }
 
- const scenarios={newsHour:scenarioNewsHour,newsGuardBackoff:scenarioNewsGuardBackoff,newsScreenOff:scenarioNewsScreenOff,newsScreenOffRefused:scenarioNewsScreenOffRefused,learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,bgDeviceRebuild:scenarioBgDeviceRebuild,bgDeviceGone:scenarioBgDeviceGone,bgOtherDevice:scenarioBgOtherDevice,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
+ const scenarios={newsHour:scenarioNewsHour,newsGuardBackoff:scenarioNewsGuardBackoff,newsScreenOff:scenarioNewsScreenOff,newsScreenOffRefused:scenarioNewsScreenOffRefused,newsScreenOffInterrupt:scenarioNewsScreenOffInterrupt,learnBan:scenarioLearnBan,learnLove:scenarioLearnLove,learnManyBans:scenarioLearnManyBans,studyStation:scenarioStudyStation,rateLimitBackoff:scenarioRateLimitBackoff,backgroundNativeMusicFirst:scenarioBackgroundNativeMusicFirst,nativeSession:scenarioNativeSession,sessionReopen:scenarioSessionReopen,sessionNetworkError:scenarioSessionNetworkError,sessionInvalidGrant:scenarioSessionInvalidGrant,sessionOtherTab:scenarioSessionOtherTab,aiPicksSwitch:scenarioAiPicksSwitch,requestUi:scenarioRequestUi,iosVoiceVolume:scenarioIosVoiceVolume,regressions:scenarioRegressions,reload:scenarioReload,skipThenBreak:scenarioSkipThenBreak,hidden:scenarioHidden,soak:scenarioSoak,request:scenarioRequest,tokenRefresh:scenarioTokenRefresh,start:scenarioStart,djBreak:scenarioDjBreak,writerDown:scenarioWriterDown,ttsDown:scenarioTtsDown,skipDuringBreak:scenarioSkipDuringBreak,deviceLoss:scenarioDeviceLoss,bgDeviceRebuild:scenarioBgDeviceRebuild,bgDeviceGone:scenarioBgDeviceGone,bgOtherDevice:scenarioBgOtherDevice,rateLimit:scenarioRateLimit,sleepTimer:scenarioSleepTimer};
 // iOS verbreekt de Web Playback SDK met het scherm uit of bij een netwerkwissel; de app krijgt alleen not_ready.
 // Voor de fix bleef het daarna stil tot je de app weer opende (recover weigerde in de achtergrond, niets bouwde het device opnieuw).
 const hide=(page,v)=>page.evaluate(x=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>x});Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>x?'hidden':'visible'});document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event(x?'pagehide':'pageshow'))},v);
