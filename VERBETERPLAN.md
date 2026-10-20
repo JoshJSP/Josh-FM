@@ -36,4 +36,12 @@ Volgorde van belang (uit CLAUDE.md): muziek blijft spelen, wachtrij klopt, Spoti
 
 ## Testronde 20-10-2026
 
-Zie de stappen hieronder; per bevinding wat er mis was en wat er gedaan is.
+Getest met Playwright (MAIR_E2E_BUNDLED=1) op de VM:
+- predeploy: alles groen.
+- playback e2e (start, DJ-break, stem kapot, writer kapot, skip, achtergrond, sessie, nieuws): 153 ok, 0 mislukt.
+- rondgang e2e (alle tabbladen, zender wisselen, DJ-schakelaar en nieuws, stem kapot, rare tekst, CSP): 14 ok.
+- Car Mode e2e: 522 ok, 2 mislukt. Sleep e2e: 86 ok, 1 mislukt. sw-update: 5 ok.
+
+- [x] Gevonden: onder het nummer stond "Current past in de komende MAIR-programmering" (interne code op het scherm). Nu Nederlands.
+- [x] Gevonden: e2e kon niet op de VM draaien (geen Google Chrome op arm64). Nu met MAIR_E2E_BUNDLED=1.
+- [ ] Layout-checks die op de VM-browser net niet passen: Car Mode C2 667x375 aanwijzingstekst, Car Mode "na herstel: pijl en kaart volgen", Sleep-knoppen op 390x844 (811-853 van 844). Zelfde uitkomst op main zonder mijn wijzigingen, dus niet door deze ronde. Op de laptop met echte Chrome nog eens draaien (Hestia).
