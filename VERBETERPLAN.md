@@ -62,3 +62,24 @@ Flitsers:
 - [ ] De reserve-Overpass (overpass.private.coffee) had op 20-10 data van 15-07. De VM krijgt 406 van overpass-api.de, dus de echte telefoon-route is niet vanaf hier te testen.
 - [ ] Rit-test in de auto staat in de Courant.
 
+## Autorit 20-10-2026: drie bugs (v188)
+
+Ritstart soms wel, soms niet:
+- [x] De ritstart gebruikt geen AI (geen Groq): de zin is een vast sjabloon. Hij viel weg door de stem: de backoff (gefixt in v187), de trage Fish-terugval toen Edge kapot was, en een stem die op iOS niet startte. Dan bleef de muziek op pauze staan.
+- [x] Nu: stem moet binnen 8 s klaar zijn (muziek speelt intussen door), anders overslaan. Na het pauzeren moet de stem binnen 8 s hoorbaar starten, anders muziek weer aan. Hervatten heeft een laatste redmiddel direct via de speler.
+- [x] Elke reden om over te slaan staat in het foutlog (car-ride.skipped): scherm uit, DJ of nieuws al bezig, stem te laat.
+- [x] e2e: rideintrohang, rideintrotts (oude code: 24 s stilte).
+
+Vlaamse stemmen:
+- [x] De Edge-stemmen zijn nl-NL (Maarten, Fenna, Colette, SSML xml:lang nl-NL). Fish kent alleen 'nl' zonder land; de twee standaard-Fish-stemmen zijn community-klonen. Tot v186 klonk elke zin via Fish, omdat Edge kapot was. Dat was waarschijnlijk het Vlaams.
+- [x] Fish staat nu standaard uit. Valt Edge uit, dan slaat de DJ over en speelt de muziek door. Terug aan met FISH_AUDIO_FALLBACK=1 in Vercel. Geen andere plek in de app kiest een stem (geen speechSynthesis).
+- [x] Check: zonder de vlag wordt Fish nooit aangeroepen, elke DJ heeft een nl-NL-stem (api-failure-behavior).
+- [ ] Nadeel: werkt Edge niet (zoals deze week), dan praat de DJ helemaal niet. Zie de dagelijkse Edge-check hierboven.
+
+Uurnieuws:
+- [x] (a) Speelde door een nummer heen: met het scherm uit zette de app de muziek zachter, maar de iPhone negeert dat volume. Op iOS wordt de muziek nu altijd gepauzeerd, ook met het scherm uit. e2e newsIosHidden.
+- [x] (b) Muziek stil, geen nieuws, 2 minuten niets: na het pauzeren wachtte het nieuws op het jingle-logo (AudioContext.resume(), dat op iOS kan blijven hangen) en op de stem zonder tijdslimiet. Nu: jingle max 2 s (en resume max 1,5 s in mair-imaging.js), stem moet binnen 8 s starten, anders muziek weer aan. e2e newsVoiceHangs, newsJingleHangs (oude code: stilte tot het eind van de meting).
+- [x] Stem niet op tijd klaar (cache verlopen, TTS traag): eerst opnieuw maken terwijl de muziek nog speelt, max 8 s, anders blijft de muziek gewoon doorspelen. e2e newsVoiceNotReady.
+- [x] Gedeelde bewaakte stem: MAIRVoiceEngine.speakSafe, gebruikt door nieuws en ritstart.
+- [ ] Auto-test door Josh (Courant).
+

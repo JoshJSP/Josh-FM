@@ -9,6 +9,8 @@ class DeadEdge{constructor(){throw new Error('edge down')}}
 // Nep-Edge: stuurt een audioframe (2 bytes headerlengte, headers, mp3) en daarna turn.end.
 function fakeEdge(sent){return class{constructor(url,opt){sent.push({url,opt,messages:[]});this.sent=sent.at(-1);setTimeout(()=>this.onopen?.(),0)}send(m){this.sent.messages.push(m);if(!m.includes('Path:ssml'))return;const head=Buffer.from('X-RequestId:x\r\nContent-Type:audio/mpeg\r\nPath:audio'),frame=Buffer.concat([Buffer.from([head.length>>8,head.length&255]),head,Buffer.from([0xff,0xf3,0x64,1])]);setTimeout(()=>{this.onmessage?.({data:frame.buffer.slice(frame.byteOffset,frame.byteOffset+frame.length)});this.onmessage?.({data:'X-RequestId:x\r\nPath:turn.end\r\n\r\n{}'})},0)}close(){}}}
 globalThis.WebSocket=DeadEdge;
+// De Fish-tests hieronder gaan over de terugval; die staat sinds 20-10-2026 alleen aan met FISH_AUDIO_FALLBACK=1.
+process.env.FISH_AUDIO_FALLBACK='1';
 const originalEnv={...process.env};
 function response(){return{statusCode:0,headers:{},body:null,status(code){this.statusCode=code;return this},setHeader(name,value){this.headers[name]=value},json(value){this.body=value;return this},send(value){this.body=value;return this}}}
 async function call(handler,req){const res=response();await handler(withAI(req),res);return res}
@@ -20,6 +22,14 @@ function restoreEnv(){for(const key of Object.keys(process.env))if(!(key in orig
 // Uitspraaklijst: alleen hele woorden, voor Edge en Fish.
 assert.equal(sayText('Froukje met Davina Michelle en S10.'),'Frauwkje met Davina Mischèl en Es-tien.');assert.equal(sayText('Michelle zingt'),'Michelle zingt');assert.equal(sayText('Froukjes S100'),'Froukjes S100');
 
+// Alleen nl-NL: zonder FISH_AUDIO_FALLBACK geen Fish, ook niet als Edge faalt en er een Fish-sleutel is; elke DJ heeft een nl-NL-stem.
+{
+  delete process.env.FISH_AUDIO_FALLBACK;process.env.FISH_AUDIO_API_KEY='fish-key';let fished=0;globalThis.fetch=async()=>{fished++;return fishResponse(Buffer.from([0x49,0x44,0x33,1]))};
+  const r=await call(tts,{method:'POST',body:{text:'Hallo',djProfile:'maya'}});
+  assert.equal(r.statusCode,503);assert.equal(r.body.error,'edge_tts_failed');assert.equal(fished,0,'Fish mag niet worden aangeroepen');
+  for(const dj of ['josh','maya','max']){const h=await call(tts,{method:'GET',query:{djProfile:dj}});assert.match(h.body.edge.voice,/^nl-NL-/,`${dj} heeft een nl-NL-stem`);assert.equal(h.body.fallback.configured,false)}
+  globalThis.fetch=originalFetch;restoreEnv();
+}
 try{
   delete process.env.FISH_AUDIO_API_KEY;
   let res=await call(tts,{method:'POST',body:{text:'Hallo'}});

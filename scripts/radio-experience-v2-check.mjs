@@ -58,7 +58,7 @@ check('live news exposes fresh bulletin items',has(liveNews,'bulletinItems(max=6
 check('headline API is source attributed, summarized and cached',has(headlines,'feeds.nos.nl','sourceLabel','summary:description','TTL=5*60*1000','stale-while-revalidate'));
 check('half-hour news remains isolated from Radio Brain',!dj.includes('MAIRLiveNews?.take')&&has(liveNews,'bulletinItems','feedFresh'));
 check('DJ writer remains source constrained',has(writer,'Feiten mogen uitsluitend uit ALLOWED FACTS','Verzin nooit jaartallen','allowedFacts'));
-check('hourly news bulletin prepares before a natural transition',has(bulletin,"mair-news-bulletin-v3-screen-off","jfm:natural-next-ready","mair:track-transition","NATURAL_END","JFMDJAudio?.prepare","prepareSpeech","GRACE_MINUTE=12","djDuck","djUnduck"));
+check('hourly news bulletin prepares before a natural transition',has(bulletin,"mair-news-bulletin-v4-never-silent","jfm:natural-next-ready","mair:track-transition","NATURAL_END","JFMDJAudio?.prepare","prepareSpeech","GRACE_MINUTE=12","djDuck","djUnduck","speakSafe","START_MS=8000"));
 check('hourly news uses only primary playback transport',has(bulletin,'window.JFMPlayback','djPause','djRewind','djResume')&&!bulletin.includes("api('/me/player")&&!bulletin.includes('fetch(\'/me/player'));
 check('hourly news yields to an active DJ handoff',has(bulletin,'djHasPriority','HANDOFF','SPEAKING','RESTORING'));
 check('hourly news writer is source constrained',has(bulletinWriter,'uitsluitend de aangeleverde nieuwsitems','Gebruik geen eigen kennis','Dit is MAIR Nieuws.','Dit was MAIR Nieuws. Je luistert naar MAIR.'));

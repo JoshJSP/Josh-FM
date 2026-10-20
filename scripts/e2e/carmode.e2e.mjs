@@ -971,6 +971,40 @@ async function scenarioRideIntroBackoff(){
     c.ok('ritstart in backoff: geen page errors',!h.log.pageErrors.length,h.log.pageErrors.join(' | '));
   }finally{await h.close()}
 }
+// Autorit 20-10-2026: het praatje kwam soms wel, soms niet. Altijd praten of netjes overslaan: nooit stilte, en de reden in het foutlog.
+async function rideCase(t,hang){
+  const {page}=t;
+  await page.locator('nav button, [role=tab]',{hasText:'Stations'}).locator('visible=true').first().click();await sleep(500);
+  await page.locator('[data-mair-station]').locator('visible=true').first().click();
+  await until(page,()=>window.__mock.state().playing&&window.__mock.state().uris>=10&&queue.length>=10,null,25000,'station speelt');
+  await sleep(2500);
+  await page.evaluate(hang);
+  await page.evaluate(()=>{window.__pb=[];const i=setInterval(()=>window.__pb.push(window.__mock.state().playing),250);setTimeout(()=>clearInterval(i),60000)});
+  await startRoute(t);
+}
+const longestSilenceMs=pb=>{let run=0,max=0;for(const p of pb){run=p?0:run+1;max=Math.max(max,run)}return max*250};
+async function scenarioRideIntroVoiceHangs(){
+  const t=await setup(),{page,h}=t;
+  try{
+    await rideCase(t,()=>{window.speakText=()=>new Promise(()=>{})});
+    await sleep(25000);
+    const pb=await page.evaluate(()=>window.__pb),st=await page.evaluate(()=>window.__mock.state()),log=await page.evaluate(()=>window.MAIRRuntime.errorLog().filter(x=>x.type==='car-ride.skipped').map(x=>x.error));
+    c.ok('ritstart, stem hangt: muziek binnen 12 s weer aan',st.playing&&longestSilenceMs(pb)<=12000,`${longestSilenceMs(pb)} ms stil`);
+    c.ok('ritstart, stem hangt: reden in het foutlog',log.some(x=>/8 s|startte niet/.test(x)),JSON.stringify(log));
+    c.ok('ritstart, stem hangt: geen page errors',!h.log.pageErrors.length,h.log.pageErrors.join(' | '));
+  }finally{await h.close()}
+}
+async function scenarioRideIntroTtsDown(){
+  const t=await setup(),{page,h}=t;
+  try{
+    await rideCase(t,()=>{window.JFMDJAudio.cancel('e2e');const f=window.fetch;window.fetch=async(u,...a)=>String(u?.url||u).includes('/api/tts')?new Response(JSON.stringify({error:'edge_tts_failed'}),{status:503,headers:{'content-type':'application/json'}}):f(u,...a)});
+    await sleep(16000);
+    const pb=await page.evaluate(()=>window.__pb),log=await page.evaluate(()=>window.MAIRRuntime.errorLog().filter(x=>x.type==='car-ride.skipped').map(x=>x.error));
+    c.ok('ritstart, stem kapot: muziek wordt niet stilgezet',pb.length>20&&pb.every(Boolean),JSON.stringify(pb));
+    c.ok('ritstart, stem kapot: overgeslagen met reden in het foutlog',log.length>=1,JSON.stringify(log));
+    c.ok('ritstart, stem kapot: geen page errors',!h.log.pageErrors.length,h.log.pageErrors.join(' | '));
+  }finally{await h.close()}
+}
 async function scenarioRideIntro(){
   const t=await setup(),{page,h}=t;
   try{
@@ -1338,7 +1372,7 @@ async function scenarioPlaces(){
   }finally{await p.h.close()}
 }
 
-const scenarios={rideaudio:scenarioRideAudio,places:scenarioPlaces,vibeall:scenarioVibeAll,vibeallnr:scenarioVibeAllNoRoute,vibeslow:scenarioVibeSlow,cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,rideintrobackoff:scenarioRideIntroBackoff,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
+const scenarios={rideaudio:scenarioRideAudio,places:scenarioPlaces,vibeall:scenarioVibeAll,vibeallnr:scenarioVibeAllNoRoute,vibeslow:scenarioVibeSlow,cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,rideintrobackoff:scenarioRideIntroBackoff,rideintrohang:scenarioRideIntroVoiceHangs,rideintrotts:scenarioRideIntroTtsDown,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);

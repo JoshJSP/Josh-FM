@@ -45,11 +45,15 @@ function someoneTalking(mine=null){const d=window.MAIRDJ?.diagnostics?.()||{},lo
 // Het eerste nummer van de rit: wat na het lopende nummer in de wachtrij staat nadat de journey-director herplande.
 function waitReplan(){return new Promise(res=>{const done=()=>{clearTimeout(t);removeEventListener('mair:director-replanned',on);res()},on=e=>{if(/journey/.test(String(e.detail?.reason||'')))done()},t=setTimeout(done,REPLAN_WAIT_MS);addEventListener('mair:director-replanned',on)})}
 function firstRideTrack(){const q=window.JFMQueue?.current?.()||[],id=String(truth()?.trackId||''),i=q.findIndex(t=>t?.id===id);return q[i+1]||null}
+// Elke reden om niet te praten in het foutlog (Diagnostiek): "soms wel, soms niet" (autorit 20-10-2026) moet na de rit te zien zijn.
+const skip=why=>{lastError=why;try{window.MAIRRuntime?.record?.('car-ride.skipped',{error:why},'error')}catch{/* log kapot: onschuldig */}return false};
+const within=(promise,ms,why)=>Promise.race([Promise.resolve(promise),wait(ms).then(()=>{throw Error(why)})]);
 async function announce(detail={}){
   const change=!!detail.change,dest=detail.destination;
-  if(busy||!dest||!djOn()||document.visibilityState==='hidden')return false;
+  if(!dest)return false;if(!djOn())return false;
+  if(busy)return skip('al bezig met een ritstart');if(document.visibilityState==='hidden')return skip('scherm uit bij de routestart');
   if(change&&near(dest,lastDest))return false;
-  if(someoneTalking())return false;
+  if(someoneTalking())return skip('DJ of nieuws was al aan het woord');
   // De lock gaat er meteen bij de routestart op: zo stuurt de herplanning geen play naar Spotify terwijl wij gaan pauzeren.
   // Die play kwam op de iPhone soms pas aan als de DJ al praatte: de Spotify-app nam de audio over en de stem brak af.
   // Wat de director daardoor niet naar Spotify stuurde (held), sturen we na afloop alsnog.
@@ -58,26 +62,30 @@ async function announce(detail={}){
   try{
     if(!change)await waitReplan();
     // Pas na het herplannen kijken: in die seconden kan de DJ of het nieuws net begonnen zijn.
-    if(someoneTalking(lock)||!djOn()||document.visibilityState==='hidden')return false;
+    if(someoneTalking(lock))return skip('DJ of nieuws begon tijdens het herplannen');if(!djOn())return false;if(document.visibilityState==='hidden')return skip('scherm ging uit tijdens het herplannen');
     const t=truth();uri=String(t?.uri||'');const playing=!!(uri&&t?.isPlaying);
     track=!change&&playing?firstRideTrack():null;const text=line({destination:dest,duration:detail.duration,track,change});
     if(typeof window.prepareSpeech!=='function'||typeof window.speakText!=='function')throw Error('MAIR Voice Engine is niet klaar');
     // Direct naar de TTS, niet via prepareSpeech: die gaat door de backoff van dj-audio-guard en weigert na één mislukte
     // DJ-stem 30 s tot 5 min zonder verzoek. Zo bleef de ritstart stil (20-10-2026, zelfde oorzaak als het uurnieuws).
-    if(typeof window.JFMDJAudio?.prepare==='function')await window.JFMDJAudio.prepare(text,false,{breakId:'car-ride'});
-    else if(!await window.prepareSpeech(text,false))throw Error(window.JFMDJAudio?.status?.error||'Rit-aankondiging kon niet worden voorbereid');
-    if(someoneTalking(lock))return false;
+    // Max 8 s: de muziek speelt intussen gewoon door. Lukt het niet, dan netjes overslaan.
+    const say=window.MAIRVoiceEngine?.speechText?.(text)||text;
+    if(typeof window.JFMDJAudio?.prepare==='function')await within(window.JFMDJAudio.prepare(say,false,{breakId:'car-ride'}),8000,'stem niet binnen 8 s klaar');
+    else if(!await within(window.prepareSpeech(text,false),8000,'stem niet binnen 8 s klaar'))throw Error(window.JFMDJAudio?.status?.error||'Rit-aankondiging kon niet worden voorbereid');
+    if(someoneTalking(lock))return skip('DJ of nieuws begon terwijl de stem werd gemaakt');
     const p=window.JFMPlayback;
-    if(playing){op=window.JFMPlaybackState?.begin?.('dj-handoff',{expectedUri:uri,timeoutMs:60000})||0;if(!await p?.djPause?.(uri))throw Error(p?.health?.lastError||'Muziek pauzeren voor de rit-aankondiging mislukt');paused=true}
-    if(!await window.speakText(text,false))throw Error(window.JFMDJAudio?.status?.error||'Rit-aankondiging werd niet hoorbaar afgespeeld');
+    if(playing){op=window.JFMPlaybackState?.begin?.('dj-handoff',{expectedUri:uri,timeoutMs:60000})||0;paused=true;// vóór de await: hangt het pauzeren, dan zet finally de muziek toch aan
+      if(!await within(p?.djPause?.(uri),8000,'pauzeren duurde te lang'))throw Error(p?.health?.lastError||'Muziek pauzeren voor de rit-aankondiging mislukt')}
+    if(window.MAIRVoiceEngine?.speakSafe)await window.MAIRVoiceEngine.speakSafe(text,{breakId:'car-ride',label:'Rit-aankondiging'});
+    else if(!await window.speakText(text,false))throw Error(window.JFMDJAudio?.status?.error||'Rit-aankondiging werd niet hoorbaar afgespeeld');
     lastText=text;lastAt=Date.now();lastDest={latitude:+dest.latitude,longitude:+dest.longitude};lastError='';
     try{window.dispatchEvent(new CustomEvent('mair:car-ride-intro',{detail:{text,change,trackId:track?.id||''}}))}catch{/* alleen een melding */}
     return true
-  }catch(e){error=String(e?.message||e).slice(0,240);lastError=error;window.MAIRRuntime?.caught?.('mair-car-ride-dj.announce',e);return false}
+  }catch(e){error=String(e?.message||e).slice(0,240);skip(error);return false}
   finally{
     // Muziek gaat altijd weer aan: na de aankondiging het eerste ritnummer vanaf het begin, met één play-opdracht en de
     // nieuwe ritvolgorde erachter. Anders (of als dat mislukt) het oude nummer.
-    if(paused){const p=window.JFMPlayback;try{nextAt=Date.now();started=!error&&!!track?.uri&&await p?.djNext?.('dj-ride-intro',track.uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.next',e)}if(!started)try{await p?.djResume?.(uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.resume',e)}}
+    if(paused){const p=window.JFMPlayback;try{nextAt=Date.now();started=!error&&!!track?.uri&&await p?.djNext?.('dj-ride-intro',track.uri)}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.next',e)}if(!started)try{if(!await within(p?.djResume?.(uri),10000,'hervatten duurde te lang'))await window.jfmSpotifyPlayer?.resume?.()}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.resume',e);try{await window.jfmSpotifyPlayer?.resume?.()}catch{/* niets meer te doen */}}}
     try{if(op)window.JFMPlaybackState?.end?.(op,{error})}catch(e){window.MAIRRuntime?.caught?.('mair-car-ride-dj.end',e)}
     removeEventListener('mair:director-replanned',onReplan);
     if(window.MAIRAudioTransitionLock===lock)window.MAIRAudioTransitionLock=null;busy=false;
@@ -85,5 +93,5 @@ async function announce(detail={}){
   }
 }
 addEventListener('mair:car-route-start',e=>{announce(e.detail||{}).catch(()=>{})});
-window.MAIRCarRideDJ={version:'car-ride-dj-v3',announce,line,spokenPlace,spokenDuration,status:()=>({busy,lastText,lastError,lastAt})};
+window.MAIRCarRideDJ={version:'car-ride-dj-v4',announce,line,spokenPlace,spokenDuration,status:()=>({busy,lastText,lastError,lastAt})};
 })();
