@@ -45,3 +45,20 @@ Getest met Playwright (MAIR_E2E_BUNDLED=1) op de VM:
 - [x] Gevonden: onder het nummer stond "Current past in de komende MAIR-programmering" (interne code op het scherm). Nu Nederlands.
 - [x] Gevonden: e2e kon niet op de VM draaien (geen Google Chrome op arm64). Nu met MAIR_E2E_BUNDLED=1.
 - [ ] Layout-checks die op de VM-browser net niet passen: Car Mode C2 667x375 aanwijzingstekst, Car Mode "na herstel: pijl en kaart volgen", Sleep-knoppen op 390x844 (811-853 van 844). Zelfde uitkomst op main zonder mijn wijzigingen, dus niet door deze ronde. Op de laptop met echte Chrome nog eens draaien (Hestia).
+
+## Car Mode 20-10-2026: ritstart en flitsers
+
+Ritstart-praatje bleef stil:
+- [x] Oorzaak: dezelfde als bij het nieuws. De ritstart vroeg de stem via prepareSpeech, en die weigert tijdens de backoff van dj-audio-guard (30 s tot 5 min na één mislukte DJ-stem) zonder verzoek. Doordat Edge kapot was, mislukte er vaak een stem en stond die backoff vaak aan. Nu gaat de ritstart direct naar de TTS. e2e rideintrobackoff (oude code faalt).
+- [x] Zelfde gat bij het welterusten van Sleep, ook gefixt.
+- [ ] Let op: het praatje komt alleen als je een route start (Start-knop). Car Mode openen zonder route geeft geen praatje. Dat is zo gebouwd; zeg het als dat anders moet.
+
+Flitsers:
+- [x] Bron is OpenStreetMap via Overpass (node highway=speed_camera en enforcement-relaties), per vak van ~11 x 10 km, 40 km vooruit langs de route.
+- [x] Fout gevonden: de vraag eindigde op `out tags geom`. Dan geeft Overpass relaties zonder leden terug. Alle 80 trajectcontroles in NL kwamen daardoor binnen als losse flitser of helemaal niet. Nu `out body geom`, nieuwe cache-sleutel zodat oude vakken opnieuw worden opgehaald. De nep-Overpass in de e2e doet nu hetzelfde als de echte (oude code: 17 fouten).
+- [x] Ook losse punten met alleen enforcement=maxspeed/average_speed (16 in NL) tellen nu mee.
+- [x] Josh' route gecontroleerd (auto IJsselstein - Sleeuwijk Tol Oost - Fellenoordstraat Breda, route via OSRM, 66 km; bus 500/502 rijdt door dezelfde strook over de A27). OSM heeft in die hele strook 3 vaste flitsers, de dichtstbijzijnde 810 m van de route (Vianen/IJsselstein 52.0276, 5.0684, 50 km/u; Breda 51.6014, 4.7776, 70 km/u; 52.0061, 4.9624, 80 km/u). Op de route zelf staat in OSM geen enkele vaste flitser. Er bestaat geen officiële open lijst (OM publiceert er geen).
+- [ ] Mist Josh een flitspaal die hij kent, dan ontbreekt hij in OpenStreetMap zelf. Toevoegen kan in OSM (highway=speed_camera). Niet zelf verzinnen.
+- [ ] De reserve-Overpass (overpass.private.coffee) had op 20-10 data van 15-07. De VM krijgt 406 van overpass-api.de, dus de echte telefoon-route is niet vanaf hier te testen.
+- [ ] Rit-test in de auto staat in de Courant.
+

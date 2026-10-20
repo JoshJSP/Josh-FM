@@ -11,7 +11,7 @@
 (()=>{
 'use strict';
 if(window.MAIRCarCams)return;
-const ON_KEY='mair_car_cams_on_v1',CACHE_KEY='mair_car_cams_v1',OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter'];
+const ON_KEY='mair_car_cams_on_v1',CACHE_KEY='mair_car_cams_v2',OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter'];
 const TILE_LAT=.1,TILE_LON=.15,TTL_MS=7*864e5,KEEP=40,GAP_MS=3000,FETCH_MS=25000,RETRY_MS=300000,AHEAD_M=6000,ROUTE_AHEAD_M=40000,MAP_M=6000;
 const ROUTE_SNAP_M=20,SEC_SNAP_M=35,PASS_M=8,MIN_SPEED=3,R=Math.PI/180;
 let on=true;try{on=localStorage.getItem(ON_KEY)!=='0'}catch{/* geen opslag: standaard aan */}
@@ -34,7 +34,9 @@ function save(){
 }
 function query(k){
   const[a,b]=k.split(',').map(Number),bb=[a*TILE_LAT,b*TILE_LON,(a+1)*TILE_LAT,(b+1)*TILE_LON].map(x=>x.toFixed(4)).join(',');
-  return`[out:json][timeout:20];(node["highway"="speed_camera"](${bb});rel["type"="enforcement"]["enforcement"~"^(maxspeed|average_speed)$"](${bb}););out tags geom;`
+  // out body, niet out tags: 'tags' laat de leden van een relatie weg, en zonder leden (from/to/device) vielen alle 80
+  // trajectcontroles in NL weg of werden losse punten (20-10-2026). Ook losse punten met alleen enforcement=maxspeed (16 in NL).
+  return`[out:json][timeout:20];(node["highway"="speed_camera"](${bb});node["enforcement"~"^(maxspeed|average_speed)$"](${bb});rel["type"="enforcement"]["enforcement"~"^(maxspeed|average_speed)$"](${bb}););out body geom;`
 }
 // Overpass -> {cams, secs}. Een enforcement-relatie met een begin (from) en einde (to) is een trajectcontrole; de camera's
 // (device) daarvan tellen niet los mee. Heeft de relatie geen begin en einde, dan zijn de devices gewone flitsers.
@@ -50,7 +52,7 @@ function parse(d){
     if(f&&t&&Math.hypot(flat(f,t).x,flat(f,t).y)>100)secs.push({id:'r'+e.id,max,f,t});
     else devs.forEach((p,i)=>cams.push({id:`r${e.id}.${i}`,max,...p}))
   }
-  for(const e of els){if(e.type==='node'&&e.tags?.highway==='speed_camera'&&!dev.has(e.id)&&pt(e))cams.push({id:'n'+e.id,max:maxOf(e.tags.maxspeed),...pt(e)})}
+  for(const e of els){if(e.type==='node'&&(e.tags?.highway==='speed_camera'||/^(maxspeed|average_speed)$/.test(e.tags?.enforcement||''))&&!dev.has(e.id)&&pt(e))cams.push({id:'n'+e.id,max:maxOf(e.tags.maxspeed),...pt(e)})}
   return{cams,secs}
 }
 function fetchJson(url,ms){const ac=new AbortController(),to=setTimeout(()=>ac.abort(),ms);return fetch(url,{signal:ac.signal}).then(r=>{if(!r.ok)throw Error('http '+r.status);return r.json()}).finally(()=>clearTimeout(to))}

@@ -62,7 +62,10 @@ async function announce(detail={}){
     const t=truth();uri=String(t?.uri||'');const playing=!!(uri&&t?.isPlaying);
     track=!change&&playing?firstRideTrack():null;const text=line({destination:dest,duration:detail.duration,track,change});
     if(typeof window.prepareSpeech!=='function'||typeof window.speakText!=='function')throw Error('MAIR Voice Engine is niet klaar');
-    if(!await window.prepareSpeech(text,false))throw Error(window.JFMDJAudio?.status?.error||'Rit-aankondiging kon niet worden voorbereid');
+    // Direct naar de TTS, niet via prepareSpeech: die gaat door de backoff van dj-audio-guard en weigert na één mislukte
+    // DJ-stem 30 s tot 5 min zonder verzoek. Zo bleef de ritstart stil (20-10-2026, zelfde oorzaak als het uurnieuws).
+    if(typeof window.JFMDJAudio?.prepare==='function')await window.JFMDJAudio.prepare(text,false,{breakId:'car-ride'});
+    else if(!await window.prepareSpeech(text,false))throw Error(window.JFMDJAudio?.status?.error||'Rit-aankondiging kon niet worden voorbereid');
     if(someoneTalking(lock))return false;
     const p=window.JFMPlayback;
     if(playing){op=window.JFMPlaybackState?.begin?.('dj-handoff',{expectedUri:uri,timeoutMs:60000})||0;if(!await p?.djPause?.(uri))throw Error(p?.health?.lastError||'Muziek pauzeren voor de rit-aankondiging mislukt');paused=true}
@@ -82,5 +85,5 @@ async function announce(detail={}){
   }
 }
 addEventListener('mair:car-route-start',e=>{announce(e.detail||{}).catch(()=>{})});
-window.MAIRCarRideDJ={version:'car-ride-dj-v2',announce,line,spokenPlace,spokenDuration,status:()=>({busy,lastText,lastError,lastAt})};
+window.MAIRCarRideDJ={version:'car-ride-dj-v3',announce,line,spokenPlace,spokenDuration,status:()=>({busy,lastText,lastError,lastAt})};
 })();

@@ -121,7 +121,9 @@ async function mapbox(h,{token=process.env.REAL_MM_TOKEN||'pk.test'}={}){
       if(m.failOverpass||(m.failHost&&route.request().url().includes(m.failHost)))return route.fulfill({status:502,body:'busy',headers:H}).catch(()=>{});
       const bb=/\(([\d.-]+),([\d.-]+),([\d.-]+),([\d.-]+)\)/.exec(q)||[],[s,w,n,e]=bb.slice(1).map(Number);
       const inb=x=>x.type==='relation'?x.members.some(k=>k.lat>=s&&k.lat<=n&&k.lon>=w&&k.lon<=e):x.lat>=s&&x.lat<=n&&x.lon>=w&&x.lon<=e;
-      return route.fulfill({status:200,contentType:'application/json',headers:H,body:JSON.stringify({elements:m.camEls.filter(inb)})}).catch(()=>{});
+      // Zoals de echte Overpass: met 'out tags' komen relaties zonder leden terug (zo vielen de trajectcontroles weg, 20-10-2026).
+      const tagsOnly=/out tags/.test(q),els=m.camEls.filter(inb).map(x=>tagsOnly&&x.type==='relation'?{type:x.type,id:x.id,tags:x.tags}:x);
+      return route.fulfill({status:200,contentType:'application/json',headers:H,body:JSON.stringify({elements:els})}).catch(()=>{});
     }
     m.overpass.push({q,url:route.request().url().split('?')[0]});
     if(m.failOverpass)return route.fulfill({status:502,body:'busy',headers:H}).catch(()=>{});
@@ -950,6 +952,25 @@ const scenarioVibeSlow=()=>vibeAll({withRoute:true,searchDelay:2500,list:['chill
 // Josh 17-10-2026: route starten = DJ zegt meteen waar we heen gaan, hoe lang het duurt en met welk nummer we beginnen.
 // Het lopende nummer stopt, de DJ praat, dan start precies het aangekondigde nummer. Nieuwe bestemming tijdens de rit:
 // korte zin zonder nummer. DJ uit of al iemand aan het woord: niks.
+// 20-10-2026: geen ritstart-praatje. Stond de DJ-stem in de backoff van dj-audio-guard (na één mislukte stem),
+// dan weigerde prepareSpeech zonder TTS-verzoek en bleef de rit stil. Nu moet het praatje toch klinken.
+async function scenarioRideIntroBackoff(){
+  const t=await setup(),{page,h}=t;
+  try{
+    await page.locator('nav button, [role=tab]',{hasText:'Stations'}).locator('visible=true').first().click();await sleep(500);
+    await page.locator('[data-mair-station]').locator('visible=true').first().click();
+    await until(page,()=>window.__mock.state().playing&&window.__mock.state().uris>=10&&queue.length>=10,null,25000,'station speelt');
+    await sleep(2500);
+    await page.evaluate(()=>{window.JFMDJAudioGuard.failure('e2e: eerdere DJ-stem mislukt','prepare');window.__said=[];window.__intros=[];const o=window.speakText;window.speakText=async(x,...a)=>{const r=await o(x,...a);window.__said.push({x,r});return r};addEventListener('mair:car-ride-intro',e=>window.__intros.push(e.detail))});
+    const backoff=await page.evaluate(()=>window.JFMDJAudioGuard.state.retryInMs);
+    await startRoute(t);
+    await until(page,()=>window.__intros.length>=1,null,25000,'DJ kondigt de rit aan ondanks backoff');
+    await until(page,()=>window.__mock.playing,null,10000,'muziek weer aan');
+    const said=await page.evaluate(()=>window.__said);
+    c.ok('ritstart in backoff: praatje echt afgespeeld',backoff>0&&said.length===1&&said[0].r===true&&/^We zijn onderweg naar /.test(said[0].x),JSON.stringify({backoff,said}));
+    c.ok('ritstart in backoff: geen page errors',!h.log.pageErrors.length,h.log.pageErrors.join(' | '));
+  }finally{await h.close()}
+}
 async function scenarioRideIntro(){
   const t=await setup(),{page,h}=t;
   try{
@@ -1154,7 +1175,7 @@ async function scenarioCams(){
     await page.locator('#mairCarWaveOverlay .car-menu [data-act="menuclose"]').click();await sleep(250);
     await at(2700,'Flitser over 300 m','weer aan: melding is er weer (vak zat nog in het geheugen)');
     if(outDir){await sleep(500);await page.screenshot({path:outDir+'/carmode-flitser.png'})}
-    const keys=await page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('mair_car_cams_v1')||'{}')).length);
+    const keys=await page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('mair_car_cams_v2')||'{}')).length);
     c.ok('de vakken staan in localStorage (7 dagen)',keys>=2,String(keys));
     c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
   }finally{await h.close()}
@@ -1317,7 +1338,7 @@ async function scenarioPlaces(){
   }finally{await p.h.close()}
 }
 
-const scenarios={rideaudio:scenarioRideAudio,places:scenarioPlaces,vibeall:scenarioVibeAll,vibeallnr:scenarioVibeAllNoRoute,vibeslow:scenarioVibeSlow,cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
+const scenarios={rideaudio:scenarioRideAudio,places:scenarioPlaces,vibeall:scenarioVibeAll,vibeallnr:scenarioVibeAllNoRoute,vibeslow:scenarioVibeSlow,cams:scenarioCams,camsroute:scenarioCamsRoute,rideintro:scenarioRideIntro,rideintrobackoff:scenarioRideIntroBackoff,viberide:scenarioVibeRide,nav:scenarioNav,arrows:scenarioArrows,bare:scenarioBare,map:scenarioMap,stops:scenarioStops,concurrent:scenarioConcurrent,sizes:scenarioSizes,map2:scenarioMap2,search:scenarioSearch,portrait:scenarioPortrait,snap:scenarioSnap,noroute:scenarioNoRoute,vibe:scenarioVibe,zoomout:scenarioZoomOut,vibewidth:scenarioVibeWidth};
 const only=process.env.ONLY;
 for(const [name,fn] of Object.entries(scenarios)){if(only&&only!==name)continue;console.log('--- '+name);try{await fn()}catch(e){c.ok(`scenario ${name} afgerond`,false,e.message.slice(0,300))}}
 process.exit(c.summary('MAIR e2e car mode')?0:1);

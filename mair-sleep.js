@@ -93,7 +93,8 @@ function planGoodnight(now,due){
   if(now>fs+GOODNIGHT_BEFORE_MS*2){gn.phase='done';gn.result='skipped-late';return}
   if(gn.phase==='idle'){
     gn.phase='armed';gn.text=GOODNIGHT_LINES[Math.floor(Math.random()*GOODNIGHT_LINES.length)];const gen=gn.gen;
-    gn.prep=(async()=>{try{if(document.visibilityState==='hidden'||typeof window.prepareSpeech!=='function')return false;return !!(await window.prepareSpeech(gn.text,false,{breakId:`sleep-goodnight-${gen}`}))}catch{return false}})()
+    gn.prep=(async()=>{try{if(document.visibilityState==='hidden'||typeof window.prepareSpeech!=='function')return false;const meta={breakId:`sleep-goodnight-${gen}`};// direct naar de TTS: prepareSpeech weigert tijdens de backoff van dj-audio-guard
+    if(typeof window.JFMDJAudio?.prepare==='function'){await window.JFMDJAudio.prepare(gn.text,false,meta);return true}return !!(await window.prepareSpeech(gn.text,false,meta))}catch{return false}})()
   }
   // Liefst bij een natuurlijke trackwissel in het venster voor de fade; anders vlak voor het begin van de fade.
   if(gn.boundary||now>=fs-GOODNIGHT_BEFORE_MS)speakGoodnight().catch(()=>{})
