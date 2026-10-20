@@ -31,7 +31,7 @@ Volgorde van belang (uit CLAUDE.md): muziek blijft spelen, wachtrij klopt, Spoti
 - [ ] Luistertest op de iPhone: uurnieuws met scherm aan, en met scherm uit (zie de Courant).
 - [ ] Werkt het nieuws met het scherm uit op de iPhone, dan de DJ-break op dezelfde manier (zachter in plaats van pauzeren) zodat de DJ ook met het scherm uit praat.
 - [ ] Werkt het niet: native app met keep-alive aanzetten en testen (BACKGROUND_DJ), of accepteren dat nieuws alleen met het scherm aan komt.
-- [ ] Edge kan weer veranderen. Een dagelijkse check die één korte zin via Edge maakt en een melding geeft als hij faalt.
+- [x] Edge kan weer veranderen. Een dagelijkse check die één korte zin via Edge maakt en een melding geeft als hij faalt.
 - [ ] Diagnostiek: het nieuws-status (lastError, bgRefused) zichtbaar in de diagnostiek, zodat we na een rit kunnen zien waarom het stil bleef.
 
 ## Testronde 20-10-2026
