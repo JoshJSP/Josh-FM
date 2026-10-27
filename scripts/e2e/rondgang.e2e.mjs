@@ -40,6 +40,9 @@ try{
   ok('dj uit: nieuws staat ook uit',await page.evaluate(()=>window.MAIR_DJ_ENABLED===false&&window.MAIRNewsBulletin.status().enabled===false));
   await page.evaluate(()=>window.MAIRFlags.setDJEnabled(true));await page.reload({waitUntil:'load'});await page.waitForFunction(()=>window.MAIRNewsBulletin,null,{timeout:15000});
   ok('dj weer aan: nieuws weer aan',await page.evaluate(()=>window.MAIRNewsBulletin.status().enabled===true));
+  // Diagnostiek laat de nieuws-status zien, ook in het gekopieerde foutlog.
+  const diag=await page.evaluate(()=>{window.MAIRDiagnosticsHub.open();const t=document.querySelector('#mairNewsStatusCard')?.innerText||'';window.MAIRDiagnosticsHub.close();return t});
+  ok('diagnostiek: kaart uurnieuws met status',/Nieuws: aan/.test(diag)&&/Geweigerd met scherm uit: \d+x/.test(diag)&&/Laatste fout:/.test(diag),diag);
   // Stem kapot: een melding in gewone taal, geen kale HTTP-code, en de muziek blijft.
   await page.route('**/api/tts',r=>r.request().method()==='POST'?r.fulfill({status:502,contentType:'application/json',body:JSON.stringify({error:'fish_tts_failed',detail:'Fish Audio generation timed out'})}):r.fallback());
   const said=await page.evaluate(async()=>{const r=await window.prepareSpeech('Test van de stem.',false);return{r,err:window.JFMDJAudio.status.error}});

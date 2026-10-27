@@ -32,7 +32,7 @@ Volgorde van belang (uit CLAUDE.md): muziek blijft spelen, wachtrij klopt, Spoti
 - [ ] Werkt het nieuws met het scherm uit op de iPhone, dan de DJ-break op dezelfde manier (zachter in plaats van pauzeren) zodat de DJ ook met het scherm uit praat.
 - [ ] Werkt het niet: native app met keep-alive aanzetten en testen (BACKGROUND_DJ), of accepteren dat nieuws alleen met het scherm aan komt.
 - [x] Edge kan weer veranderen. Een dagelijkse check die één korte zin via Edge maakt en een melding geeft als hij faalt.
-- [ ] Diagnostiek: het nieuws-status (lastError, bgRefused) zichtbaar in de diagnostiek, zodat we na een rit kunnen zien waarom het stil bleef.
+- [x] Diagnostiek: het nieuws-status (lastError, bgRefused) zichtbaar in de diagnostiek, zodat we na een rit kunnen zien waarom het stil bleef. Kaart UURNIEUWS in Diagnostiek, en de status gaat mee met "Kopieer foutlog" (v189).
 
 ## Testronde 20-10-2026
 
