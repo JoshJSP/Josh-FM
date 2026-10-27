@@ -44,7 +44,7 @@ Getest met Playwright (MAIR_E2E_BUNDLED=1) op de VM:
 
 - [x] Gevonden: onder het nummer stond "Current past in de komende MAIR-programmering" (interne code op het scherm). Nu Nederlands.
 - [x] Gevonden: e2e kon niet op de VM draaien (geen Google Chrome op arm64). Nu met MAIR_E2E_BUNDLED=1.
-- [ ] Layout-checks die op de VM-browser net niet passen: Car Mode C2 667x375 aanwijzingstekst, Car Mode "na herstel: pijl en kaart volgen", Sleep-knoppen op 390x844 (811-853 van 844). Zelfde uitkomst op main zonder mijn wijzigingen, dus niet door deze ronde. Op de laptop met echte Chrome nog eens draaien (Hestia).
+- [x] Layout-checks die op de VM-browser net niet passen: Car Mode C2 667x375 aanwijzingstekst, Car Mode "na herstel: pijl en kaart volgen", Sleep-knoppen op 390x844 (811-853 van 844). Zelfde uitkomst op main zonder mijn wijzigingen, dus niet door deze ronde. Op de laptop met echte Chrome nog eens draaien (Hestia). 27-10 op de laptop met echte Chrome: Car Mode 532 ok, Sleep 87 ok, rondgang 15 ok. Het lag aan de VM-browser, niet aan de app.
 
 ## Car Mode 20-10-2026: ritstart en flitsers
 
