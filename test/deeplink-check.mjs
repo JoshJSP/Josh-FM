@@ -1,15 +1,18 @@
-// mair-deeplink.js: tikt de zenderknop aan en haalt de parameter weg; rommel in ?station doet niets
-import { chromium } from '/home/kantoor/.npm-global/lib/node_modules/playwright/index.mjs';
-import fs from 'fs';
-const js = fs.readFileSync(new URL('../mair-deeplink.js', import.meta.url).pathname, 'utf8');
-const b = await chromium.launch(); const p = await b.newPage();
-const run = async (q) => {
-  await p.route('https://mair.test/**', (r) => r.fulfill({ contentType: 'text/html', body: `<body><script>window.geklikt=null;setTimeout(()=>{const k=document.createElement('button');k.dataset.jfmChannel='study';k.onclick=()=>window.geklikt='study';document.body.append(k)},1500)</script><script>${js}</script></body>` }));
-  await p.goto('https://mair.test/' + q); await p.waitForTimeout(3000);
-  return p.evaluate(() => [window.geklikt, location.search]);
-};
-const a = await run('?station=study'), c = await run('?station=<x>');
+// mair-deeplink.js tegen de echte index.html (lokaal geserveerd): na de deeplink moet
+// body.dataset.musicChannel de gevraagde zender zijn en is ?station weg uit het adres.
+// Draaien: python3 -m http.server 8797 (in deze map), dan node test/deeplink-check.mjs (duurt ~1 min)
+const pw = await import(process.env.PLAYWRIGHT || '/home/kantoor/.npm-global/lib/node_modules/playwright/index.mjs');
+const BASIS = process.env.MAIR_URL || 'http://localhost:8797/index.html';
+const b = await pw.chromium.launch(); const p = await b.newPage();
+const fout = [];
+for (const id of ['study', 'chill']) {
+  await p.goto(BASIS + '?station=' + id);
+  await p.waitForTimeout(26000);
+  const [kanaal, zoek] = await p.evaluate(() => [document.body.dataset.musicChannel, location.search]);
+  if (kanaal !== id || zoek !== '') fout.push(`${id}: kanaal=${kanaal} zoek=${zoek}`);
+}
+await p.goto(BASIS + '?station=<x>'); await p.waitForTimeout(3000);
+if (!(await p.evaluate(() => location.search)).includes('station')) fout.push('rommel in ?station moet blijven staan en niets doen');
 await b.close();
-const ok = a[0] === 'study' && a[1] === '' && c[0] === null;
-console.log(ok ? 'ok  deeplink: zender aangetikt, parameter weg, rommel genegeerd' : 'MIS ' + JSON.stringify([a, c]));
-process.exit(ok ? 0 : 1);
+console.log(fout.length ? 'MIS ' + fout.join('; ') : 'ok  deeplink: echte MAIR springt naar study en chill, rommel doet niets');
+process.exit(fout.length ? 1 : 0);
