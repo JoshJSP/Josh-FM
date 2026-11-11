@@ -9,12 +9,11 @@
   try{localStorage.setItem('jfm_music_channel_v1',id)}catch{/* opslag geblokkeerd: dan alleen tikken */}
   const tot=Date.now()+20000;
   const probeer=()=>{
-    if(document.body?.dataset?.musicChannel!==id){
-      const knop=document.querySelector(`[data-jfm-channel="${id}"],[data-mair-station="${id}"]`);
-      if(knop)knop.click();
-    }
-    if(Date.now()<tot)return setTimeout(probeer,1000);
-    if(document.body?.dataset?.musicChannel===id)history.replaceState(null,'',location.pathname);
+    // klopt hij, dan stoppen: kiest Josh daarna zelf iets anders, dan blijft dat staan
+    if(document.body?.dataset?.musicChannel===id)return history.replaceState(null,'',location.pathname);
+    const knop=document.querySelector(`[data-jfm-channel="${id}"],[data-mair-station="${id}"]`);
+    if(knop)knop.click();
+    if(Date.now()<tot)setTimeout(probeer,1000);
   };
   setTimeout(probeer,1500);
 })();
