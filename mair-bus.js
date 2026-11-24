@@ -14,7 +14,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const log=(what,e)=>{try{window.MAIRRuntime?.caught?.('bus.'+what,e)}catch{/* log kapot: onschuldig */}};
 const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??d}catch{return d}};
 const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{/* opslag vol of geblokkeerd */}};
-let S=fresh(),ritten=[],source='',fetchedAt=0,pos=null,watchId=null,tick=null,lastFetch=0,fetching=false,open=false,overlay=null,banner='',map=null,mapFailed=false,talking=false;
+let S=fresh(),ritten=[],les=null,source='',fetchedAt=0,pos=null,watchId=null,tick=null,lastFetch=0,fetching=false,open=false,overlay=null,banner='',map=null,mapFailed=false,talking=false;
 function fresh(dir=''){return{active:false,dir,phase:'',trip1:'',trip2:'',boardedAt:0,said:{},queue:[],done:null,at:Date.now()}}
 const save=()=>{S.at=Date.now();write(RIDE,S)};
 function restore(){const r=read(RIDE,null);if(r&&r.active&&Date.now()-Number(r.at||0)<3*3600000)S={...fresh(),...r};}
@@ -27,23 +27,26 @@ function current(){
     // Halverwege starten: rijdt Josh al mee? Anders de eerstvolgende bus.
     const p=fix(),loc=p&&C.locate(ritten,p,now);
     if(loc){S.trip1=C.buses(loc.rit)[0].tripId;S.phase=loc.phase;S.boardedAt=Date.parse(C.buses(loc.rit)[0].start)}
-    else{const r=C.pick(ritten,now);return r}
+    else{const a=advised(now);return a||C.pick(ritten,now)}
   }
   const r=ritten.find(x=>C.buses(x)[0]?.tripId===S.trip1);if(!r)return null;
   if(!S.trip2)return r;
   const b2=ritten.map(x=>C.buses(x)[1]).find(l=>l?.tripId===S.trip2);
   return b2?{...r,legs:[C.buses(r)[0],{mode:'WALK'},b2]}:r;
 }
+// Rooster: de bus die Josh voor zijn eerste les moet nemen (laatste die op tijd is). Alleen als die binnen 18 uur vertrekt.
+function advised(now){const id=les?.bus?.[les.bus.length-1],r=id&&ritten.find(x=>C.buses(x)[0]?.tripId===id),t=r&&Date.parse(C.buses(r)[0].start);return r&&t>=now-60000&&t-now<18*3600000?r:null}
 async function load(force=false){
   if(!S.dir||!force&&(fetching||Date.now()-lastFetch<FETCH_MS))return;
   const dir=S.dir;fetching=true;lastFetch=Date.now();// richting gewisseld tijdens het ophalen: het oude antwoord telt niet
   const first=S.trip1&&ritten.length?ritten.find(x=>C.buses(x)[0]?.tripId===S.trip1):null;
   const from=first?Date.parse(C.buses(first)[0].start)-60000:Date.now()-45*60000;
   try{
-    const r=await fetch(`/api/bus?dir=${dir}&time=${encodeURIComponent(new Date(from).toISOString())}`,{cache:'no-store',signal:AbortSignal.timeout?.(10000)});
-    const d=r.ok?await r.json():null;if(dir!==S.dir)return;if(!d?.ok||!Array.isArray(d.ritten)||!d.ritten.length)throw Error(d?.error||'http '+r.status);
-    ritten=d.ritten;source='live';fetchedAt=Date.now();
-    const cache=read(CACHE,{});cache[dir]={at:fetchedAt,ritten:d.ritten.map(x=>({...x,legs:x.legs.map(l=>({...l,_line:undefined}))}))};write(CACHE,cache);
+    const r=await fetch(`/api/bus?dir=${dir}&time=${encodeURIComponent(new Date(from).toISOString())}${dir==='heen'?'&les=1':''}`,{cache:'no-store',signal:AbortSignal.timeout?.(10000)});
+    const d=r.ok?await r.json():null;if(dir!==S.dir)return;if(!d?.ok||!Array.isArray(d.ritten))throw Error(d?.error||'http '+r.status);
+    // Lege lijst = er is verbinding maar er rijdt niks. Dat is iets anders dan geen data.
+    ritten=d.ritten;les=d.les||null;source='live';fetchedAt=Date.now();
+    if(ritten.length){const cache=read(CACHE,{});cache[dir]={at:fetchedAt,ritten:d.ritten.map(x=>({...x,legs:x.legs.map(l=>({...l,_line:undefined}))}))};write(CACHE,cache)}// lege lijst niet over de opgeslagen dienstregeling heen
   }catch(e){
     if(dir!==S.dir)return;log('fetch',e);
     // Geen internet of Transitous plat: de laatst opgehaalde dienstregeling, verschoven naar vandaag.
@@ -159,22 +162,34 @@ function fit(g){try{const c=g.route.features.flatMap(f=>f.geometry.coordinates);
 
 // ---- scherm ----
 const hm=t=>t?C.hm(t):'--:--';
-const until=t=>{const m=Math.round((Date.parse(t)-Date.now())/60000);return m<=0?'nu':m===1?'over 1 min':`over ${m} min`};
+const dayKey=t=>new Date(t).toLocaleDateString('en-CA',{timeZone:'Europe/Amsterdam'});
+const dayName=t=>{const d=dayKey(t);return d===dayKey(Date.now())?'vandaag':d===dayKey(Date.now()+86400000)?'morgen':new Date(t).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Amsterdam'})};
+// Ver weg (s nachts de eerste bus van morgen): een klok in plaats van "over 412 min".
+const until=t=>{const m=Math.round((Date.parse(t)-Date.now())/60000);if(m>=90){const n=dayName(t);return n==='vandaag'?`om ${C.hm(t)}`:`${n} om ${C.hm(t)}`}return m<=0?'nu':m===1?'over 1 min':`over ${m} min`};
 const late=l=>{const d=C.delay(l);return d>0?` <em class="mair-bus-late">+${d}</em>`:''};
 function headline(rit){
   if(S.done)return['Je bent er',window.MAIRCarRideDJ?.arrivalLine?.(S.done)||''];
-  if(!rit)return source==='none'?['Geen busdata','Geen verbinding en nog geen opgeslagen dienstregeling.']:['Bustijden laden…',''];
+  if(!rit)return source==='none'?['Geen busdata','Geen verbinding en nog geen opgeslagen dienstregeling.']:source==='live'?['Geen bus gevonden','De komende 12 uur rijdt er geen 500 of 502.']:['Bustijden laden…',''];
   const[b1,b2]=C.buses(rit);
   if(S.phase==='in-1')return[`In de ${b1.lijn}`,`Overstappen ${until(b1.end)} · ${hm(b1.end)}`];
   if(S.phase==='overstap')return[`Overstap op de ${b2.lijn}`,`Vertrekt ${until(b2.start)} · ${hm(b2.start)}`];
   if(S.phase==='in-2')return[`In de ${b2.lijn}`,`Uitstappen ${until(b2.end)} · ${hm(b2.end)}`];
-  return[`Wachten op de ${b1.lijn}`,`Vertrekt ${until(b1.start)} · ${hm(b1.start)}${b1.cancelled?' · rijdt niet':''}`];
+  const far=Date.parse(b1.start)-Date.now()>=90*60000;
+  return[`Wachten op de ${b1.lijn}`,`Vertrekt ${until(b1.start)}${far?'':' · '+hm(b1.start)}${b1.cancelled?' · rijdt niet':''}`];
 }
 function infoHtml(rit){
   if(!rit||S.done)return'';
   const[b1,b2]=C.buses(rit),t=C.transfer(rit),pill=t?`<i class="mair-bus-pill is-${t.status}">${t.status}</i>`:'';
   const alerts=C.alerts(rit).map(a=>`<p class="mair-bus-alert">${esc(a)}</p>`).join('');
-  return`<div class="mair-bus-rows"><div><small>OVERSTAP ${esc(String(b1.to?.name||'').replace(/^[^,]*,\s*/,'').toUpperCase())}</small><b>${hm(b1.end)}${late(b1)} → ${esc(b2.lijn)} ${hm(b2.start)} ${pill}</b></div><div><small>${S.dir==='terug'?'THUIS (LEKBRUG)':'OP SCHOOL'}</small><b>${hm(b2.end)}${late(b2)}</b></div></div>${alerts}`;
+  return`${lesHtml()}<div class="mair-bus-rows"><div><small>OVERSTAP ${esc(String(b1.to?.name||'').replace(/^[^,]*,\s*/,'').toUpperCase())}</small><b>${hm(b1.end)}${late(b1)} → ${esc(b2.lijn)} ${hm(b2.start)} ${pill}</b></div><div><small>${S.dir==='terug'?'THUIS (LEKBRUG)':'OP SCHOOL'}</small><b>${hm(b2.end)}${late(b2)}</b></div></div>${alerts}`;
+}
+function lesHtml(){
+  if(S.dir!=='heen'||!les?.start||S.phase&&S.phase!=='wachten')return'';
+  const label=`${dayName(les.start)==='vandaag'?'EERSTE LES VANDAAG':'VOLGENDE LES '+dayName(les.start).toUpperCase()} ${C.hm(les.start)}`;
+  const opts=(les.bus||[]).map(id=>ritten.find(x=>C.buses(x)[0]?.tripId===id)).filter(Boolean);
+  if(!opts.length)return`<div class="mair-bus-les"><small>${esc(label)}</small><b>Geen 500/502 gevonden die op tijd is</b></div>`;
+  const best=opts[opts.length-1],[b1,b2]=C.buses(best),eerder=opts.slice(0,-1).reverse().map(r=>hm(C.buses(r)[0].start));
+  return`<div class="mair-bus-les"><small>${esc(label)}</small><b>Neem de ${hm(b1.start)} · op school ${hm(b2?.end)}</b>${eerder.length?`<span>Eerder kan ook: ${eerder.join(', ')}</span>`:''}</div>`;
 }
 function sourceText(){const t=fetchedAt?new Date(fetchedAt).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}):'';return source==='live'?`Live OV-data · ${t}`:source==='cache'?`Vaste dienstregeling (geen verbinding) · van ${new Date(fetchedAt).toLocaleDateString('nl-NL')}`:''}
 function nowPlaying(){const img=$('artImg');return{title:String($('title')?.textContent||'').trim()||'MAIRFM',artist:String($('artist')?.textContent||'').trim(),art:img&&!img.classList.contains('hidden')?img.currentSrc||img.src:'mair-icon-512.png',playing:!!window.JFMPlaybackState?.get?.()?.isPlaying}}
@@ -217,7 +232,7 @@ function syncLauncher(){
 }
 // Bij Lekbrug = heen, bij school = terug. Onderweg zegt de plek niets over de richting, dan beslist de klok.
 function guessDir(){const p=fix();if(p&&C.dist(p,HOME)<3000)return'heen';if(p&&C.dist(p,SCHOOL)<3000)return'terug';return new Date().getHours()<12?'heen':'terug'}
-function chooseDir(dir){if(S.dir===dir&&S.active)return;S={...fresh(dir),active:true,queue:S.queue};ritten=[];source='';fetchedAt=0;banner='';save();load(true);render()}
+function chooseDir(dir){if(S.dir===dir&&S.active)return;S={...fresh(dir),active:true,queue:S.queue};ritten=[];les=null;source='';fetchedAt=0;banner='';save();load(true);render()}
 function startTimers(){stopTimers();tick=setInterval(()=>{if(document.visibilityState==='visible'){load();step()}},TICK_MS)}
 function stopTimers(){if(tick)clearInterval(tick);tick=null}
 function setOpen(v){
@@ -236,5 +251,5 @@ if(S.active){watch();startTimers();load(true)}
 const boot=()=>{try{syncLauncher()}catch(e){log('launcher',e)}};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 setTimeout(boot,1500);addEventListener('mair:runtime-ready',boot);
-window.MAIRBus={version:'bus-v1',open:()=>setOpen(true),close:()=>setOpen(false),state:()=>({...S,source,ritten:ritten.length,pos:fix()}),_set:(r,p)=>{if(r)ritten=r,source='live',fetchedAt=Date.now();if(p!==undefined)pos=p;step()}};
+window.MAIRBus={version:'bus-v1',open:()=>setOpen(true),close:()=>setOpen(false),state:()=>({...S,source,ritten:ritten.length,les,pos:fix()}),_set:(r,p)=>{if(r)ritten=r,source='live',fetchedAt=Date.now();if(p!==undefined)pos=p;step()}};
 })();

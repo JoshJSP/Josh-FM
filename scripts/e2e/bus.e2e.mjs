@@ -90,5 +90,33 @@ async function offline(){
     noErrors('offline: geen fouten',h);
   }finally{await h.close()}
 }
-for(const[n,f]of Object.entries({instappen,halverwege,gemist,offline}))if(!only||only===n){try{await f()}catch(e){c.ok(n+': liep door',false,String(e.message||e).slice(0,400))}}
+async function nacht(){
+  // Verbinding goed, maar er rijdt niks meer: geen "Geen busdata / geen verbinding".
+  const h=await setup({ok:true,ritten:[]});
+  try{
+    await gps(h,{lat:51.9909,lon:5.0826});await open(h);await h.page.locator('#mairBusOverlay [data-bus="heen"]').click();
+    await until(h.page,()=>document.getElementById('mairBusTitle')?.textContent==='Geen bus gevonden',null,15000,'nacht-tekst');
+    const s=await st(h);
+    c.ok('nacht: eerlijke tekst, geen "geen verbinding"',!/verbinding/i.test(s.title)&&s.src.startsWith('Live OV-data'),s.title+' | '+s.src);
+    noErrors('nacht: geen fouten',h);
+  }finally{await h.close()}
+}
+async function rooster(){
+  // Les over ruim 4 uur. Advies = rit 2 van de fixture (de laatste die op tijd is), rit 1 eerder.
+  const d=data(3*3600000),[b1,b2]=bus(d.ritten[1].legs),[e1]=bus(d.ritten[0].legs);
+  d.les={start:new Date(Date.parse(b2.end)+10*60000).toISOString(),bus:[e1.tripId,b1.tripId]};
+  const h=await setup(d);
+  try{
+    await gps(h,b1.from);await open(h);await h.page.locator('#mairBusOverlay [data-bus="heen"]').click();
+    await until(h.page,()=>/Neem de/.test(document.querySelector('.mair-bus-les')?.textContent||''),null,15000,'lesadvies');
+    const t=await h.page.evaluate(()=>document.querySelector('.mair-bus-les').textContent),hm=x=>h.page.evaluate(v=>window.MAIRBusCore.hm(v),x);
+    c.ok('rooster: noemt de les en de juiste bus',/(EERSTE LES VANDAAG|VOLGENDE LES MORGEN) [0-9]{2}:[0-9]{2}/.test(t)&&t.includes('Neem de '+await hm(b1.start))&&t.includes('Eerder kan ook: '+await hm(e1.start)),t);
+    const s=await st(h);
+    c.ok('rooster: wacht op de geadviseerde bus',s.phase==='wachten'&&/^Wachten op de 500/.test(s.title),s.title);
+    c.ok('rooster: muziek speelt door',s.playing===true);
+    await h.page.screenshot({path:path.join(SHOTS,'bus-rooster.png')});
+    noErrors('rooster: geen fouten',h);
+  }finally{await h.close()}
+}
+for(const[n,f]of Object.entries({instappen,halverwege,gemist,offline,nacht,rooster}))if(!only||only===n){try{await f()}catch(e){c.ok(n+': liep door',false,String(e.message||e).slice(0,400))}}
 process.exit(c.summary('MAIR bus e2e')?0:1);
