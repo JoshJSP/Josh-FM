@@ -26,8 +26,12 @@
     const ids=window.JFMRadioSuite?.state?.()?.lastIds;if(!Array.isArray(list)||!Array.isArray(ids)||!ids.length)return list;
     const cur=String(window.JFMPlaybackState?.get?.()?.trackId||''),ci=cur?list.findIndex(t=>t?.id===cur):-1;
     const head=list.slice(0,ci+1),tail=list.slice(ci+1),req=t=>!!t?._request||(typeof window.jfmIsRequest==='function'&&window.jfmIsRequest(t));
-    for(const n of[50,25,10]){const r=new Set(ids.slice(0,n)),out=tail.filter(t=>req(t)||!r.has(t?.id));if(out.length>=Math.min(10,tail.length))return[...head,...out]}
+    // Uurgrens (Josh 24-11): wat het afgelopen uur speelde komt nooit terug, ook niet als de geschiedenis hieronder korter wordt.
+    const hour=playedLastHour();
+    for(const n of[50,25,10]){const r=new Set([...ids.slice(0,n),...hour]),out=tail.filter(t=>req(t)||!r.has(t?.id));if(out.length>=Math.min(10,tail.length))return[...head,...out]}
+    const fresh=tail.filter(t=>req(t)||!hour.has(t?.id));if(fresh.length)return[...head,...fresh];
     return list}catch{return list}}
+  function playedLastHour(){const at=window.JFMRadioSuite?.state?.()?.playedAt||{},cut=Date.now()-3600000;return new Set(Object.keys(at).filter(id=>Number(at[id])>cut))}
   function current(){try{return normalize(Array.isArray(queue)?queue:[])}catch{return[]}}
   function loadActive(){try{const x=JSON.parse(sessionStorage.getItem(ACTIVE_KEY)||'{}');if(Date.now()-Number(x.at||0)>6*60*60*1000||x.station!==(localStorage.getItem('jfm_music_channel_v1')||'mix'))return[];return normalize(x.tracks)}catch{return[]}}
   function persistActive(list,stationId=station){try{sessionStorage.setItem(ACTIVE_KEY,JSON.stringify({at:Date.now(),station:stationId||localStorage.getItem('jfm_music_channel_v1')||'mix',tracks:normalize(list).slice(0,60)}))}catch{/* opslag geblokkeerd: dan maar zonder opslag */}}

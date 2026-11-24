@@ -51,7 +51,7 @@ expect(sw.includes("'./apple-touch-icon.png'")&&sw.includes("'./mair-icon-192.pn
 expect(!health.includes('Test Josh FM opnieuw'),'Self Test bevat nog oude Josh FM-knoptekst');
 expect(health.includes("btn.textContent='Test MAIR opnieuw'")&&health.includes("b.textContent='Test MAIR opnieuw'"),'Self Test gebruikt niet overal MAIR');
 expect(health.includes("name:brand(c.show.name)")&&health.includes("esc(brand(s.show?.name||'—'))"),'Self Test scrubt oude programmanaam niet');
-expect(brain.includes("maxHour=talk==='LESS'?2:talk==='MORE'?5:4")&&brain.includes("threshold=talk==='LESS'?7:talk==='MORE'?4:6"),'Radio Brain praatfrequentie of uurcap is onverwacht gewijzigd');
+expect(brain.includes("maxHour=talk==='LESS'?2:talk==='MORE'?7:5")&&brain.includes("threshold=talk==='LESS'?7:talk==='MORE'?4:6"),'Radio Brain praatfrequentie of uurcap is onverwacht gewijzigd');
 expect(dj.includes("phase:'COUNTING'")&&dj.includes("'PREPARING'")&&dj.includes("'ARMED'")&&dj.includes("'HANDOFF'")&&dj.includes("'SPEAKING'")&&dj.includes("'RESTORING'"),'Nieuwe DJ v3.2 state machine is incompleet');
 expect(writer.includes('process.env.GROQ_API_KEY')&&writer.includes('openai/gpt-oss-120b')&&writer.includes('openai/gpt-oss-20b'),'Groq DJ Writer ontbreekt, gebruikt verouderde modellen of key is niet server-side');
 expect(writer.includes('persoonlijke Nederlandse muziekzender')&&writer.includes('natuurlijk hedendaags Nederlands'),'Groq DJ Writer is niet strikt Nederlands');

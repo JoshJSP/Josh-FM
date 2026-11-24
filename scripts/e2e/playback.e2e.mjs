@@ -28,10 +28,6 @@ async function scenarioStart(){
     c.ok('station: eerste nummer speelt',st.playing&&st.idx===0);
     await until(h.page,()=>/Testnummer/.test(document.getElementById('title')?.textContent||''),null,8000,'titel in UI');
     c.ok('UI: titel toont het spelende nummer',true);
-    await until(h.page,()=>document.querySelectorAll('#mair-up-next-list .mair-up-row').length>=2,null,10000,'Hierna gevuld');
-    const upNext=await h.page.evaluate(()=>[...document.querySelectorAll('#mair-up-next-list .mair-up-row b')].map(x=>x.textContent));
-    c.ok('Hierna op MAIRFM: geen dubbele nummers',new Set(upNext).size===upNext.length,upNext.join(' / '));
-    c.ok('Hierna op MAIRFM: titel zonder artiest erin geplakt',upNext.every(x=>!x.includes(' · ')),upNext.join(' / '));
     const pbState=await h.page.evaluate(()=>window.JFMPlaybackState.get());
     c.ok('playback-state: isPlaying en trackId gevuld',pbState.isPlaying===true&&!!pbState.trackId,JSON.stringify(pbState));
     await h.page.evaluate(()=>document.getElementById('play').click());

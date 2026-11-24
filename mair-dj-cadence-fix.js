@@ -5,7 +5,7 @@
 if(window.MAIRDJCadenceFix?.version)return;
 const $=id=>document.getElementById(id);
 const level=()=>Math.max(0,Math.min(3,Number($('talk')?.value??1)||0));
-const range=()=>[{min:5,max:7},{min:3,max:5},{min:2,max:4},{min:1,max:3}][level()]||{min:3,max:5};
+const range=()=>[{min:5,max:7},{min:3,max:3},{min:2,max:4},{min:1,max:3}][level()]||{min:3,max:5};
 let planTarget=0,lastBreakAt=0,lastLevel=-1,lastDetail=null;
 function pickTarget(){const r=range();return r.min+Math.floor(Math.random()*(r.max-r.min+1))}
 function memory(){try{return window.MAIRDJMemory?.snapshot?.()||{}}catch{return{}}}
@@ -20,7 +20,9 @@ function patchBrain(){
     const result=original({...input,audioLockBusy:lockBusy});
     if(!input.manual&&result?.shouldTalk===false&&result.reason==='score-below-threshold'&&tracks>=target&&minutes>=5){
       const now=Date.now(),hour=new Date(now).getHours();
-      return{...result,shouldTalk:true,breakType:'STATION_ID',maxDurationSeconds:5,targetWordCount:8,priority:6,permittedTopics:['music','station','local-time','session-context'],prohibitedTopics:['weather','news','sport','traffic','unverified-facts','technical-details'],mustMention:[],mayMention:[],reason:'cadence-due-safe-break',fallbackType:'STATION_ID',score:Math.max(Number(result.score)||0,Number(result.threshold)||0),cadenceTarget:target,hourKey:`${new Date(now).toISOString().slice(0,10)}-${hour}`}
+      // Josh 25-11: korte nummer-intro als het tijd is, stationsnaam om de 2-3 DJ-momenten.
+      const recent=(m.recentBreaks||[]).slice(0,2).map(x=>x.type),station=!recent.includes('STATION_ID')||!input.nextTrack?.name,[words,secs]=station?[8,5]:[14,10];
+      return{...result,shouldTalk:true,breakType:station?'STATION_ID':'INTRO',maxDurationSeconds:secs,targetWordCount:words,priority:6,permittedTopics:['music','station','local-time','session-context'],prohibitedTopics:['weather','news','sport','traffic','unverified-facts','technical-details'],mustMention:[],mayMention:[],reason:'cadence-due-safe-break',fallbackType:'STATION_ID',score:Math.max(Number(result.score)||0,Number(result.threshold)||0),cadenceTarget:target,hourKey:`${new Date(now).toISOString().slice(0,10)}-${hour}`}
     }
     return{...result,cadenceTarget:target}
   };

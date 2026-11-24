@@ -20,7 +20,7 @@ function decide(input={}){
   const rapidSuppressed=Object.hasOwn(memory,'rapidSkipTracksRemaining')?Number(memory.rapidSkipTracksRemaining)>0:skipCount>=3;if(!manual&&rapidSuppressed)return no('rapid-skip-suppression',{suppressedTracks:Number(memory.rapidSkipTracksRemaining)||2});
   const tracks=Number(memory.tracksSinceLastBreak)||0,minutes=Number(memory.minutesSinceLastBreak);
   if(!manual&&(tracks<2||minutes<5))return no('minimum-separation');
-  const talk=clean(input.userTalkativeness||'NORMAL').toUpperCase(),maxHour=talk==='LESS'?2:talk==='MORE'?5:4;
+  const talk=clean(input.userTalkativeness||'NORMAL').toUpperCase(),maxHour=talk==='LESS'?2:talk==='MORE'?7:5;
   if(!manual&&(memory.recentHour||[]).length>=maxHour)return no('hourly-cap');
   const clock=input.clock||{},minute=Number.isFinite(Number(clock.minute))?Number(clock.minute):new Date(now).getMinutes(),hour=Number.isFinite(Number(clock.hour))?Number(clock.hour):new Date(now).getHours();
   const hourKey=`${new Date(now).toISOString().slice(0,10)}-${hour}`;
@@ -43,12 +43,13 @@ function decide(input={}){
   else if(minute>=52&&recentCount(history,'HOUR_CLOSER',3000000,now)===0&&tracks>=3)type='HOUR_CLOSER';
   else if(facts.length&&recentCount(history,'ARTIST_FACT',2700000,now)+recentCount(history,'TRACK_FACT',2700000,now)===0)type=facts[0].subjectType==='track'?'TRACK_FACT':'ARTIST_FACT';
   else if(relationship&&!recentTypes.slice(0,2).includes('TWO_SONG_LINK'))type='TWO_SONG_LINK';
-  else if(sessionMinutes>=45&&memory.narrative?.dominantGenre&&!recentTypes.includes('SESSION_LINK'))type='SESSION_LINK';
+  else if(sessionMinutes>=20&&memory.narrative?.dominantGenre&&!recentTypes.includes('SESSION_LINK'))type='SESSION_LINK';
   else if((minute<=3||minute>=27&&minute<=33)&&recentCount(history,'TIME_CHECK',1800000,now)===0)type='TIME_CHECK';
   else if(input.nextTrack?.discovery)type='INTRO';
   else if(input.currentTrack?.notable)type='OUTRO';
-  else if(!recentTypes.includes('STATION_ID')&&sessionMinutes<10)type='STATION_ID';
   else if(input.currentTrack?.discovery)type='BACK_ANNOUNCE';
+  // Josh 25-11: stationsnaam om de 2-3 DJ-momenten.
+  else if(!recentTypes.slice(0,2).includes('STATION_ID'))type='STATION_ID';
   else type='FORWARD_ANNOUNCE';
   if(recentTypes[0]===type&&recentTypes[1]===type)type=relationship?'TWO_SONG_LINK':'FORWARD_ANNOUNCE';
   const [target,maxDuration]=CONFIG[type]||CONFIG.SESSION_LINK,fact=type.endsWith('_FACT')?facts[0]:null;
