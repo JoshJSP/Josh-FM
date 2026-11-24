@@ -20,5 +20,8 @@ rt=boot();
 const log=rt.errorLog();
 assert.equal(log.length,2,'foutlog moet een herlaadbeurt overleven');
 assert.equal(log[0].error,'boom');assert.equal(log[1].type,'caught.playback-primary.transfer');
+rt.record('playback.tap-state',{reason:'druk-play',bound:true,deviceId:'ja',accessToken:'abc'},'error');
+const tap=rt.errorLog().at(-1);assert.equal(tap.error,'druk-play');
+const info=JSON.parse(tap.info);assert.equal(info.bound,true,'staat-velden moeten in de foutlog blijven');assert.equal(info.deviceId,'ja');assert.equal(info.accessToken,'[redacted]');assert.equal(info.reason,undefined);
 rt.clearErrorLog();assert.equal(boot().errorLog().length,0);
 console.log('MAIR foutlog: persistent + dedupe + wissen PASS');
