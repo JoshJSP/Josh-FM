@@ -43,7 +43,7 @@ async function load(force=false){
   const from=first?Date.parse(C.buses(first)[0].start)-60000:Date.now()-45*60000;
   try{
     const r=await fetch(`/api/bus?dir=${dir}&time=${encodeURIComponent(new Date(from).toISOString())}${dir==='heen'?'&les=1':''}`,{cache:'no-store',signal:AbortSignal.timeout?.(10000)});
-    const d=r.ok?await r.json():null;if(dir!==S.dir)return;if(!d?.ok||!Array.isArray(d.ritten))throw Error(d?.error||'http '+r.status);
+    const d=r.ok?await r.json().catch(()=>null):null;if(dir!==S.dir)return;if(!d?.ok||!Array.isArray(d.ritten))throw Error(d?.error||(r.ok?'onleesbaar antwoord (http '+r.status+')':'http '+r.status));
     // Lege lijst = er is verbinding maar er rijdt niks. Dat is iets anders dan geen data.
     ritten=d.ritten;les=d.les||null;source='live';fetchedAt=Date.now();
     if(ritten.length){const cache=read(CACHE,{});cache[dir]={at:fetchedAt,ritten:d.ritten.map(x=>({...x,legs:x.legs.map(l=>({...l,_line:undefined}))}))};write(CACHE,cache)}// lege lijst niet over de opgeslagen dienstregeling heen
@@ -148,10 +148,11 @@ async function mapUpdate(rit){
       if(!token)throw Error('Mapbox-token ontbreekt');
       const gl=await lib();gl.accessToken=token;
       map=new gl.Map({container:host,style:'mapbox://styles/mapbox/navigation-night-v1',attributionControl:false,interactive:true});
-      map.on('load',()=>{map.addSource('r',{type:'geojson',data:g.route});map.addSource('s',{type:'geojson',data:g.stops});map.addSource('d',{type:'geojson',data:g.dots});
-        map.addLayer({id:'r',type:'line',source:'r',paint:{'line-color':['match',['get','i'],0,'#9b4dff','#36d7b7'],'line-width':4}});
-        map.addLayer({id:'s',type:'circle',source:'s',paint:{'circle-radius':5,'circle-color':'#fff'}});
-        map.addLayer({id:'d',type:'circle',source:'d',paint:{'circle-radius':['match',['get','kind'],'bus',9,7],'circle-color':['match',['get','kind'],'bus','#ffcc33','#4aa3ff'],'circle-stroke-width':2,'circle-stroke-color':'#08070e'}});
+      map.on('load',()=>{// load kan na een stationswissel opnieuw afgaan: bron al aanwezig = alleen data vervangen, nooit dubbel toevoegen
+        for(const[id,data]of[['r',g.route],['s',g.stops],['d',g.dots]]){const src=map.getSource(id);if(src)src.setData(data);else map.addSource(id,{type:'geojson',data})}
+        if(!map.getLayer('r'))map.addLayer({id:'r',type:'line',source:'r',paint:{'line-color':['match',['get','i'],0,'#9b4dff','#36d7b7'],'line-width':4}});
+        if(!map.getLayer('s'))map.addLayer({id:'s',type:'circle',source:'s',paint:{'circle-radius':5,'circle-color':'#fff'}});
+        if(!map.getLayer('d'))map.addLayer({id:'d',type:'circle',source:'d',paint:{'circle-radius':['match',['get','kind'],'bus',9,7],'circle-color':['match',['get','kind'],'bus','#ffcc33','#4aa3ff'],'circle-stroke-width':2,'circle-stroke-color':'#08070e'}});
         fit(g);map._mairReady=true});
       map.on('error',e=>log('map',e?.error||Error('map')));
     }else if(map._mairReady){map.getSource('r').setData(g.route);map.getSource('s').setData(g.stops);map.getSource('d').setData(g.dots);if(map._mairTrip!==S.trip1+S.trip2)fit(g)}
