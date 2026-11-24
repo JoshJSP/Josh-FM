@@ -25,7 +25,9 @@ const hostOf=v=>{try{return new URL(v).host}catch{return ''}};
 
 export function originAllowed(req){
   const origin=String(req.headers?.origin||'').trim();
-  if(!origin)return false;
+  // Een same-origin GET (gezondheidscontrole in Diagnostiek) stuurt in de browser geen Origin mee en kreeg 403. Sec-Fetch-Site zet de
+  // browser zelf en is voor pagina-JS niet te vervalsen; de Spotify-sessiecontrole blijft daarna gewoon gelden.
+  if(!origin)return String(req.headers?.['sec-fetch-site']||'').toLowerCase()==='same-origin';
   const own=String(req.headers?.['x-forwarded-host']||req.headers?.host||'').split(',')[0].trim().toLowerCase();
   if(own&&hostOf(origin).toLowerCase()===own)return true;
   return list(process.env.MAIR_ALLOWED_ORIGINS).includes(origin);
