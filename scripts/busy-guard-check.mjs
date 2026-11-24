@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+// Hangt een opdracht binnen withBusy om een andere reden dan de SDK, dan moet busy na de limiet toch vrijkomen.
+const src=fs.readFileSync(new URL('../playback-primary.js',import.meta.url),'utf8');
+const def=src.match(/const BUSY_MAX_MS=[^\n]*\n\s*async function withBusy[^\n]*/)[0].replace('BUSY_MAX_MS=25000','BUSY_MAX_MS=80');
+const logged=[];let busy=false,lastError='';
+const window={MAIRRuntime:{record:t=>logged.push(t)}};
+const make=new Function('window','info','setBusy','getBusy',`let busy=false,lastError='';const _s=setBusy;setBusy=v=>{busy=!!v;_s(v)};getBusy.f=()=>busy;${def};return withBusy`);
+const getBusy={};const withBusy=make(window,()=>{},v=>{busy=!!v},getBusy);
+withBusy(()=>new Promise(()=>{}));
+assert.equal(busy,true,'bezig tijdens de opdracht');
+await new Promise(r=>setTimeout(r,150));
+assert.equal(busy,false,'busy komt vrij na de limiet');
+assert.deepEqual(logged,['playback.busy-timeout']);
+let late;const slow=withBusy(()=>new Promise(r=>{late=r}));
+await new Promise(r=>setTimeout(r,150));
+assert.equal(await withBusy(async()=>'ok'),'ok','nieuwe tik werkt weer');
+const next=withBusy(()=>new Promise(()=>{}));late('oud');await slow;
+assert.equal(busy,true,'oude opdracht zet busy van een nieuwe niet uit');
+console.log('MAIR busy-vangnet: PASS');process.exit(0);
