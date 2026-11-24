@@ -230,7 +230,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
       try{for(let i=0;i<24&&(busy||djOwnsTransport());i++)await wait(150)}finally{startPending=false}
       if(busy||djOwnsTransport()){info('MAIRFM is nog bezig. Tik Start nog een keer.',true);return false}
     }
-    return withBusy(async()=>{try{return await startDirect()}catch(e){truth()?.setExpectedLive?.(false,'start-failed');return rememberError(e,'Starten lukte niet: ')}})
+    return withBusy(async()=>{try{try{return await startDirect()}catch(e){/* Spotify kende het verse SDK-device nog niet: een keer opnieuw registreren en starten */if(!/device not found/i.test(String(e?.message||e))||!window.JFMSpotifySDK?.reconnect)throw e;note('start-device-not-found',e);await window.JFMSpotifySDK.reconnect();return await startDirect()}}catch(e){truth()?.setExpectedLive?.(false,'start-failed');return rememberError(e,'Starten lukte niet: ')}})
   }
 
   async function pauseDirect(){

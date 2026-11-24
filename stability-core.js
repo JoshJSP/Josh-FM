@@ -141,7 +141,10 @@
   }
   // Een mislukte devices-lookup (429, timeout, offline) is geen bewijs dat het device weg is: dan niet reconnecten, want dat koppelt een werkende speler los.
   async function isAvailable(id=deviceId){if(!id)return false;try{const d=await api('/me/player/devices');if(!Array.isArray(d?.devices))return true;return d.devices.some(x=>x?.id===id&&!x?.is_restricted)}catch{return true}}
-  async function ensureDevice(){let id=deviceId;if(id&&await isAvailable(id))return id;return reconnect()}
+  // iPhone Safari: 'ready' komt vaak eerder dan Spotify het device in /me/player/devices kent. Een transfer/play op dat moment
+  // geeft 404 "Device not found", en een nieuwe reconnect maakt weer een onbekend device. Wacht dus begrensd tot het in de lijst staat.
+  async function waitListed(id,tries){for(let i=0;i<tries;i++){if(await isAvailable(id))return true;await new Promise(r=>setTimeout(r,500+i*250))}return false}
+  async function ensureDevice(){let id=deviceId;if(id&&await waitListed(id,3))return id;id=await reconnect();await waitListed(id,6);return id}
   async function transfer(play=false){const id=await ensureDevice();await api('/me/player',{method:'PUT',body:{device_ids:[id],play:!!play}});return id}
   async function playUris(uris){const id=await ensureDevice();await api('/me/player/play?device_id='+encodeURIComponent(id),{method:'PUT',body:{uris}});return true}
   function ownConnectButton(){const old=$('connect');if(!old||old.dataset.jfmAuthOwner==='1')return;const fresh=old.cloneNode(true);old.replaceWith(fresh);fresh.dataset.jfmAuthOwner='1';fresh.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();connectSpotify().catch(x=>message(x.message||String(x),true))},true)}
