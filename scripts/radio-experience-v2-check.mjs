@@ -50,7 +50,7 @@ check('DJ writer receives anti-repeat context',has(writer,'recentBreaks','usedFa
 
 check('radio imaging active',has(imaging,'mair-imaging-v1','sonicLogo','beforeBreak','shouldPlay'));
 check('imaging respects user jingles toggle',has(imaging,"$('jingles')?.checked",'document.visibilityState'));
-check('DJ handoff calls imaging before speech',has(dj,'MAIRImaging?.beforeBreak','await playPrepared(pack)'));
+check('DJ handoff calls imaging before speech',has(dj,'MAIRImaging?.startTone','await playPrepared(pack)'));
 
 check('live news is opt-in',has(liveNews,"mair_news_enabled_v1","MAIR Nieuws (:00) + headlines (:30)",'setEnabled'));
 check('half-hour headline is isolated from top-of-hour news',has(liveNews,'COOLDOWN=27*60*1000','12*60*60*1000',"p!=='half'",'LAST_SLOT','LAST_TITLE'));

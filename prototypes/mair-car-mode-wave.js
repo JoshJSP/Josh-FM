@@ -407,7 +407,7 @@ function roundaboutAngle(st,steps=s.steps){
 }
 const roundaboutAngleSvg=a=>{const r=a*Math.PI/180,sx=Math.sin(r),cy=Math.cos(r),p=d=>`${(32+d*sx).toFixed(1)} ${(36-d*cy).toFixed(1)}`;
   return`<circle cx="32" cy="36" r="8" ${SK}/><path d="M32 62V44M${p(8)}L${p(13)}" ${SK}/>${HEAD(+(32+16*sx).toFixed(1),+(36-16*cy).toFixed(1),a)}`};
-const arrowSvg=st=>{const k=maneuverKind(st?.maneuver?.type,st?.maneuver?.modifier),a=k==='roundabout'?roundaboutAngle(st):null;return`<svg class="car-arrow" data-kind="${k}"${a===null?'':` data-exit-angle="${a}"`} viewBox="0 0 64 64" role="img" aria-label="${k}">${k==='roundabout'?(a===null?roundaboutSvg(String(st?.maneuver?.modifier||'')):roundaboutAngleSvg(a)):ARROW_SVG[k]||ARROW_SVG.straight}</svg>`};
+const arrowSvg=(st,steps)=>{const k=maneuverKind(st?.maneuver?.type,st?.maneuver?.modifier),a=k==='roundabout'?roundaboutAngle(st,steps):null;return`<svg class="car-arrow" data-kind="${k}"${a===null?'':` data-exit-angle="${a}"`} viewBox="0 0 64 64" role="img" aria-label="${k}">${k==='roundabout'?(a===null?roundaboutSvg(String(st?.maneuver?.modifier||'')):roundaboutAngleSvg(a)):ARROW_SVG[k]||ARROW_SVG.straight}</svg>`};
 // Bij een rotonde levert Mapbox het afslagnummer in maneuver.exit (omdat
 // roundabout_exits=true wordt meegestuurd). De Nederlandse instructietekst noemt dat
 // nummer meestal al, dus het staat hier als losse badge bij de pijl in plaats van in

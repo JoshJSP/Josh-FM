@@ -12,7 +12,7 @@ const staleVoice=air.indexOf("if(pack.voiceProfileId");
 const voiceReady=air.indexOf('await ensureVoiceReady();');
 const validate=air.indexOf('const s=await stableCurrent');
 const fastPause=air.indexOf('await pauseMusic(uri)',validate);
-const imaging=air.indexOf('MAIRImaging?.beforeBreak',validate);
+const imaging=air.indexOf('MAIRImaging?.startTone',validate);
 const speak=air.indexOf('await playPrepared(pack)',validate);
 const rewindResume=air.indexOf('await restoreMusic(uri,{rewind})',speak);
 

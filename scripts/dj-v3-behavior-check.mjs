@@ -25,7 +25,7 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
   const storage=new Map([['jfm_spotify_device_id','device-test']]);
   const localStorage={getItem:k=>storage.has(k)?storage.get(k):null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},sessionStorage=localStorage;
   const remote={id:'A',uri:'spotify:track:A',playing:true,progress:4000};
-  const metrics={volume:1,genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,djDuck:0,djUnduck:0,speak:0,speakAborted:0,playbackActions:0,prepare:0,prepareAborted:0,writerAborted:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0,requestConsume:0};
+  const metrics={volume:1,genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,djDuck:0,djUnduck:0,djMute:0,djUnmute:0,speak:0,speakAborted:0,playbackActions:0,prepare:0,prepareAborted:0,writerAborted:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0,requestConsume:0};
   let operation=null,expectedLive=true;
   const playbackTruth={
     get:()=>({trackId:remote.id,uri:remote.uri,isPlaying:remote.playing,expectedLive,operation}),
@@ -56,6 +56,8 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
     JFMPlayback.djPause=async uri=>{assert.equal(uri,remote.uri);metrics.djPause++;remote.playing=false;return true};
     JFMPlayback.djResume=async uri=>{assert.equal(uri,remote.uri);metrics.djResume++;remote.playing=true;return true};
     JFMPlayback.djRewind=async uri=>{assert.equal(uri,remote.uri);metrics.djRewind++;remote.progress=0;return true};
+    JFMPlayback.djMute=async()=>{metrics.djMute++;metrics.volume=0;return true};
+    JFMPlayback.djUnmute=async()=>{metrics.djUnmute++;metrics.volume=1;return true};
   }
   // De echte transportlaag kan sinds de duckingwijziging het volume wegdraaien.
   // De muziek blijft daarbij spelen: remote.playing wordt bewust niet aangeraakt.
@@ -85,6 +87,7 @@ async function testSuccessfulAutomaticBreak(){
   assert.equal(h.metrics.speak,1,'successful break speaks exactly once');
   assert.equal(h.metrics.djRewind,1,'na een geduckte break begint het nummer opnieuw, anders praat de DJ over het begin heen');
   assert.equal(h.metrics.djResume,1,'successful break resumes exactly once');assert.equal(h.metrics.djUnduck,0);
+  assert.equal(h.metrics.djMute,1,'begintoon: muziek op 0 tot de pauze staat');assert.equal(h.metrics.djUnmute,1);assert.equal(h.metrics.volume,1,'na de break staat het volume terug');
   assert.equal(h.metrics.genericPause,0,'generic pause must not own DJ handoff');
   assert.equal(h.metrics.genericResume,0,'generic resume must not own DJ handoff');
   assert.equal(h.metrics.queueCalls,queuesBeforeAir,'critical on-air handoff must not fetch Spotify queue');
@@ -96,7 +99,7 @@ async function testDuplicateNaturalEventCannotDoubleAir(){
 }
 async function testVoiceFailureRestoresOnceAndNeverRetries(){
   const h=createHarness({speakSucceeds:false});await prepareAutomaticDue(h);h.natural('D','E');await sleep(800);const first={...h.metrics};
-  assert.equal(first.djPause,1);assert.equal(first.speak,1);assert.equal(first.djResume,1,'failed voice resumes the music once');assert.equal(first.djRewind,0,'failed voice must not rewind before restore');assert.equal(first.djDuck,0);assert.equal(h.state().missed,1);
+  assert.equal(first.djPause,1);assert.equal(first.speak,1);assert.equal(first.djResume,1,'failed voice resumes the music once');assert.equal(first.djRewind,0,'failed voice must not rewind before restore');assert.equal(first.djDuck,0);assert.equal(first.djMute,1);assert.equal(first.volume,1,'mislukte stem: volume terug van 0');assert.equal(h.state().missed,1);
   await sleep(1900);assert.equal(h.metrics.djDuck,first.djDuck);assert.equal(h.metrics.speak,first.speak);assert.equal(h.metrics.djUnduck,first.djUnduck)
 }
 // Stap 2 app-klaar: met BACKGROUND_DJ aan en het scherm uit zet de DJ de muziek zachter in plaats van te pauzeren.

@@ -78,6 +78,16 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     else{try{await pushVolume(volume)}catch{/* terugzetten mislukt: de watchdog en de volgende unduck proberen opnieuw */}}// halverwege mislukte ramp: terug naar de stand van de luisteraar
     return ok;
   }
+  // DJ-break: muziek op 0 tijdens de begintoon, tot de pauze staat. Zelfde 'ducked'-stand als djDuck,
+  // dus djUnmute (= djUnduck) zet het volume van Josh terug, ook als de break mislukt.
+  async function djMute(){
+    if(ducked)return true;
+    if(!player()?.setVolume&&!deviceId())return false;
+    const ok=await rampVolume(0,{steps:2,gap:30});
+    if(ok)ducked=true;
+    else{try{await pushVolume(volume)}catch{/* terugzetten mislukt: de volgende unduck probeert opnieuw */}}
+    return ok;
+  }
   async function djUnduck(){
     if(!ducked)return true;
     let ok=await rampVolume(volume);
@@ -386,7 +396,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   let tries=0;const boot=()=>{if(bind())return;if(++tries<100)setTimeout(boot,120)};boot();
   window.addEventListener('pageshow',()=>setTimeout(()=>{bound=controlsOwned();tries=0;boot();recover('pageshow')},450));window.addEventListener('online',()=>setTimeout(()=>recover('online'),450));window.addEventListener('mair:wake',e=>{const d=e?.detail;if(d?.phase!=='reconcile'||d.reconciled)return;d.tasks?.push(recover('visible'))});/* Fase 1 van het wake-protocol in mair-background-guard.js. Dit was een eigen visibilitychange met een zelfgekozen vertraging van 450 ms, terwijl director.js op 0 ms al tekende met wat er nog in het geheugen stond. Reconciled betekent dat de eigenaar zelf al met Spotify heeft gepraat. */setInterval(()=>watchdog(),5000);/* 5s: de watchdog leest alleen lokale SDK-state zolang muziek speelt; Spotify wordt uitsluitend benaderd als playback daadwerkelijk stilstaat. */
 
-  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,djNext,djDuck,djUnduck,fadeOut,fadeTo,readVolume,restoreVolume,playUri,recover,setVolume,bindVolume,get ducked(){return ducked},get volume(){return volume},get appliedVolume(){return appliedVolume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
+  window.JFMPlayback={primary:true,version:'primary-v17-end-detection-guard',start,next:()=>skip(1),previous:()=>skip(-1),playPause,pause,resume,djPause,djResume,djRewind,djNext,djDuck,djUnduck,djMute,djUnmute:djUnduck,fadeOut,fadeTo,readVolume,restoreVolume,playUri,recover,setVolume,bindVolume,get ducked(){return ducked},get volume(){return volume},get appliedVolume(){return appliedVolume},handleNaturalEnd,ensureDevice:freshDevice,stationContext,get state(){return truth()?.get?.()||null},get health(){return{installed:!!window.__jfmPlaybackPrimaryInstalled,failures,recoveries,deviceHandovers,reloadRestores,reloadNeedsGesture,lastError,busy,endGuardBusy,djBusy:djOwnsTransport(),backgrounded:backgrounded(),deviceId:deviceId(),bound,startPending,recoveryFailures,recoveryCooldownMs:Math.max(0,recoveryCooldownUntil-Date.now()),resumeGuard:{trackId:resumeGuardTrackId,attempts:resumeGuardAttempts,advancedTrackId:resumeGuardAdvancedId,advances:resumeGuardAdvances}}}};
   window.JFMPlaybackPrimary='playback-primary';window.jfmPlayUri=playUri;window.jfmWebResume=resume;window.jfmWebPause=pause;window.jfmWebNext=()=>skip(1);window.jfmWebPrevious=()=>skip(-1);
   window.MAIRRuntime?.register?.('playback-primary',{version:'primary-v17-end-detection-guard',owner:'transport'});
 })();
