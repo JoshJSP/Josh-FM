@@ -10,4 +10,7 @@ t=3000;ctx.playback=m();ctx.window.JFMProgressClock.tick();
 if(el.elapsed.textContent!=='0:57')throw new Error('klok ankerde niet op nieuwe meting: '+el.elapsed.textContent);
 t=5000;ctx.window.JFMProgressClock.tick();
 if(el.elapsed.textContent!=='0:59')throw new Error('klok loopt niet door tussen metingen: '+el.elapsed.textContent);
+// Eén schrijver: renderPlayback laat tijd en balk aan de klok zolang die er is.
+const rp=/function renderPlayback\(d\)\{.*\}/.exec(fs.readFileSync('app.js','utf8'))?.[0]||'';
+if(!/if\(window\.JFMProgressClock\?\.tick\)window\.JFMProgressClock\.tick\(\);else\{\$\('barFill'\)/.test(rp))throw new Error('renderPlayback schrijft #elapsed/#barFill naast de klok');
 console.log('progress-clock anchor check ok');
