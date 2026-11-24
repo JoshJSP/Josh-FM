@@ -5,7 +5,7 @@
   if(window.__jfmStabilityCoreInstalled)return;window.__jfmStabilityCoreInstalled=true;
   const $=id=>document.getElementById(id);
   const PKCE_V='jfm_pkce_verifier_v2',PKCE_S='jfm_pkce_state_v2',STREAM='jfm_streaming_ready_v2',DEVICE='jfm_spotify_device_id';
-  let player=null,deviceId='',initPromise=null,lastEndSignal='',lastObserved=null,reconnectPromise=null,playbackErrorTimer=null;
+  let authHealAt=0,player=null,deviceId='',initPromise=null,lastEndSignal='',lastObserved=null,reconnectPromise=null,playbackErrorTimer=null;
   // Koude start op een telefoon over mobiel internet haalde de oude 10s-limieten
   // regelmatig niet. Bij een mislukking ruimde initPlayer alles op en werd er
   // niets meer geprobeerd tot de gebruiker de app opnieuw naar de voorgrond
@@ -42,10 +42,11 @@
       player=new Spotify.Player({name:'MAIRFM',getOAuthToken:async cb=>{try{cb(await ensure()||'')}catch{cb('')}},volume:1,enableMediaSession:false});window.jfmSpotifyPlayer=player;
       const ready=new Promise((resolve,reject)=>{
         const timer=setTimeout(()=>reject(Error('MAIRFM-speler reageert niet.')),PLAYER_READY_TIMEOUT_MS);
-        player.addListener('ready',({device_id})=>{clearTimeout(timer);rememberDevice(device_id);localStorage.setItem(STREAM,'1');message('Spotify gekoppeld · MAIRFM-speler klaar.');setStatus(true,'gekoppeld');enable(true);resolve(device_id)});
+        let readyDone=false;
+        player.addListener('ready',({device_id})=>{readyDone=true;clearTimeout(timer);rememberDevice(device_id);localStorage.setItem(STREAM,'1');message('Spotify gekoppeld · MAIRFM-speler klaar.');setStatus(true,'gekoppeld');enable(true);resolve(device_id)});
         const me=player;
         player.addListener('not_ready',({device_id}={})=>{if(!device_id||device_id===deviceId)rememberDevice('');lastObserved=null;try{window.JFMPlaybackState?.patch?.({deviceId:'',deviceName:'',isPlaying:false},'sdk-not-ready')}catch(e){window.MAIRRuntime?.caught?.('stability-core.initPlayer',e)};message('Spotify-speler is tijdelijk offline.',true);if(me===player&&!reconnectPromise)deviceLost()});
-        /* SDK kan in deze browser/webview niet afspelen (bijv. geen DRM): meteen melden in plaats van 20 s per poging wachten */player.addListener('initialization_error',({message:m}={})=>{clearTimeout(timer);reject(Error('Spotify-speler kan hier niet starten: '+(m||'onbekende fout')))});player.addListener('authentication_error',()=>{rememberDevice('');localStorage.removeItem(STREAM);message('Spotify moet één keer opnieuw gekoppeld worden voor afspelen in MAIRFM.',true);enable(false);if($('connect'))$('connect').disabled=false});
+        /* SDK kan in deze browser/webview niet afspelen (bijv. geen DRM): meteen melden in plaats van 20 s per poging wachten */player.addListener('initialization_error',({message:m}={})=>{clearTimeout(timer);reject(Error('Spotify-speler kan hier niet starten: '+(m||'onbekende fout')))});/* Ontkoppelen en opnieuw koppelen hielp alleen omdat het een verse token gaf: de speler bleef de bewaarde, door Spotify geweigerde token gebruiken tot die verliep. Nu doen we dat zelf, net als api() bij een 401: token weggooien en de speler opnieuw opbouwen. Maximaal een keer per minuut; lukt het dan nog niet, dan pas de koppelmelding. */player.addListener('authentication_error',()=>{clearTimeout(timer);rememberDevice('');if(me===player&&sessionAlive()&&Date.now()-authHealAt>60000){authHealAt=Date.now();try{window.JFMAuth?.invalidateAccessToken?.()}catch(e){window.MAIRRuntime?.caught?.('stability-core.authHeal',e)}window.MAIRRuntime?.record?.('spotify.sdk-auth-heal',{ready:readyDone},'warn');message('Spotify-token wordt vernieuwd…');if(readyDone)reconnect().catch(e=>window.MAIRRuntime?.caught?.('stability-core.authHeal',e));else reject(Object.assign(Error('Spotify-token wordt vernieuwd.'),{authHeal:true}));return}localStorage.removeItem(STREAM);message('Spotify moet één keer opnieuw gekoppeld worden voor afspelen in MAIRFM.',true);enable(false);if($('connect'))$('connect').disabled=false;reject(Error('Spotify moet één keer opnieuw gekoppeld worden voor afspelen in MAIRFM.'))});
         player.addListener('account_error',()=>message('Spotify Premium is nodig om muziek in MAIRFM af te spelen.',true));
         player.addListener('autoplay_failed',()=>message('iPhone blokkeerde autoplay. Tik nogmaals op Start MAIRFM.',true));
         player.addListener('playback_error',({message:m})=>{clearTimeout(playbackErrorTimer);playbackErrorTimer=setTimeout(()=>{playbackErrorTimer=null;const state=window.JFMPlaybackState?.get?.();if(state?.isPlaying&&Date.now()-Number(state.updatedAt||0)<4000){message('MAIR speelt.');return}message('Spotify-afspeelfout: '+m,true)},700)});
@@ -113,7 +114,7 @@
   }
   async function reconnect(){
     if(reconnectPromise)return reconnectPromise;
-    reconnectPromise=(async()=>{const old=player;rememberDevice('');initPromise=null;player=null;window.jfmSpotifyPlayer=null;try{old?.disconnect?.()}catch{/* oude speler al losgekoppeld */};await new Promise(r=>setTimeout(r,180));const id=await initPlayer();if(!id)throw Error('Spotify-device kon niet opnieuw worden geregistreerd.');return id})().finally(()=>{reconnectPromise=null});
+    reconnectPromise=(async()=>{const old=player;rememberDevice('');initPromise=null;player=null;window.jfmSpotifyPlayer=null;try{old?.disconnect?.()}catch{/* oude speler al losgekoppeld */};await new Promise(r=>setTimeout(r,180));let id;try{id=await initPlayer()}catch(e){if(!e?.authHeal)throw e;id=await initPlayer()}if(!id)throw Error('Spotify-device kon niet opnieuw worden geregistreerd.');return id})().finally(()=>{reconnectPromise=null});
     return reconnectPromise
   }
   // iOS verbreekt de SDK-verbinding met het scherm uit of bij een netwerkwissel. Daarna kwam
