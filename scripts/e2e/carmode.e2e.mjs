@@ -447,7 +447,7 @@ async function scenarioStops(){
     st=await status(page);
     c.ok('onderweg naar de stop: stop en route intact, niet aangekomen',st.stops.length===1&&st.routeActive,JSON.stringify(st.stops));
     const d0=mb.directions;
-    for(let i=0;i<3;i++)await t.at(9970+i*5,{jump:i===0});
+    for(let i=0;i<3;i++)await t.at(9978+i*5,{jump:i===0});
     await sleep(1200);
     st=await status(page);
     c.ok('aangekomen bij de stop: stop weg, route loopt door',st.stops.length===0&&st.routeActive===true,JSON.stringify(st.stops));
@@ -460,9 +460,12 @@ async function scenarioStops(){
     await t.at(25010,{jump:false});
     c.ok('10 m na de afrit: volgende aanwijzing (aankomst)',(await kind(page))==='arrive',await kind(page));
     c.ok('15 m voor/na de afrit: nog geen aankomst',(await status(page)).routeActive===true);
-    for(let i=0;i<4;i++)await t.at(DEST_M-120+i*20,{jump:i===0});
+    for(let i=0;i<3;i++)await t.at(DEST_M-90+i*20,{jump:i===0});
+    c.ok('50 m voor de bestemming: nog niet aangekomen',(await status(page)).routeActive===true);
+    for(let i=0;i<3;i++)await t.at(DEST_M-20+i*5);
     await sleep(600);
     st=await status(page);
+    c.ok('ritsamenvatting met duur, gemiddelde, snelst en afstand',await page.evaluate(()=>{const e=document.querySelector('#mairCarWaveOverlay .car-ridesum');return!!e&&/DUUR/.test(e.textContent)&&/GEMIDDELD/.test(e.textContent)&&/SNELST/.test(e.textContent)&&/\d+,\d km/.test(e.textContent)}),await txt(page,'.car-ridesum'));
     c.ok('bij de bestemming: route klaar',st.routeActive===false,JSON.stringify(st));
     c.ok('melding "Route klaar"',(await page.evaluate(()=>window.__toasts)).some(x=>/Route klaar/.test(x)));
     c.ok('geen pageerrors',h.log.pageErrors.length===0,h.log.pageErrors.join('|'));
