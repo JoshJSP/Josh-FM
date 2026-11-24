@@ -19,7 +19,7 @@
   function signalNatural(track){if(!track?.id)return false;const sig=`${track.id}:${Math.floor(Number(track.durationMs||0)/1000)}`;if(lastEndSignal===sig)return false;lastEndSignal=sig;try{window.dispatchEvent(new CustomEvent('jfm:natural-track-end',{detail:{trackId:track.id,uri:track.uri||'',durationMs:Number(track.durationMs||0),positionMs:Number(track.positionMs||0),source:track.source||'sdk'}}))}catch{/* event-listener gooide: onschuldig */}return true}
   function message(text,bad=false){const el=$('queueInfo');if(el){el.textContent=text;el.style.color=bad?'#ffb4b4':''}}
   function setStatus(ok,text){const s=$('status');if(s){s.classList.toggle('on',ok);s.classList.toggle('off',!ok);s.textContent=text||(ok?'gekoppeld':'offline')}}
-  function enable(ok){['start','play','prev','next','djNow','skipTalk','searchBtn','rebuild'].forEach(id=>{const e=$(id);if(e)e.disabled=!ok})}
+  function enable(ok){['start','play','prev','next','djNow','skipTalk','searchBtn','rebuild'].forEach(id=>{const e=$(id);if(e)e.disabled=!ok});if(!ok)window.MAIRPlayerSnapshot?.('knoppen-uit')}
   // Zoeken en een nieuwe radioset bouwen zijn Web API-acties: die hebben alleen een geldig
   // token nodig, geen afspeelapparaat. Ze horen dus niet mee uit te gaan als enkel de
   // speler faalt. sessionAlive() gebruikt dezelfde sessiewaarheid als de UX-laag sinds

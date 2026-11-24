@@ -63,7 +63,7 @@ async function nativeRestore(){
 }
 window.JFMNativeSession={clear:nativeClear,save:nativeSave};
 window.__jfmNativeReady=nativeRestore();
-function saveToken(d){token=d.access_token;refreshToken=d.refresh_token||refreshToken;expiresAt=Date.now()+(d.expires_in||3600)*1000-30000;localStorage.setItem('jfm_token',token);if(refreshToken)localStorage.setItem('jfm_refresh',refreshToken);localStorage.setItem('jfm_exp',String(expiresAt));nativeSave()}
+function saveToken(d){if(d.scope)try{localStorage.setItem('jfm_scope',String(d.scope))}catch{/* opslag vol: alleen de diagnose mist dan de scopes */}token=d.access_token;refreshToken=d.refresh_token||refreshToken;expiresAt=Date.now()+(d.expires_in||3600)*1000-30000;localStorage.setItem('jfm_token',token);if(refreshToken)localStorage.setItem('jfm_refresh',refreshToken);localStorage.setItem('jfm_exp',String(expiresAt));nativeSave()}
 function restore(){token=localStorage.getItem('jfm_token');refreshToken=localStorage.getItem('jfm_refresh');expiresAt=Number(localStorage.getItem('jfm_exp')||0)}
 function invalidateAccessToken(){token=null;expiresAt=0;localStorage.removeItem('jfm_token');localStorage.setItem('jfm_exp','0');if(refreshToken)nativeSave()}
 // Een ander tabblad kan de refresh-token al vernieuwd hebben: alleen wissen als in de opslag nog
@@ -97,7 +97,9 @@ async function api(path,opt={},retry401=true){const isRead=!opt.method||String(o
 // stond een storing die er niet was. Een geslaagd antwoord zonder JSON is gewoon leeg,
 // net als een 204.
 return r.json().catch(()=>null)}
-window.JFMAuth={version:'auth-v2-single-flight-timeout',ensure,invalidateAccessToken,clearSpotifySession,get state(){return{hasAccessToken:!!token,hasRefreshToken:!!refreshToken,expiresAt,refreshing:!!tokenRefreshPromise,refreshCount:tokenRefreshCount}}};
+window.// Play deed niks in de iPhone-app en het foutlog bleef leeg. Dit legt bij een tik vast wat de speler ziet.
+window.MAIRPlayerSnapshot=function(reason){try{const sdk=window.JFMSpotifySDK?.health||{},scope=localStorage.getItem('jfm_scope');window.MAIRRuntime?.record?.('playback.tap-state',{reason:String(reason||'').slice(0,40),hasToken:!!token,tokenValid:!!token&&Date.now()<expiresAt,hasRefresh:!!refreshToken,streamingScope:scope==null?'onbekend':/streaming/.test(scope),sdkPlayer:!!sdk.hasPlayer,deviceId:sdk.deviceId?'ja':'nee',initializing:!!sdk.initializing,reconnecting:!!sdk.reconnecting,bootAttempts:sdk.bootAttempts,lastBootError:String(sdk.lastBootError||'').slice(0,200),native:!!window.Capacitor?.isNativePlatform?.()},'error')}catch{/* diagnose mag nooit afspelen blokkeren */}};
+JFMAuth={version:'auth-v2-single-flight-timeout',ensure,invalidateAccessToken,clearSpotifySession,get state(){return{hasAccessToken:!!token,hasRefreshToken:!!refreshToken,expiresAt,refreshing:!!tokenRefreshPromise,refreshCount:tokenRefreshCount}}};
 function talkPlan(){return[{label:'Weinig',min:6,max:9},{label:'Normaal',min:3,max:5},{label:'Radio',min:2,max:4},{label:'Veel',min:1,max:3}][Number($('talk').value)]}
 function scheduleTalk(){const x=talkPlan();nextTalkAt=Math.floor(Math.random()*(x.max-x.min+1))+x.min;tracksSinceTalk=0}
 function updateTalkLabel(){$('talkValue').textContent=talkPlan().label}
