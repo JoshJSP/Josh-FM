@@ -216,6 +216,23 @@ check('B1. faalt alleen de speler, dan blijven zoeken en radioset bouwen bruikba
   assert.equal(els.rebuild.disabled, false, 'een nieuwe radioset bouwen mag ook blijven werken');
 });
 
+check('B1a. faalt de speler met een levende sessie, dan blijven Play en Start tikbaar en staat de fout in het foutlog', async () => {
+  // Josh (iPhone-app): Play deed niks tot hij ontkoppelde. Een uitgeschakelde knop slikt elke tik.
+  const { context, els } = sdkHarness({ hasRefreshToken: true, spelerFaalt: true });
+  const records = [];
+  context.MAIRRuntime = { record: (type, detail, level) => records.push({ type, detail, level }), caught() {} };
+  await new Promise(r => setTimeout(r, 120));
+  assert.equal(els.play.disabled, false, 'Play moet tikbaar blijven, de tik bouwt de speler opnieuw op');
+  assert.equal(els.start.disabled, false, 'Start moet tikbaar blijven');
+  assert.equal(els.next.disabled, true, 'volgende/vorige blijven uit zonder speler');
+  assert.ok(records.some(r => r.type === 'spotify.player-init-failed'), 'de mislukte opstart moet in het foutlog komen');
+});
+
+check('B1c. een tik zonder speler bouwt hem opnieuw op in plaats van niks te doen', async () => {
+  const bron = read('playback-primary.js');
+  assert.ok(bron.includes("window.JFMSpotifySDK.reconnect().then(()=>{if(!bind())"), 'de tik op Play/Start moet reconnect aanroepen');
+});
+
 check('B1b. zonder sessie blijft de zoekknop wel uit', async () => {
   const { context, els } = sdkHarness({ hasRefreshToken: false, spelerFaalt: true });
   await new Promise(r => setTimeout(r, 120));
@@ -226,10 +243,10 @@ check('B1b. zonder sessie blijft de zoekknop wel uit', async () => {
 check('B2. zonder geldige sessie gaat alles wel uit', async () => {
   const bron = read('stability-core.js');
   assert.ok(bron.includes('function sessionAlive()'), 'de sessiecontrole moet bestaan');
-  assert.ok(bron.includes('if(sessionAlive())enableSessionControls(true)'),
+  assert.ok(bron.includes('if(sessionAlive()){enableSessionControls(true);enableRetryControls()}'),
     'het foutpad van reconcile moet de sessie-controls alleen terugzetten als de sessie leeft');
   assert.ok(bron.includes("const SESSION_CONTROLS=['searchBtn','rebuild']"),
-    'alleen zoeken en radioset bouwen zijn sessie-controls; playback-knoppen blijven device-afhankelijk');
+    'alleen zoeken en radioset bouwen zijn sessie-controls; alleen Play en Start blijven daarnaast tikbaar (enableRetryControls)');
   assert.ok(bron.includes("hasRefreshToken"),
     'de sessiewaarheid moet uit JFMAuth komen, niet uit de CSS-klasse van de statuspil');
 });
