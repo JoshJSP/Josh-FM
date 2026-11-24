@@ -22,7 +22,8 @@ assert.match(director, /m\.likes\[id\].*\+1/, 'Positieve voorkeur wordt in stati
 assert.match(director, /m\.likes\[id\].*-3/, 'Negatieve voorkeur wordt in stationgeheugen opgeslagen');
 assert.match(director, /mair:taste-feedback/, 'Voorkeursfeedback werkt Mijn MAIR direct bij');
 assert.match(learning, /m\.artists\[a\]/, 'Persoonlijk leren vertaalt feedback naar artiestvoorkeur');
-assert.match(learning, /JFMMusicIntelligence.*rerank/s, 'Queue wordt na feedback opnieuw gerangschikt');
+assert.match(learning, /filterBanned/, 'Feedback bereikt de wachtrij via filterBanned');
+assert.match(fs.readFileSync(new URL('../queue-core.js', import.meta.url), 'utf8'), /JFMTasteModel\?\.filterBanned/, 'queue-core filtert geweigerde nummers uit elke nieuwe set');
 assert.match(dashboard, /jfm_radio_suite/, 'Mijn MAIR gebruikt bestaande sessiestatistiek');
 assert.match(dashboard, /jfm_top40_telemetry_v1/, 'Mijn MAIR gebruikt bestaande tracktelemetrie');
 assert.match(dashboard, /mairfmSettingsSection='Mijn MAIR'/, 'Mijn MAIR heeft een eigen instellingensectie');

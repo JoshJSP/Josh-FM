@@ -30,10 +30,7 @@
     const spread=[],artistWindow=[];for(const t of rest){const a=artist(t);if(a&&artistWindow.slice(-4).includes(a))continue;spread.push(t);artistWindow.push(a);if(spread.length>=49)break}
     const out=head?[head,...spread]:spread;if(id==='top40')return out.slice(0,40);return out.slice(0,50)
   }
-  // 15-10-2026: bewust uit. Dit herschikte window.queue, maar dat bestaat niet (de wachtrij zit in JFMQueue) en de
-  // programmadirector (window.JFMProgramDirector?.directWithContext) bepaalt de volgorde al. Het draaide wel elke 0,9 s voor niets.
-  // Aanzetten verandert wat de zender speelt, dus dat is een eigen keuze. optimize/pure/score blijven bruikbaar.
-  function reconcile(){return false}
-  function rerank(){return false}
-  window.JFMMusicIntelligence={version:'music-intelligence-v4-policy-driven',optimize,pure,score:baseScore,recent:history,reconcile,rerank,tasteWeight};
+  // reconcile/rerank herschikten window.queue, maar dat bestaat niet (de wachtrij zit in JFMQueue) en de programmadirector (window.JFMProgramDirector?.directWithContext)
+  // bepaalt de volgorde al. Ze deden sinds 15-10-2026 niets meer en zijn weg (app-klaar 24-11-2026).
+  window.JFMMusicIntelligence={version:'music-intelligence-v4-policy-driven',optimize,pure,score:baseScore,recent:history,tasteWeight};
 })();
