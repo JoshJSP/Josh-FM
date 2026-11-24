@@ -233,6 +233,25 @@ check('B1c. een tik zonder speler bouwt hem opnieuw op in plaats van niks te doe
   assert.ok(bron.includes("window.JFMSpotifySDK.reconnect().then(()=>{if(!bind())"), 'de tik op Play/Start moet reconnect aanroepen');
 });
 
+check('B1d. een tik zonder speler legt de spelerstaat vast in het foutlog', async () => {
+  // Het foutlog bleef leeg terwijl Play niks deed; nu moet er staan wat de speler zag.
+  const { context } = appHarness();
+  const records = [];
+  context.MAIRRuntime = { record: (type, detail, level) => records.push({ type, detail, level }), caught() {} };
+  context.JFMSpotifySDK = { health: { hasPlayer: false, deviceId: '', bootAttempts: 4, lastBootError: 'connect time-out' } };
+  context.localStorage.setItem('jfm_scope', 'user-read-playback-state streaming');
+  context.MAIRPlayerSnapshot('tik-play');
+  const r = records.find(x => x.type === 'playback.tap-state');
+  assert.ok(r, 'er moet een tap-state regel in het foutlog komen');
+  assert.equal(r.detail.reason, 'tik-play');
+  assert.equal(r.detail.streamingScope, true);
+  assert.equal(r.detail.deviceId, 'nee');
+  assert.equal(r.detail.lastBootError, 'connect time-out');
+  assert.ok(!JSON.stringify(r.detail).includes('refresh'.repeat(2)), 'geen tokens in het log');
+  assert.ok(read('playback-primary.js').includes("MAIRPlayerSnapshot?.('tik-'"), 'de Play-tik roept de snapshot aan');
+  assert.ok(read('stability-core.js').includes("MAIRPlayerSnapshot?.('knoppen-uit')"), 'uitgaande knoppen roepen de snapshot aan');
+});
+
 check('B1b. zonder sessie blijft de zoekknop wel uit', async () => {
   const { context, els } = sdkHarness({ hasRefreshToken: false, spelerFaalt: true });
   await new Promise(r => setTimeout(r, 120));
