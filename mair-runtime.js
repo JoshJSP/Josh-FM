@@ -30,8 +30,11 @@
   const errorLog=(()=>{try{const x=JSON.parse(localStorage.getItem(ERROR_KEY)||'[]');return Array.isArray(x)?x.slice(-MAX_ERROR_LOG):[]}catch{return[]}})();
   function keepError(event){
     const error=String(event.detail?.error||event.detail?.reason||event.detail?.message||event.type).slice(0,300),last=errorLog.at(-1);
-    if(last&&last.type===event.type&&last.error===error){last.count=(last.count||1)+1;last.at=event.at}
-    else{errorLog.push({at:event.at,type:event.type,level:event.level,error,breakId:event.breakId||'',sessionId});if(errorLog.length>MAX_ERROR_LOG)errorLog.splice(0,errorLog.length-MAX_ERROR_LOG)}
+    // De overige velden (al geschoond door safe) gaan mee, anders zie je wel dát iets gebeurde maar niet in welke staat.
+    const rest={};for(const[k,v]of Object.entries(event.detail||{}))if(!/^(error|reason|message|breakId|sessionId|correlationId|transitionId)$/.test(k))rest[k]=v;
+    let info=Object.keys(rest).length?JSON.stringify(rest):'';if(info.length>800)info=info.slice(0,800)+'…';
+    if(last&&last.type===event.type&&last.error===error){last.count=(last.count||1)+1;last.at=event.at;if(info)last.info=info}
+    else{errorLog.push({at:event.at,type:event.type,level:event.level,error,...(info?{info}:{}),breakId:event.breakId||'',sessionId});if(errorLog.length>MAX_ERROR_LOG)errorLog.splice(0,errorLog.length-MAX_ERROR_LOG)}
     try{localStorage.setItem(ERROR_KEY,JSON.stringify(errorLog))}catch{/* opslag vol of geblokkeerd: de log blijft dan alleen in het geheugen */}
   }
   // Voor catch-blokken: één regel, en de fout belandt in de foutlog in plaats van in het niets.
