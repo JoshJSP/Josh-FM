@@ -62,6 +62,8 @@ async function search(q){
   return(p?items.sort((a,b)=>a.km-b.km):items).slice(0,8)
 }
 const resultsHtml=()=>s.searchResults.length||s.searchQuery.length>=2?s.searchResults.map((x,i)=>`<div class="car-place"><button data-result-index="${i}"><b>${esc(x.name)}</b><small>${esc([x.address,Number.isFinite(x.km)?lower(dist(x.km*1000)):''].filter(Boolean).join(' · '))}</small></button><button class="car-place-star" data-place-save="result:${i}" aria-label="Plek opslaan">${isSaved(x)?'★':'☆'}</button></div>`).join(''):placeLists();
+// Mapbox Directions (ook driving-traffic) neemt hoogstens 25 coördinaten: start + stops + einde.
+const MAX_ROUTE_POINTS=25,MAX_STOPS=MAX_ROUTE_POINTS-2;
 const routePoints=()=>[s.origin,...s.stops,s.destination].filter(Boolean);
 // Elke aanvraag krijgt een volgnummer: een afgebroken of ingehaalde aanvraag mag niets meer
 // zetten, melden of de laadstatus van een nieuwere aanvraag aanraken. quiet = achtergrond-
@@ -588,7 +590,7 @@ async function applyVibe(id,seq){
 function setVibe(id){if(!window.JFMRotation?.setMode?.(id))return;render();const seq=++vibeSeq;applyVibe(id,seq).catch(e=>{window.MAIRRuntime?.caught?.('carmode.vibe',e);if(seq===vibeSeq)toast('Vibe wisselen lukte niet. De muziek speelt door.',7000)})}
 const camsButton=()=>window.MAIRCarCams?`<button data-act="cams" aria-pressed="${window.MAIRCarCams.isOn()}">Flitsers: ${window.MAIRCarCams.isOn()?'aan':'uit'}</button>`:'';
 function menu(){return`<div class="car-menu-backdrop"><section class="car-menu"><button data-act="vibe">Vibe: ${esc(vibeLabel())}</button>${camsButton()}${s.routeActive?'<button data-act="addstop">Tussenstop toevoegen</button><button data-act="search">Bestemming wijzigen</button><button data-act="waze">Open in Waze</button><button data-act="music">Verder zonder route</button>':'<button data-act="search">Bestemming toevoegen</button><button data-act="placehere">Huidige locatie opslaan</button>'}<button class="danger" data-act="close">Car Mode sluiten</button><button class="muted" data-act="menuclose">Annuleren</button></section></div>`}
-function openSearch(purpose='destination'){closeMenu();s.searchPurpose=purpose;s.searchQuery='';s.searchResults=[];s.error='';s.screen='search';render();queueMicrotask(bindSearch);
+function openSearch(purpose='destination'){closeMenu();if(purpose==='stop'&&s.stops.length>=MAX_STOPS){toast(`Maximaal ${MAX_STOPS} tussenstops per route.`);return}s.searchPurpose=purpose;s.searchQuery='';s.searchResults=[];s.error='';s.screen='search';render();queueMicrotask(bindSearch);
   // Hier is locatie voor het eerst echt nodig (proximity bij zoeken en straks als
   // vertrekpunt), dus hier hoort de iOS-prompt. Niet blokkerend: zoeken werkt ook
   // zonder fix, alleen zonder nabijheidsvoorkeur.
