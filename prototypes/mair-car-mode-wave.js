@@ -300,6 +300,10 @@ function rideEnd(arrived,name){
   const r=ride;ride=null;if(!r||!overlay)return;
   const x=rideSummary(r,Date.now());if(!arrived&&(x.sec<60||r.m<200))return;
   closeMenu();overlay.insertAdjacentHTML('beforeend',rideSheet(x,arrived,name));
+  // Ritlijst op de Profiel-tab (laatste 10) en de aankomst-DJ (mair-car-ride-dj.js) lezen deze rit.
+  const item={at:Date.now(),name:String(name||'Je rit'),arrived:!!arrived,min:x.min,diff:x.diff,km:Math.round(x.km*10)/10,avg:x.avg,max:x.max};
+  try{const k='mair_car_rides_v1',list=JSON.parse(localStorage.getItem(k)||'[]');localStorage.setItem(k,JSON.stringify([item,...(Array.isArray(list)?list:[])].slice(0,10)))}catch{/* opslag vol of geblokkeerd: alleen de lijst mist hem */}
+  try{dispatchEvent(new CustomEvent('mair:car-ride-end',{detail:{...item,destination:s.destination||null}}))}catch{/* alleen een melding */}
   clearTimeout(rideTimer);rideTimer=setTimeout(()=>{overlay?.querySelector('.car-ridesum')?.remove()},RIDE_SHOW_MS)
 }
 // --- Afwijken van de route --------------------------------------------------
