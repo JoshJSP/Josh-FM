@@ -208,7 +208,13 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
     const s=await verify(x=>x.device?.id===id&&x.is_playing&&uris.includes(x.item?.uri),10);if(!s)throw Error('Spotify bevestigde geen afspeelbare track uit de radioset.');
     await nudgeSdkPlayback();ingest(s,source);truth()?.setExpectedLive?.(true,'play-track');return s
   }
+  // Spotify kent een vers SDK-device soms nog niet (404 Device not found). De retry zat
+  // alleen op de Start-knop; play, en hervatten zonder track, liepen ook via deze functie
+  // en strandden dan op 'Nog niets op de radio'. Nu krijgt elke start de retry.
   async function startDirect(){
+    try{return await startOnce()}catch(e){if(!/device not found/i.test(String(e?.message||e))||!window.JFMSpotifySDK?.reconnect)throw e;note('start-device-not-found',e);await window.JFMSpotifySDK.reconnect();return await startOnce()}
+  }
+  async function startOnce(){
     const id=await freshDevice();let before=await remote();
     if(before?.device?.id!==id)before=await transfer(id,false);else if(before?.is_playing){await api('/me/player/pause?device_id='+encodeURIComponent(id),{method:'PUT'});await verify(x=>x.device?.id===id&&!x.is_playing,6)}
     if(!Array.isArray(queue)||!queue.length){info('Radioset wordt gemaakt…');await buildSet()}
@@ -230,7 +236,7 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
       try{for(let i=0;i<24&&(busy||djOwnsTransport());i++)await wait(150)}finally{startPending=false}
       if(busy||djOwnsTransport()){info('MAIRFM is nog bezig. Tik Start nog een keer.',true);return false}
     }
-    return withBusy(async()=>{try{try{return await startDirect()}catch(e){/* Spotify kende het verse SDK-device nog niet: een keer opnieuw registreren en starten */if(!/device not found/i.test(String(e?.message||e))||!window.JFMSpotifySDK?.reconnect)throw e;note('start-device-not-found',e);await window.JFMSpotifySDK.reconnect();return await startDirect()}}catch(e){truth()?.setExpectedLive?.(false,'start-failed');return rememberError(e,'Starten lukte niet: ')}})
+    return withBusy(async()=>{try{return await startDirect()}catch(e){truth()?.setExpectedLive?.(false,'start-failed');return rememberError(e,'Starten lukte niet: ')}})
   }
 
   async function pauseDirect(){

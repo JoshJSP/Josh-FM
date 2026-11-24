@@ -67,7 +67,10 @@ async function scenarioDjBreak(){
     c.ok('DJ: muziek speelt door na de break',st.playing===true,JSON.stringify(st));
     c.ok('DJ: volgend nummer is gestart',st.idx>=1);
     c.ok('DJ: volume staat terug op de luisteraarstand (0,5)',Math.abs(st.volume-0.5)<0.02,'volume '+st.volume+' log '+v.join(','));
-    c.ok('DJ: volume is niet weggedraaid (geen DJ over muziek)',v.every(x=>x>=0.4),'log '+v.join(','));
+    // Sinds a57e0d5 (v198) gaat de muziek bewust naar 0 tijdens de begintoon (djMute), daarna pauze en stem.
+    // Wat niet mag: zacht doorspelen op duck-stand onder de DJ. Dus omlaag gaat in één keer naar 0.
+    const down=v.slice(0,v.indexOf(0)+1);
+    c.ok('DJ: volume gaat naar 0, niet naar een duck-stand (geen DJ over muziek)',down.length>0&&down.every(x=>x===0||x>=0.25),'log '+v.join(','));
     noErrors('DJ: geen page errors',h);
   }finally{await h.close()}
 }
@@ -123,12 +126,19 @@ async function scenarioDeviceLoss(){
   try{
     await startStation(h);
     await h.page.evaluate(()=>{window.__mock.player.disconnect()});
-    await sleep(1500);
+    // Sinds 05f1416 bouwt de app een weggevallen device zelf op en hervat (mair:spotify-device-recovered).
+    // Een tik op play is daarna gewoon pauze/play, geen "start opnieuw".
+    const back=await h.page.waitForFunction(()=>window.__mock.playing===true,null,{timeout:10000,polling:100}).then(()=>true,()=>false);
+    c.ok('device weg: speelt vanzelf weer zonder tik',back,JSON.stringify(await mock(h.page)));
+    await until(h.page,()=>!window.JFMPlayback.health.busy,null,10000,'herstel klaar');
     await h.page.evaluate(()=>document.getElementById('play').click());
-    await sleep(8000);
+    await sleep(3000);
+    c.ok('device weg: tik na herstel pauzeert',(await mock(h.page)).playing===false,JSON.stringify(await mock(h.page)));
+    await h.page.evaluate(()=>document.getElementById('play').click());
+    await sleep(4000);
     const st=await mock(h.page),pb=await h.page.evaluate(()=>window.JFMPlaybackState.get());
     noErrors('device weg: geen page errors',h);
-    c.ok('device weg: na tik op play speelt het weer',st.playing===true,JSON.stringify(st)+' pb '+JSON.stringify({isPlaying:pb.isPlaying,lastError:pb.lastError}));
+    c.ok('device weg: tweede tik speelt weer',st.playing===true,JSON.stringify(st)+' pb '+JSON.stringify({isPlaying:pb.isPlaying,lastError:pb.lastError}));
   }finally{await h.close()}
 }
 
