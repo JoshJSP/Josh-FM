@@ -7,7 +7,7 @@ expect(!live.includes("live.id='jfmLiveMeta'"),'live-ui mag geen tweede live-met
 expect(!live.includes('Josh FM'),'live-ui bevat nog zichtbare Josh FM-branding');
 expect(!suite.includes('ensureShowPill'),'radio-suite mag geen legacy showMini-pill meer injecteren');
 expect(!suite.includes('Josh FM'),'radio-suite bevat nog zichtbare Josh FM-branding');
-expect(suite.includes('mair-logo.svg'),'radio-suite moet het MAIR-icoon gebruiken');
+expect(suite.includes('apple-touch-icon.png'),'radio-suite moet het MAIR-icoon gebruiken');
 expect(!pwa.includes('Josh FM'),'pwa-platform bevat nog zichtbare Josh FM-branding');
 expect(pwa.includes('Nieuwe MAIR-versie klaar.'),'PWA-updatebanner moet MAIR heten');
 expect(voice.includes("selectedLanguage='nl'"),'DJ-taal moet Nederlands zijn');
@@ -45,7 +45,7 @@ for(const asset of ['mair-hits.webp','mair-top40.webp','mair-discovery.webp','ma
 expect(templateAssets.includes("./assets/mair-mix.svg?v=47"),'MY MAIR artwork ontbreekt');
 expect(templateAssets.includes('.top{display:flex!important'),'MAIR-header wordt niet expliciet hersteld op Stations/Voor jou');
 expect(logo.includes('MAIR app icon')&&logo.includes('▥')===false,'app icon moet de nieuwe MAIR templateversie zijn');
-expect(manifest.includes('mair-logo.svg?v=12'),'manifest gebruikt niet het vernieuwde MAIR-icoon');
+expect(manifest.includes('mair-logo.svg?v=20'),'manifest gebruikt niet het vernieuwde MAIR-icoon');
 expect(manifest.includes('mair-icon-192.png')&&manifest.includes('mair-icon-512.png')&&fs.statSync('apple-touch-icon.png').size>1000,'PWA/iPhone PNG-iconen ontbreken');
 expect(sw.includes("'./apple-touch-icon.png'")&&sw.includes("'./mair-icon-192.png'")&&sw.includes("'./mair-icon-512.png'"),'PWA cachet de installatie-iconen niet');
 expect(!health.includes('Test Josh FM opnieuw'),'Self Test bevat nog oude Josh FM-knoptekst');

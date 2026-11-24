@@ -13,7 +13,7 @@
     "predeploy:static": "node scripts/predeploy-check-build1.mjs",
     "smoke": "node scripts/app-smoke-check-v362.mjs",
     "channel-tap": "node scripts/channel-tap-check.mjs",
-    "hotfix-check": "node scripts/hotfix-release-check.mjs",
+    "hotfix-check": "node scripts/hotfix-release-check.mjs && node scripts/progress-clock-anchor-check.mjs",
     "personal-source-sync": "node --check mair-personal-source-sync.js && node scripts/personal-source-sync-check.mjs",
     "spotify-2026-stations": "node --check channel-click-fix.js && node --check mair-station-policy.js && node scripts/spotify-2026-station-check.mjs",
     "station-picks": "node --check api/station-picks.js && node --check channel-click-fix.js && node --check mair-station-policy.js && node scripts/station-picks-check.mjs",

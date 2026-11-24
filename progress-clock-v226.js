@@ -1,14 +1,19 @@
 // Josh FM v2.2.6 local progress clock — keeps elapsed time moving between Spotify refreshes.
 (()=>{
   const $=id=>document.getElementById(id);
-  let trackId='',baseMs=0,anchor=performance.now(),playing=false,durationMs=0,lastRemoteMs=-1,lastRemotePlaying=null;
+  let trackId='',baseMs=0,anchor=performance.now(),playing=false,durationMs=0,lastRemoteMs=-1,lastRemotePlaying=null,lastRef=null;
   const fmt=ms=>{const s=Math.max(0,Math.floor(Number(ms||0)/1000)),m=Math.floor(s/60);return `${m}:${String(s%60).padStart(2,'0')}`};
   function syncFromPlayback(){
     let p=null;try{p=playback}catch{/* optionele waarde/uitbreiding niet beschikbaar: dan terugval */}
     const id=String(p?.item?.id||''),remoteMs=Math.max(0,Number(p?.progress_ms||0)),remotePlaying=!!p?.is_playing,dur=Math.max(0,Number(p?.item?.duration_ms||0));
     if(!id)return;
     const changedTrack=id!==trackId,changedRemote=remoteMs!==lastRemoteMs,changedPlaying=remotePlaying!==lastRemotePlaying;
-    if(changedTrack||changedRemote||changedPlaying){trackId=id;baseMs=remoteMs;anchor=performance.now();playing=remotePlaying;durationMs=dur;lastRemoteMs=remoteMs;lastRemotePlaying=remotePlaying;}
+    // Elke nieuwe meting (nieuw object) is een nieuw ankerpunt, ook als de positie gelijk is.
+    // Meldt de SDK een paar keer per seconde dezelfde positie (iOS die hapert), dan liep
+    // deze klok anders door vanaf het oude anker terwijl renderPlayback de gemeten tijd
+    // schreef: het scherm sprong dan om de 0,25 s tussen 0:57 en 1:00.
+    const fresh=p!==lastRef;lastRef=p;
+    if(changedTrack||changedRemote||changedPlaying||fresh){trackId=id;baseMs=remoteMs;anchor=performance.now();playing=remotePlaying;durationMs=dur;lastRemoteMs=remoteMs;lastRemotePlaying=remotePlaying;}
   }
   function tick(){
     syncFromPlayback();

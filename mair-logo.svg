@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MAIR app icon"><defs><linearGradient id="o" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff8a1a"/><stop offset="1" stop-color="#ff5a00"/></linearGradient></defs><rect width="512" height="512" rx="116" fill="#080808"/><rect x="15" y="15" width="482" height="482" rx="103" fill="none" stroke="#ff6a00" stroke-width="5"/><g fill="url(#o)"><rect x="89" y="167" width="12" height="76" rx="6"/><rect x="111" y="139" width="12" height="132" rx="6"/><rect x="133" y="112" width="12" height="186" rx="6"/><rect x="155" y="151" width="12" height="108" rx="6"/><rect x="177" y="126" width="12" height="158" rx="6"/><rect x="199" y="157" width="12" height="96" rx="6"/><rect x="221" y="180" width="12" height="50" rx="6"/><rect x="67" y="185" width="12" height="40" rx="6"/></g><text x="262" y="229" textLength="196" lengthAdjust="spacingAndGlyphs" font-family="Arial,Helvetica,sans-serif" font-size="80" font-weight="900" fill="url(#o)">MAIR</text><text x="256" y="306" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="30" font-weight="900" letter-spacing="7" fill="#ffffff">MAIR</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MAIR app icon">
+  <title id="title">MAIRFM soundbars M app-icoon</title>
+  <desc id="desc">HUD-oranje apptegel met equalizerbalken die samen de letter M vormen.</desc>
+  <rect width="512" height="512" rx="112" fill="#ff633e"/>
+  <g fill="#171816">
+    <rect x="92" y="144" width="34" height="224" rx="17"/>
+    <rect x="144" y="199" width="34" height="169" rx="17"/>
+    <rect x="196" y="252" width="34" height="116" rx="17"/>
+    <rect x="248" y="203" width="34" height="165" rx="17"/>
+    <rect x="300" y="151" width="34" height="217" rx="17"/>
+    <rect x="352" y="144" width="34" height="224" rx="17"/>
+  </g>
+  <path d="M92 391h294" fill="none" stroke="#171816" stroke-width="9" stroke-linecap="round" opacity=".24"/>
+  <circle cx="410" cy="399" r="12" fill="#fff8ec"/>
+</svg>
