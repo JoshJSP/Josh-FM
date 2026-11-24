@@ -8,7 +8,9 @@ export const ROUTES = {
   terug: { from: 'nl-OpenOV_4227272', to: 'nl-OpenOV_4259867' }  // Claudius Prinsenlaan > Lekbrug-Oost
 };
 const json = (res, status, body, cache = 'no-store') => { res.status(status).setHeader('Cache-Control', cache); res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.end(JSON.stringify(body)) };
-const stop = s => s && { name: s.name, stopId: s.stopId, lat: s.lat, lon: s.lon, arrival: s.arrival, scheduledArrival: s.scheduledArrival, departure: s.departure, scheduledDeparture: s.scheduledDeparture, cancelled: !!s.cancelled, alerts: (s.alerts || []).map(a => a.headerText).filter(Boolean) };
+// Transitous geeft ook verlopen meldingen terug (staking 23 & 24 nov stond nog op ritten van 25 nov).
+const live = (a, t) => !a.impactPeriod?.length || a.impactPeriod.some(p => (!p.start || Date.parse(p.start) <= t) && (!p.end || t <= Date.parse(p.end)));
+const stop = s => s && { name: s.name, stopId: s.stopId, lat: s.lat, lon: s.lon, arrival: s.arrival, scheduledArrival: s.scheduledArrival, departure: s.departure, scheduledDeparture: s.scheduledDeparture, cancelled: !!s.cancelled, alerts: (s.alerts || []).filter(a => live(a, Date.parse(s.arrival || s.departure) || Date.now())).map(a => a.headerText).filter(Boolean) };
 export function slimLeg(l) {
   return { mode: l.mode, lijn: l.routeShortName || '', headsign: l.headsign || '', from: stop(l.from), to: stop(l.to), start: l.startTime, end: l.endTime, scheduledStart: l.scheduledStartTime, scheduledEnd: l.scheduledEndTime, realTime: !!l.realTime, cancelled: !!l.cancelled, tripId: l.tripId || '', stops: (l.intermediateStops || []).map(stop), polyline: l.legGeometry?.points || '', precision: l.legGeometry?.precision ?? null };
 }

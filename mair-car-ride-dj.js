@@ -54,8 +54,8 @@ function firstRideTrack(){const q=window.JFMQueue?.current?.()||[],id=String(tru
 const skip=why=>{lastError=why;try{window.MAIRRuntime?.record?.('car-ride.skipped',{error:why},'error')}catch{/* log kapot: onschuldig */}return false};
 const within=(promise,ms,why)=>Promise.race([Promise.resolve(promise),wait(ms).then(()=>{throw Error(why)})]);
 async function announce(detail={}){
-  const change=!!detail.change,arrival=!!detail.arrival,dest=detail.destination;
-  if(!dest&&!arrival)return false;if(!djOn())return false;
+  const change=!!detail.change,arrival=!!detail.arrival,dest=detail.destination,own=String(detail.say||'').trim();
+  if(!dest&&!arrival&&!own)return false;if(!djOn())return false;
   if(busy)return skip('al bezig met een ritstart');if(document.visibilityState==='hidden')return skip('scherm uit bij de routestart');
   if(change&&near(dest,lastDest))return false;
   if(someoneTalking())return skip('DJ of nieuws was al aan het woord');
@@ -65,11 +65,11 @@ async function announce(detail={}){
   busy=true;let op=0,paused=false,uri='',error='',track=null,started=false,heldAt=0,nextAt=0;const lock={breakId:'car-ride',acquiredAt:Date.now()};
   window.MAIRAudioTransitionLock=lock;const onReplan=e=>{if(e.detail?.held)heldAt=Date.now()};addEventListener('mair:director-replanned',onReplan);
   try{
-    if(!change&&!arrival)await waitReplan();
+    if(!change&&!arrival&&!own)await waitReplan();
     // Pas na het herplannen kijken: in die seconden kan de DJ of het nieuws net begonnen zijn.
     if(someoneTalking(lock))return skip('DJ of nieuws begon tijdens het herplannen');if(!djOn())return false;if(document.visibilityState==='hidden')return skip('scherm ging uit tijdens het herplannen');
     const t=truth();uri=String(t?.uri||'');const playing=!!(uri&&t?.isPlaying);
-    track=!change&&!arrival&&playing?firstRideTrack():null;const text=arrival?arrivalLine(detail):line({destination:dest,duration:detail.duration,track,change});
+    track=!change&&!arrival&&!own&&playing?firstRideTrack():null;const text=own||(arrival?arrivalLine(detail):line({destination:dest,duration:detail.duration,track,change}));
     if(typeof window.prepareSpeech!=='function'||typeof window.speakText!=='function')throw Error('MAIR Voice Engine is niet klaar');
     // Direct naar de TTS, niet via prepareSpeech: die gaat door de backoff van dj-audio-guard en weigert na één mislukte
     // DJ-stem 30 s tot 5 min zonder verzoek. Zo bleef de ritstart stil (20-10-2026, zelfde oorzaak als het uurnieuws).
@@ -99,5 +99,6 @@ async function announce(detail={}){
 }
 addEventListener('mair:car-route-start',e=>{announce(e.detail||{}).catch(()=>{})});
 addEventListener('mair:car-ride-end',e=>{if(e.detail?.arrived)announce({...e.detail,arrival:true}).catch(()=>{})});
-window.MAIRCarRideDJ={version:'car-ride-dj-v5',announce,line,arrivalLine,spokenPlace,spokenDuration,status:()=>({busy,lastText,lastError,lastAt})};
+// Busradio (mair-bus.js) gebruikt announce({say}) voor eigen zinnen: zelfde lock, pauze en hervatten.
+window.MAIRCarRideDJ={version:'car-ride-dj-v6',announce,line,arrivalLine,spokenPlace,spokenDuration,status:()=>({busy,lastText,lastError,lastAt})};
 })();
