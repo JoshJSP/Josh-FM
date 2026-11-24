@@ -19,6 +19,8 @@ let passed=0;const check=async(name,fn)=>{await fn();passed++;console.log('PASS'
 
 try{
   await check('zonder Origin (curl) gaat de deur dicht',async()=>{const r=await run({host:own.host,authorization:token(1)});assert.equal(r.ok,false);assert.equal(r.status,403);assert.equal(spotifyCalls,0)});
+  await check('same-origin GET zonder Origin (gezondheidscontrole) komt langs de origin-poort, niet langs de Spotify-poort',async()=>{const r=await run({host:own.host,'sec-fetch-site':'same-origin'});assert.equal(r.status,401);assert.equal(r.error,'spotify_token_missing')});
+  await check('Sec-Fetch-Site cross-site zonder Origin blijft dicht',async()=>{const r=await run({host:own.host,'sec-fetch-site':'cross-site',authorization:token(1)});assert.equal(r.status,403)});
   await check('een vreemde site komt er niet in',async()=>{const r=await run({...own,origin:'https://evil.example',authorization:token(1)});assert.equal(r.status,403)});
   await check('een lookalike-domein komt er niet in',async()=>{const r=await run({...own,origin:'https://josh-fm.vercel.app.evil.example',authorization:token(1)});assert.equal(r.status,403)});
   await check('eigen Origin zonder Spotify-sessie: 401',async()=>{const r=await run(own);assert.equal(r.status,401);assert.equal(r.error,'spotify_token_missing');assert.equal(spotifyCalls,0)});
@@ -32,5 +34,5 @@ try{
     await window.fetch('/api/dj-writer',{method:'POST',headers:{'Content-Type':'application/json'}});await window.fetch('/api/tts',{method:'POST'});await window.fetch('https://evil.example/api/dj-writer',{method:'POST'});await window.fetch('/api/category-filter');
     assert.deepEqual(seen.map(x=>x.auth),['Bearer tok-123','Bearer tok-123',null,'Bearer tok-123']);
     window.JFMAuth.ensure=async()=>{throw new Error('refresh mislukt')};await window.fetch('/api/news-bulletin',{method:'POST'});assert.equal(seen.at(-1).auth,null,'zonder token gaat het verzoek gewoon door')});
-  console.log(`MAIR AI-poort: ${passed}/11 PASS`);
+  console.log(`MAIR AI-poort: ${passed}/13 PASS`);
 }finally{globalThis.fetch=originalFetch;for(const k of Object.keys(process.env))if(!(k in originalEnv))delete process.env[k];Object.assign(process.env,originalEnv)}
