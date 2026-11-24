@@ -92,10 +92,6 @@ html body.mairfm-ux-v1 .mair-profile-metric-l{margin-top:6px;color:rgba(255,255,
 /* Discovery: de kader uit mair-profile-discovery-bridge.js gaat weg */
 html body.mairfm-ux-v1 #mairProfileDiscoveryCard>div:last-child{border:0!important;background:transparent!important;padding:0!important}
 html body.mairfm-ux-v1 .mair-profile-goal{border:0;background:transparent;padding:0}
-/* Jouw week */
-html body.mairfm-ux-v1 .mair-profile-week-grid>div{border:0;background:transparent;padding:0}
-html body.mairfm-ux-v1 .mair-profile-week-grid span{color:rgba(255,255,255,.55)}
-html body.mairfm-ux-v1 .mair-profile-week-insight{color:rgba(255,255,255,.65)}
 /* lijsten: alleen lijnen */
 html body.mairfm-ux-v1 .mair-profile-list{border:0;border-radius:0}
 html body.mairfm-ux-v1 .mair-profile-row{padding:13px 0;border-bottom:1px solid rgba(255,255,255,.1)}

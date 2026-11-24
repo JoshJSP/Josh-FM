@@ -141,7 +141,7 @@ assert.equal(switched.suite.discoveries().length,1,'Dezelfde Discovery werd dubb
 // "Your Month on MAIR" en "Your Year on MAIR" zijn uit het product gehaald; alleen de
 // week blijft. Deze test bewaakt beide kanten: de week rendert nog volledig, en de
 // periodeschakelaar met MONTH/YEAR komt niet terug.
-function profileRenderRuntime({recapData={topArtist:'Artiest',topTrack:'Nummer',minutes:120,tracks:9,insight:'Inzicht'}}={}){
+function profileRenderRuntime({recapData={topArtist:'Artiest',topTrack:'Nummer',minutes:120,tracks:9,insight:'Inzicht'},stored={}}={}){
   const gemaakt=[];
   const maakElement=()=>{const el={id:'',className:'',style:{},dataset:{},children:[],innerHTML:'',classList:{add(){},remove(){},toggle(){}},appendChild(kind){el.children.push(kind);return kind},insertBefore(kind){el.children.push(kind);return kind},querySelectorAll:()=>[],querySelector:()=>null,addEventListener(){},remove(){},setAttribute(){},insertAdjacentElement(){},closest:()=>null};gemaakt.push(el);return el};
   const pane=maakElement();pane.id='tab-settings';
@@ -150,7 +150,7 @@ function profileRenderRuntime({recapData={topArtist:'Artiest',topTrack:'Nummer',
     getElementById:id=>perId[id]||null,querySelector:()=>null,querySelectorAll:()=>[],
     createElement:()=>{const el=maakElement();return el},addEventListener(){}};
   const window={MAIRModeManager:{recap:()=>recapData},JFMRadioSuite:{state:()=>({minutes:600,tracks:120})},addEventListener(){},dispatchEvent(){}};
-  const context={window,document,localStorage:storage(),sessionStorage:storage(),CustomEvent:class{},location:{reload(){}},prompt:()=>null,confirm:()=>false,setTimeout:()=>0,setInterval:()=>0,clearTimeout(){},console};
+  const context={window,document,localStorage:storage(stored),navigator:{},sessionStorage:storage(),CustomEvent:class{},location:{reload(){}},prompt:()=>null,confirm:()=>false,setTimeout:()=>0,setInterval:()=>0,clearTimeout(){},console};
   vm.runInNewContext(profileSource,context,{filename:'mair-profile.js'});
   window.MAIRProfile.render();
   // De paginacontainer is het element dat aan tab-settings is toegevoegd.
@@ -158,11 +158,17 @@ function profileRenderRuntime({recapData={topArtist:'Artiest',topTrack:'Nummer',
   return {api:window.MAIRProfile,html};
 }
 
-const weekRender=profileRenderRuntime();
-assert.ok(weekRender.html.includes('Jouw week op MAIR'),'De weekkaart moet nog steeds "Jouw week op MAIR" tonen');
-assert.ok(weekRender.html.includes('mair-profile-week-grid'),'Het weekraster met TOP ARTIEST/NUMMERS moet blijven bestaan');
-assert.ok(weekRender.html.includes('TOP ARTIEST')&&weekRender.html.includes('ONTDEKKINGEN'),'De weekcijfers moeten blijven staan');
-assert.ok(weekRender.html.includes('Artiest')&&weekRender.html.includes('Nummer'),'De weekdata uit recap() moet nog worden gerenderd');
+const now=Date.UTC(2026,10,24,8,0);
+const weekRender=profileRenderRuntime({stored:{mair_car_rides_v1:JSON.stringify([{at:now,name:'Thuis',arrived:true,min:66,diff:2,km:41.3,avg:38,max:101},{at:now-86400000,name:'Breda',arrived:false,min:12,diff:null,km:6,avg:30,max:60}])}});
+assert.ok(!weekRender.html.includes('Jouw week op MAIR')&&!weekRender.html.includes('mair-profile-week-grid'),'De weekkaart hoort weg te zijn');
+assert.ok(!weekRender.html.includes('shareWeek'),'Deel je week hoort weg te zijn');
+assert.ok(weekRender.html.includes('Jouw ritten')&&weekRender.html.includes('Thuis')&&weekRender.html.includes('1 u 6 min')&&weekRender.html.includes('41,3 km')&&weekRender.html.includes('2 min later'),'De ritlijst toont de opgeslagen ritten');
+assert.equal(weekRender.api.rides().length,2);
+const manage=weekRender.html.slice(weekRender.html.indexOf('<details'),weekRender.html.indexOf('</details>'));
+assert.ok(!manage.includes('backupExport')&&!manage.includes('diagnostics'),'Backup en Diagnostiek staan niet meer onder Beheer');
+assert.ok(/id="mairProfileHidden" hidden/.test(weekRender.html)&&weekRender.html.includes('backupExport')&&weekRender.html.includes('data-profile-action="diagnostics"'),'Backup en Diagnostiek staan verborgen, achter lang drukken');
+assert.ok(manage.includes('resetProfile')&&manage.includes('logout'),'Resetten en ontkoppelen blijven onder Beheer');
+assert.ok(profileRenderRuntime().html.includes('Nog geen ritten'),'Zonder ritten een lege melding');
 assert.ok(!/Your (Month|Year) on MAIR/.test(weekRender.html),'Month en Year mogen niet meer als kop verschijnen');
 assert.ok(!weekRender.html.includes('data-profile-period'),'De periodeschakelaar mag niet terugkomen');
 assert.ok(!/>MONTH<|>YEAR</.test(weekRender.html),'De MONTH- en YEAR-knoppen mogen niet terugkomen');
@@ -171,7 +177,7 @@ assert.ok(!/monthly|yearly/.test(profileSource),'Er mag geen maand- of jaarl
 // De opgeslagen periodekeuze is nu betekenisloos en moet bij een profiel-reset worden opgeruimd.
 assert.ok(profileSource.includes("'mair_profile_recap_period_v1'"),'De oude periodesleutel moet nog wel worden gewist bij een reset');
 
-console.log('PASS Jouw week op MAIR intact, Month en Year verwijderd');
+console.log('PASS profiel: weekkaart weg, ritlijst, backup en diagnostiek achter de versie');
 console.log('PASS release consistency');
 console.log('PASS profile cleanup and Spotify status');
 console.log('PASS isolated advanced diagnostics and retired-control safety');

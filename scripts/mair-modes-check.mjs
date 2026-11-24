@@ -71,9 +71,9 @@ assert.equal(clearRuntime.store.has('mair_mode_analytics_v1'), false, 'Wis lokal
 assert.ok(src.lastIndexOf("record('listen_minute'") < src.lastIndexOf("if(state.mode==='normal')return"),
   'normale MAIR-playback telt mee voor Weekly');
 
-/* ---------------- Jouw week op MAIR blijft in het profiel ---------------- */
+/* ---------------- Jouw week op MAIR is uit het profiel (Josh, 25-11-2026) ---------------- */
 
-assert.ok(profile.includes('Jouw week op MAIR') && profile.includes('mair-profile-week-grid'), 'Profiel mist de weekrecap');
+assert.ok(!profile.includes('Jouw week op MAIR') && !profile.includes('mair-profile-week-grid'), 'de weekkaart hoort niet meer in het profiel');
 assert.ok(!/periodButton|data-profile-period|monthly|yearly/.test(profile), 'Maand- en jaarrecap mogen niet terugkomen');
 
 /* ---------------- de drie verwijderde modi komen niet terug ---------------- */
@@ -98,4 +98,4 @@ assert.ok(rotation.includes('MAIRModeManager?.rotationScore'), 'de rotatie blijf
 assert.ok(builder.includes('MAIRModeManager?.djContext'), 'de DJ-context blijft de mode-context bevragen');
 assert.ok(writer.includes('MODE_INSTRUCTIONS'), 'de writer houdt zijn mode-instructies');
 
-console.log('MAIR Modes: PASS — recap en Your Week intact, Time Machine, Chaos en Afterparty volledig verwijderd');
+console.log('MAIR Modes: PASS — recap-laag intact, weekkaart weg, Time Machine, Chaos en Afterparty volledig verwijderd');
