@@ -52,11 +52,17 @@ function userError(p,online,health){
   // terwijl de muziek gewoon speelde. Een playbackfout telt daarom alleen mee zolang
   // playback nu ook echt stilstaat terwijl het zou moeten spelen.
   const playbackBroken=!!(p?.expectedLive&&!p?.isPlaying);
-  const raw=clean(lastStationError||(playbackBroken?(p?.lastError||health?.lastError):''),300),low=raw.toLowerCase();if(!raw)return null;
+  // Mislukt de eerste start, dan is er geen track en staat expectedLive op false. De fout
+  // viel dan weg en de gebruiker zag alleen 'Nog niets op de radio'. p.lastError wordt bij
+  // elke geslaagde ingest gewist, dus zonder track mag hij altijd getoond worden.
+  // ponytail: updatedAt als leeftijd van de fout; een oude opgeslagen fout na herladen blijft zo weg.
+  const startFailed=!p?.trackId&&!!p?.lastError&&Date.now()-Number(p?.updatedAt||0)<120000;
+  const raw=clean(lastStationError||(playbackBroken?(p?.lastError||health?.lastError):startFailed?p.lastError:''),300),low=raw.toLowerCase();if(!raw)return null;
   if(/premium|403/.test(low))return{severity:'error',title:'Spotify Premium nodig',message:'MAIRFM gebruikt Spotify om volledige nummers af te spelen. Hiervoor is een Premium-account nodig.',primaryAction:'retry',secondaryAction:'diagnostics',diagnosticsCode:'SPOTIFY_PREMIUM',autoDismiss:false};
   if(/device|apparaat|not.ready|geen actief/.test(low))return{severity:'error',title:'Spotify-apparaat niet beschikbaar',message:'De speler in MAIRFM is weggevallen. Tik hieronder om hem opnieuw te verbinden. De Spotify-app hoeft niet open.',primaryAction:'device',secondaryAction:'reconnect',diagnosticsCode:'SPOTIFY_DEVICE',autoDismiss:false};
   if(/gesture|tik|vernieuw/.test(low))return{severity:'action',title:'Klaar om verder te gaan',message:'Tik één keer om muziek en DJ-audio weer te activeren.',primaryAction:'resume',secondaryAction:null,diagnosticsCode:'AUDIO_GESTURE',autoDismiss:false};
   if(p?.expectedLive&&!p?.isPlaying&&Number(health?.failures||0)>1)return{severity:'error',title:'Muziek is gestopt',message:'MAIRFM kon Spotify niet automatisch hervatten.',primaryAction:'resume',secondaryAction:'reconnect',diagnosticsCode:'PLAYBACK_STOPPED',autoDismiss:false};
+  if(startFailed&&!lastStationError)return{severity:'error',title:'Starten lukte niet',message:raw.replace(/^(Starten lukte niet|Play\/pauze mislukt|Hervatten mislukt):\s*/i,''),primaryAction:'resume',secondaryAction:'diagnostics',diagnosticsCode:'START_FAILED',autoDismiss:false};
   if(Date.now()-lastStationErrorAt<12000)return{severity:'error',title:'Station wisselen lukte niet',message:'Je huidige uitzending blijft beschikbaar. Probeer het station opnieuw.',primaryAction:'retry-station',secondaryAction:'diagnostics',diagnosticsCode:'STATION_CHANGE_FAILED',autoDismiss:false};
   return null
 }
