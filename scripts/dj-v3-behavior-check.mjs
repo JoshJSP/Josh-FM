@@ -18,14 +18,14 @@ const FIXED_START=Date.parse('2026-08-26T10:30:00Z'),REAL_START=Date.now();
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:['2026-08-26T10:30:00Z']))}static now(){return FIXED_START+Date.now()-REAL_START}}
 function makeElement(extra={}){return{value:'',textContent:'',dataset:{},checked:false,addEventListener(){},querySelector(){return null},cloneNode(){return makeElement({...this})},replaceWith(){},...extra}}
 
-function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTransport=true,writerSucceeds=true,writerDelay=0,prepareDelay=0,prepareFailures=0,playerFailures=0,writerText='Dit is een voorbereide MAIR DJ-break.',writerTexts=null,factsEnabled=false,requestTrackId='',writerAttempts=null,ducking=true}={}){
+function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTransport=true,writerSucceeds=true,writerDelay=0,prepareDelay=0,prepareFailures=0,playerFailures=0,writerText='Dit is een voorbereide MAIR DJ-break.',writerTexts=null,factsEnabled=false,requestTrackId='',writerAttempts=null,ducking=true,backgroundDj=false}={}){
   const bus=new FakeEventTarget();
   const elements={talk:makeElement({value:'1'}),facts:makeElement({checked:factsEnabled}),talkValue:makeElement(),djBreakTime:makeElement(),djText:makeElement()};
   const document={readyState:'complete',visibilityState:hidden?'hidden':'visible',getElementById:id=>elements[id]||null,addEventListener(){}};
   const storage=new Map([['jfm_spotify_device_id','device-test']]);
   const localStorage={getItem:k=>storage.has(k)?storage.get(k):null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},sessionStorage=localStorage;
   const remote={id:'A',uri:'spotify:track:A',playing:true,progress:4000};
-  const metrics={genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,djDuck:0,djUnduck:0,speak:0,speakAborted:0,playbackActions:0,prepare:0,prepareAborted:0,writerAborted:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0,requestConsume:0};
+  const metrics={volume:1,genericPause:0,genericResume:0,djPause:0,djResume:0,djRewind:0,djDuck:0,djUnduck:0,speak:0,speakAborted:0,playbackActions:0,prepare:0,prepareAborted:0,writerAborted:0,seekApi:0,begin:0,end:0,writer:0,queueCalls:0,playerCalls:0,requestConsume:0};
   let operation=null,expectedLive=true;
   const playbackTruth={
     get:()=>({trackId:remote.id,uri:remote.uri,isPlaying:remote.playing,expectedLive,operation}),
@@ -43,6 +43,8 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
   const fetch=async(url,opt={})=>{if(url!=='/api/dj-writer')throw new Error(`Unexpected fetch ${url}`);metrics.writer++;if(!writerSucceeds)throw new Error('writer offline');if(writerDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,writerDelay);opt.signal?.addEventListener('abort',()=>{clearTimeout(timer);metrics.writerAborted++;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))},{once:true})});const text=Array.isArray(writerTexts)?writerTexts[Math.min(metrics.writer-1,writerTexts.length-1)]:writerText;return{ok:true,status:200,json:async()=>({text,provider:'groq',model:'test-model',...(writerAttempts?{attempts:writerAttempts}:{})})}};
   const audioStatus={provider:'fish',model:'test-fish',voiceId:'voice',cacheSize:0,audioUnlocked:true,playbackMode:'html-audio'};
   const JFMDJAudio={status:audioStatus,unlock:async()=>true};
+  // Vlag aan nabootsen (in de broncode blijft hij false): native shell met lopende keep-alive.
+  if(backgroundDj)Object.assign(audioStatus,{nativeShell:true,keepAlive:{running:true}});
   const prepareSpeech=async(_text,_jingle,meta={})=>{metrics.prepare++;if(prepareDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,prepareDelay);meta.signal?.addEventListener('abort',()=>{clearTimeout(timer);metrics.prepareAborted++;reject(Object.assign(new Error('aborted'),{name:'AbortError'}))},{once:true})});if(prepareFailures-->0){audioStatus.error='temporary Fish Audio failure';return false}audioStatus.error='';audioStatus.cacheSize=1;return true};
   const speakText=async(_text,_jingle,meta={})=>{metrics.speak++;audioStatus.cacheSize=0;if(!speakSucceeds)return false;const startedAt=FixedDate.now();bus.dispatchEvent(new FakeCustomEvent('mair:dj-speaking',{detail:{active:true,breakId:String(meta.breakId||''),provider:'fish',route:'test-audio',playbackStartedAt:startedAt,success:true}}));if(speakDelay)await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,speakDelay),abort=()=>{clearTimeout(timer);metrics.speakAborted++;bus.dispatchEvent(new FakeCustomEvent('mair:dj-speaking',{detail:{active:false,breakId:String(meta.breakId||''),provider:'fish',route:'test-audio',playbackStartedAt:startedAt,playbackEndedAt:FixedDate.now(),success:false,error:'voice cancelled'}}));reject(Object.assign(new Error('voice cancelled'),{name:'AbortError'}))};if(meta.signal?.aborted)return abort();meta.signal?.addEventListener?.('abort',abort,{once:true})});bus.dispatchEvent(new FakeCustomEvent('mair:dj-speaking',{detail:{active:false,breakId:String(meta.breakId||''),provider:'fish',route:'test-audio',playbackStartedAt:startedAt,playbackEndedAt:FixedDate.now(),success:true}}));return true};
   const JFMPlayback={
@@ -58,14 +60,14 @@ function createHarness({speakSucceeds=true,speakDelay=0,hidden=false,sdkTranspor
   // De echte transportlaag kan sinds de duckingwijziging het volume wegdraaien.
   // De muziek blijft daarbij spelen: remote.playing wordt bewust niet aangeraakt.
   if(ducking){
-    JFMPlayback.djDuck=async()=>{metrics.djDuck++;return true};
-    JFMPlayback.djUnduck=async()=>{metrics.djUnduck++;return true};
+    JFMPlayback.djDuck=async()=>{metrics.djDuck++;metrics.volume=.06;return true};
+    JFMPlayback.djUnduck=async()=>{metrics.djUnduck++;metrics.volume=1;return true};
   }
   const window={addEventListener:(...a)=>bus.addEventListener(...a),removeEventListener:(...a)=>bus.removeEventListener(...a),dispatchEvent:(...a)=>bus.dispatchEvent(...a),JFMPlaybackState:playbackTruth,JFMDJAudio,JFMPlayback,JFMSpotifySDK:{deviceId:'device-test'},MAIRDJProfiles:{current:{id:'josh',name:'Josh',role:'MAIR DJ'}},jfmIsRequest:t=>!!requestTrackId&&String(t?.id||'')===String(requestTrackId),JFMRequests:{consumeCurrentRequest:t=>{if(requestTrackId&&String(t?.id||'')===String(requestTrackId)){metrics.requestConsume++;return{requestId:'test-request',trackId:requestTrackId}}return null}}};
   const math=Object.create(Math);math.random=()=>0;
   const context={window,document,localStorage,sessionStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText,setTimeout,clearTimeout,AbortController,Promise,Date:FixedDate,Math:math,console};
   Object.assign(window,{window,document,localStorage,sessionStorage,CustomEvent:FakeCustomEvent,api,fetch,prepareSpeech,speakText});Object.assign(context,window);
-  vm.createContext(context);for(const[name,moduleSource]of moduleSources)vm.runInContext(moduleSource,context,{filename:name});vm.runInContext(source,context,{filename:'mair-dj-v2.js'});
+  vm.createContext(context);for(const[name,moduleSource]of moduleSources)vm.runInContext(moduleSource,context,{filename:name});vm.runInContext(backgroundDj?source.replace('const BACKGROUND_DJ=false','const BACKGROUND_DJ=true'):source,context,{filename:'mair-dj-v2.js'});
   const setTrack=(id,{playing=true,progress=4000}={})=>{remote.id=id;remote.uri=`spotify:track:${id}`;remote.playing=playing;remote.progress=progress};
   let transition=0;
   const natural=(ended,newId)=>{setTrack(newId);bus.dispatchEvent(new FakeCustomEvent('mair:track-transition',{detail:{id:`t${++transition}`,fromTrackId:ended,toTrackId:newId,cause:'NATURAL_END',source:'canonical'}}))};
@@ -96,6 +98,23 @@ async function testVoiceFailureRestoresOnceAndNeverRetries(){
   const h=createHarness({speakSucceeds:false});await prepareAutomaticDue(h);h.natural('D','E');await sleep(800);const first={...h.metrics};
   assert.equal(first.djPause,1);assert.equal(first.speak,1);assert.equal(first.djResume,1,'failed voice resumes the music once');assert.equal(first.djRewind,0,'failed voice must not rewind before restore');assert.equal(first.djDuck,0);assert.equal(h.state().missed,1);
   await sleep(1900);assert.equal(h.metrics.djDuck,first.djDuck);assert.equal(h.metrics.speak,first.speak);assert.equal(h.metrics.djUnduck,first.djUnduck)
+}
+// Stap 2 app-klaar: met BACKGROUND_DJ aan en het scherm uit zet de DJ de muziek zachter in plaats van te pauzeren.
+// Mislukt de stem, dan moet de muziek gewoon weer op vol volume staan en nooit gepauzeerd zijn geweest.
+async function testBackgroundDuckVoiceFailureRestoresFullVolume(){
+  const h=createHarness({speakSucceeds:false,backgroundDj:true});await prepareAutomaticDue(h);h.document.visibilityState='hidden';h.natural('D','E');await sleep(800);
+  assert.equal(h.metrics.djDuck,1,`scherm uit + vlag aan: zachter zetten: ${JSON.stringify(h.state())}`);assert.equal(h.metrics.speak,1);
+  assert.equal(h.metrics.djPause,0,'met ducken wordt de muziek nooit gepauzeerd');assert.equal(h.metrics.genericPause,0);
+  assert.ok(h.metrics.djUnduck>=1,'mislukte stem: volume terug');assert.equal(h.metrics.volume,1,'na een mislukte stem staat de muziek weer op vol volume');
+  assert.equal(h.state().missed,1);assert.equal(h.state().played,0);
+}
+async function testBackgroundDuckSuccessRestoresFullVolume(){
+  const h=createHarness({backgroundDj:true});await prepareAutomaticDue(h);h.document.visibilityState='hidden';h.natural('D','E');await sleep(800);
+  assert.equal(h.metrics.djDuck,1);assert.equal(h.metrics.djPause,0);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.volume,1);assert.equal(h.state().played,1);
+}
+async function testScreenOnKeepsPauseRouteEvenWithFlag(){
+  const h=createHarness({backgroundDj:true});await prepareAutomaticDue(h);h.natural('D','E');await sleep(800);
+  assert.equal(h.metrics.djDuck,0,'scherm aan: de oude pauzeroute blijft');assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.djResume,1);
 }
 async function testManualSkipCancelsPreparedBreakWithoutTouchingMusic(){
   const h=createHarness();h.window.MAIRDJ.armManual();await sleep(80);assert.equal(h.state().phase,'ARMED');h.changed('A','B','primary-next');await sleep(1900);
@@ -251,6 +270,9 @@ const tests=[
   ['track change cancels Spotify context backoff',testTrackChangeCancelsSpotifyContextBackoff],
   ['bfcache reload aborts old prepared break',testBfcacheReloadAbortsPreparedBreak],
   ['Complete Voice Check correlates real playback with one breakId',testCompleteVoiceCheckUsesOneAudibleBreakId],
+  ['background DJ (flag on, screen off) ducks; failed voice restores full volume',testBackgroundDuckVoiceFailureRestoresFullVolume],
+  ['background DJ (flag on, screen off) ducks and restores after a good break',testBackgroundDuckSuccessRestoresFullVolume],
+  ['flag on but screen on keeps the pause route',testScreenOnKeepsPauseRouteEvenWithFlag],
 ];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(e){console.error('FAIL',name,'—',e?.stack||e);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`MAIR DJ v3 behavioral simulation: ${passed}/${tests.length} PASS`);
