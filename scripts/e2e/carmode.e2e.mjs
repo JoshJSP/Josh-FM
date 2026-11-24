@@ -221,6 +221,7 @@ async function scenarioNav(){
     c.ok('rijscherm heeft de C2-onderdelen (bovenbalk met afslag en aankomst, kaartvak, snelheid, muziekblok met voortgangsbalk en knoppen)',sigStart.every(Boolean),JSON.stringify(sigStart));
     c.ok('afstand bij de rotonde: 1.5 km',(await txt(page,'.car-turn-dist'))==='1.5km',await txt(page,'.car-turn-dist'));
     c.ok('rotonde krijgt de ring-pijl met label "2e"',(await kind(page))==='roundabout'&&(await txt(page,'.car-nav-exit'))==='2e',await kind(page));
+    c.ok('rotonde-tekentje volgt de echte hoek van de uitgang, niet het woord "right" (2e afslag licht rechts was 1e-afslag-plaatje)',await page.evaluate(()=>{const f=window.MAIRCarModePrototype.roundaboutAngle,r={maneuver:{type:'roundabout',modifier:'right',bearing_before:0,exit:2}},st=[r,{maneuver:{type:'exit roundabout',bearing_after:20}}],st1=[r,{maneuver:{type:'exit roundabout',bearing_after:95}}],stL=[{maneuver:{type:'roundabout',bearing_before:350}},{maneuver:{type:'exit roundabout',bearing_after:80}}];return f(r,st)===20&&f(r,st1)===95&&f(stL[0],stL)===90&&f(r,[r])===null}));
     await layoutChecks(t,'start');
     if(outDir)await page.screenshot({path:outDir+'/carmode-c2-start.png'});
     const before=mb.directions;await sleep(17000);
