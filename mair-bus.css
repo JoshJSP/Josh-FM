@@ -14,6 +14,10 @@ body.mair-bus-open{overflow:hidden}
 .mair-bus-rows{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-top:10px}
 .mair-bus-rows small{display:block;font-size:9px;letter-spacing:.12em;color:#7f7896;font-weight:800}
 .mair-bus-rows b{font-size:14px;font-variant-numeric:tabular-nums}
+.mair-bus-les{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(155,77,255,.14)}
+.mair-bus-les small{display:block;font-size:9px;letter-spacing:.12em;color:#b9a3ff;font-weight:800}
+.mair-bus-les b{display:block;font-size:16px;font-variant-numeric:tabular-nums}
+.mair-bus-les span{display:block;font-size:12px;color:#a9a3bd;margin-top:2px}
 .mair-bus-late{font-style:normal;color:#ff8a5c;font-size:12px}
 .mair-bus-pill{font-style:normal;font-size:10px;text-transform:uppercase;letter-spacing:.06em;border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:1px}
 .mair-bus-pill.is-gehaald{background:#163a2b;color:#6be3a4}.mair-bus-pill.is-krap{background:#3d3214;color:#ffcc33}.mair-bus-pill.is-gemist{background:#45161b;color:#ff6b7a}
