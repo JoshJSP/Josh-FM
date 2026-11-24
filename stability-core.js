@@ -38,9 +38,10 @@
   function loadSDK(){if(window.Spotify)return Promise.resolve();return new Promise((resolve,reject)=>{const old=window.onSpotifyWebPlaybackSDKReady;window.onSpotifyWebPlaybackSDKReady=()=>{try{old?.()}catch(e){window.MAIRRuntime?.caught?.('stability-core.loadSDK',e)}resolve()};let s=document.getElementById('spotify-sdk-stable');/* Een scripttag die al gefaald heeft levert nooit alsnog een Spotify-object op. Het tag bleef staan, dus elke volgende poging kwam in de poll-tak hieronder en wachtte daar 20 seconden op een dood script - ook de drie pogingen van de ladder en elke latere reconcile bij online of visibilitychange. Alleen een herlaad van de pagina gaf een vers tag; precies het gedrag dat Josh beschrijft. Een gefaald tag wordt nu weggegooid, zodat een herpoging weer een echte download is. */if(s&&s.dataset&&s.dataset.jfmSdkFailed==='1'){try{s.remove()}catch{/* script-element al weg */}s=null}if(s){const timer=setInterval(()=>{if(window.Spotify){clearInterval(timer);resolve()}},100);setTimeout(()=>{clearInterval(timer);if(!window.Spotify){markSdkFailed(s);reject(Error('Spotify-speler kon niet laden.'))}},SDK_LOAD_TIMEOUT_MS);return}s=document.createElement('script');s.id='spotify-sdk-stable';s.src='https://sdk.scdn.co/spotify-player.js';s.async=true;s.onerror=()=>{markSdkFailed(s);reject(Error('Spotify-speler kon niet laden.'))};document.head.appendChild(s)})}
   async function initPlayer(){
     if(player&&deviceId)return deviceId;if(initPromise)return initPromise;
-    initPromise=(async()=>{
+    let made=null;
+    const attempt=(async()=>{
       const t=await ensure();if(!t)throw Error('Spotify is niet gekoppeld.');await loadSDK();
-      player=new Spotify.Player({name:'MAIRFM',getOAuthToken:async cb=>{try{cb(await ensure()||'')}catch{cb('')}},volume:1,enableMediaSession:false});window.jfmSpotifyPlayer=player;
+      player=new Spotify.Player({name:'MAIRFM',getOAuthToken:async cb=>{try{cb(await ensure()||'')}catch{cb('')}},volume:1,enableMediaSession:false});made=player;window.jfmSpotifyPlayer=player;
       const ready=new Promise((resolve,reject)=>{
         const timer=setTimeout(()=>reject(Error('MAIRFM-speler reageert niet.')),PLAYER_READY_TIMEOUT_MS);
         let readyDone=false;
@@ -89,7 +90,8 @@
       });
       ready.catch(()=>{});
       const ok=await Promise.race([player.connect(),new Promise((_,reject)=>setTimeout(()=>reject(Error('Spotify Web Player verbinden duurde te lang.')),PLAYER_CONNECT_TIMEOUT_MS))]);if(!ok)throw Error('Spotify Web Player kon niet verbinden.');return ready
-    })().catch(e=>{const failed=player;initPromise=null;player=null;window.jfmSpotifyPlayer=null;rememberDevice('');try{failed?.disconnect?.()}catch{/* oude speler al losgekoppeld */}message(e.message||String(e),true);throw e});return initPromise
+    })().catch(e=>{/* Alleen opruimen als deze poging nog de actuele is. Een oude poging die na een reconnect alsnog op zijn 20 s-limiet faalde, gooide anders de nieuwe speler weg die op dat moment aan het verbinden was: dan begon alles weer van voren en duurde Play minutenlang. */try{made?.disconnect?.()}catch{/* oude speler al losgekoppeld */}if(initPromise!==attempt)throw e;initPromise=null;if(player===made){player=null;window.jfmSpotifyPlayer=null}rememberDevice('');message(e.message||String(e),true);throw e});
+    initPromise=attempt;return attempt
   }
   // Een auth-fout lost zichzelf niet op door te wachten; die vraagt om opnieuw
   // koppelen. Alleen netwerk-/timingfouten zijn het herproberen waard.
@@ -115,7 +117,8 @@
   }
   async function reconnect(){
     if(reconnectPromise)return reconnectPromise;
-    reconnectPromise=(async()=>{const old=player;rememberDevice('');initPromise=null;player=null;window.jfmSpotifyPlayer=null;try{old?.disconnect?.()}catch{/* oude speler al losgekoppeld */};await new Promise(r=>setTimeout(r,180));let id;try{id=await initPlayer()}catch(e){if(!e?.authHeal)throw e;id=await initPlayer()}if(!id)throw Error('Spotify-device kon niet opnieuw worden geregistreerd.');return id})().finally(()=>{reconnectPromise=null});
+    /* Loopt er al een opstartpoging zonder device (koude start, ladder), wacht daar dan op. Een tik op Play gooide die poging weg en begon een nieuwe connect van 20 s. Pas als hij faalt bouwen we opnieuw op. */
+    reconnectPromise=(async()=>{if(initPromise&&!deviceId){window.MAIRRuntime?.record?.('spotify.reconnect-joins-init',{},'info');try{const id=await initPromise;if(id)return id}catch{/* mislukte poging: hieronder opnieuw opbouwen */}}const old=player;rememberDevice('');initPromise=null;player=null;window.jfmSpotifyPlayer=null;try{old?.disconnect?.()}catch{/* oude speler al losgekoppeld */};await new Promise(r=>setTimeout(r,180));let id;try{id=await initPlayer()}catch(e){if(!e?.authHeal)throw e;id=await initPlayer()}if(!id)throw Error('Spotify-device kon niet opnieuw worden geregistreerd.');return id})().finally(()=>{reconnectPromise=null});
     return reconnectPromise
   }
   // iOS verbreekt de SDK-verbinding met het scherm uit of bij een netwerkwissel. Daarna kwam
