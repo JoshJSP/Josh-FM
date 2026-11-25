@@ -252,6 +252,16 @@ async function testBreakFallsBackToPauseWhenDuckingIsUnavailable(){
 
 // iPhone 25-11-2026: Safari gaf "The operation was aborted" toen iOS het audio-element onderbrak tijdens play().
 // playBlob zag dat als annulering en sloeg Web Audio over: de DJ zei niks. Draait de echte playBlob uit debug-tts.js.
+// Het uurnieuws duurt langer dan 45 s. Een vaste grens van 45 s kapte het laatste bericht af en zette de muziek terug (Josh, 26-11-2026).
+async function testLongSpeechIsNotCutAt45Seconds(){
+  const tts=fs.readFileSync(new URL('../debug-tts.js',import.meta.url),'utf8');
+  assert.ok(!tts.includes('Math.min(45000'),'Web Audio-wachter volgt de echte lengte, geen vaste 45 s');
+  assert.ok(tts.includes('mediaAudio.ondurationchange=()=>'),'HTML-audio-wachter schuift op naar de echte lengte');
+  const start=tts.indexOf('mediaAudio.ondurationchange=()=>'),body=tts.slice(start,tts.indexOf('};',start)+2);
+  let armed=0;const clearTimeout=()=>{},setTimeout=(fn,ms)=>{armed=ms;return 1},late=()=>{},mediaAudio={duration:95,currentTime:0};let timer;
+  new Function('mediaAudio','clearTimeout','setTimeout','late','timer',body+';mediaAudio.ondurationchange()')(mediaAudio,clearTimeout,setTimeout,late,timer);
+  assert.ok(armed>95000,'95 s nieuws krijgt meer dan 95 s, kreeg '+armed);
+}
 async function testIOSPlayInterruptFallsBackToWebAudio(){
   const tts=fs.readFileSync(new URL('../debug-tts.js',import.meta.url),'utf8'),start=tts.indexOf('async function playBlob('),end=tts.indexOf('\n',start);
   assert.ok(start>0,'playBlob staat in debug-tts.js');
@@ -302,6 +312,7 @@ const tests=[
   ['background DJ (flag on, screen off) ducks; failed voice restores full volume',testBackgroundDuckVoiceFailureRestoresFullVolume],
   ['background DJ (flag on, screen off) ducks and restores after a good break',testBackgroundDuckSuccessRestoresFullVolume],
   ['flag on but screen on keeps the pause route',testScreenOnKeepsPauseRouteEvenWithFlag],
+  ['long speech (news) is not cut off at 45 seconds',testLongSpeechIsNotCutAt45Seconds],
   ['iOS play() interruption falls back to Web Audio instead of dropping the break',testIOSPlayInterruptFallsBackToWebAudio],
 ];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(e){console.error('FAIL',name,'—',e?.stack||e);process.exitCode=1}}
