@@ -131,6 +131,12 @@ async function testManualDJAtNextNaturalTransition(){
   const h=createHarness();assert.equal(h.window.MAIRDJ.armManual(),true);await sleep(80);assert.equal(h.state().phase,'ARMED');h.natural('A','B');await sleep(700);
   assert.equal(h.metrics.djPause,1);assert.equal(h.metrics.speak,1);assert.equal(h.metrics.djResume,1);assert.equal(h.state().played,1)
 }
+async function testDjButtonTogglesBreakAfterSong(){
+  // Knop "DJ na dit nummer": tik = break bij de volgende overgang, nog een tik = annuleren. Muziek wordt nooit onderbroken.
+  const h=createHarness();assert.equal(h.window.MAIRDJ.toggleManual(),true);await sleep(80);assert.equal(h.state().phase,'ARMED');assert.equal(h.metrics.djPause,0,'tikken mag de muziek niet stoppen');
+  assert.equal(h.window.MAIRDJ.toggleManual(),true);assert.equal(h.state().pendingAir,false);assert.equal(h.state().phase,'COUNTING');h.natural('A','B');await sleep(700);assert.equal(h.metrics.speak,0,'geannuleerde break mag niet praten');
+  assert.equal(h.window.MAIRDJ.toggleManual(),true);await sleep(80);assert.equal(h.state().phase,'ARMED');h.natural('B','C');await sleep(700);assert.equal(h.metrics.speak,1);assert.equal(h.state().played,1);assert.equal(h.state().pendingAir,false)
+}
 async function testWebApiFallbackStillWorks(){
   // ducking uit: deze test bewijst juist dat de oude pauzeroute over de Web API
   // nog werkt als de transportlaag niet kan ducken.
@@ -251,6 +257,7 @@ const tests=[
   ['manual skip cancels stale prepared break',testManualSkipCancelsPreparedBreakWithoutTouchingMusic],
   ['backgrounded break never pauses music',testBackgroundedBreakNeverPausesMusic],
   ['manual DJ airs on next natural transition',testManualDJAtNextNaturalTransition],
+  ['DJ button: tap arms break after song, second tap cancels',testDjButtonTogglesBreakAfterSong],
   ['late manual preparation rebases without stale audio',testLateManualPreparationRebasesSafely],
   ['late automatic preparation is not silently lost',testLateAutomaticPreparationIsNotLost],
   ['generic primary transport remains fallback',testWebApiFallbackStillWorks],

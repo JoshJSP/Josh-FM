@@ -9,7 +9,7 @@ ok('one semantic RadioViewState owner',state.includes("version:'radio-view-state
 ok('public DJ has exactly four states',['QUIET','PREPARING','ON_AIR','RECOVERING'].every(x=>state.includes(`state:'${x}'`))&&!state.includes("state:'GENERATING'"));
 ok('normal UI has three navigation destinations',ux.includes("stations:['⌘','Stations']")&&ux.includes("settings:['⚙','Instellingen']")&&ux.includes("nav.querySelector('[data-mair-tab=\"requests\"]')?.remove()"));
 ok('request remains reachable from Radio',ux.includes('Nummer aanvragen')&&ux.includes("activate?.('requests')"));
-ok('DJ now promise is accurate',ux.includes('DJ bij volgende overgang'));
+ok('DJ now promise is accurate',ux.includes('DJ na dit nummer'));
 ok('blocking errors expose recovery actions',ux.includes('data-mairfm-error-action')&&state.includes("primaryAction:'resume'")&&state.includes("secondaryAction:'diagnostics'"));
 ok('technical auth fields are hidden',ux.includes('mairfm-auth-internals')&&css.includes('.mairfm-auth-legacy-copy{display:none'));
 ok('legacy diagnostics widgets are hidden',hub.includes('mairfm-legacy-diagnostics')&&css.includes('.mairfm-legacy-diagnostics{display:none'));
