@@ -11,7 +11,7 @@
     try{window.dispatchEvent(new CustomEvent('jfm:dj-audio-health',{detail:{ok:true,stage}}))}catch{/* event-listener gooide: onschuldig */}
   }
   function failure(error,stage='speech'){
-    failures++;lastError=String(error?.message||error||'Fish Audio failed').slice(0,300);
+    failures++;lastError=String(error?.message||error||'DJ-stem mislukt').slice(0,300);
     const delay=Math.min(MAX_BACKOFF,BASE_BACKOFF*Math.pow(2,Math.max(0,failures-1)));
     nextRetryAt=Date.now()+delay;trace('failure',{stage,failures,retryInMs:delay,error:lastError});
     try{window.dispatchEvent(new CustomEvent('jfm:dj-audio-health',{detail:{ok:false,stage,error:lastError,retryInMs:delay}}))}catch{/* event-listener gooide: onschuldig */}
@@ -21,7 +21,7 @@
   async function guarded(fn,stage,{respectBackoff=true}={},args=[]){
     if(respectBackoff&&!available()){trace('backoff-skip',{stage,retryInMs:retryIn()});return false}
     lastAttemptAt=Date.now();
-    try{const ok=await fn();if(ok===false){if(aborted(args))return false;failure('Fish Audio returned no playable speech',stage);return false}success(stage);return ok}catch(e){if(!aborted(args))failure(e,stage);return false}
+    try{const ok=await fn();if(ok===false){if(aborted(args))return false;failure('DJ-stem gaf geen speelbare spraak',stage);return false}success(stage);return ok}catch(e){if(!aborted(args))failure(e,stage);return false}
   }
   const oldPrepare=window.prepareSpeech;
   if(typeof oldPrepare==='function')window.prepareSpeech=async(...args)=>guarded(()=>oldPrepare(...args),'prepare',{respectBackoff:true},args);

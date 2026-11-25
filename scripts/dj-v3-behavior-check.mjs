@@ -218,7 +218,7 @@ async function testCompleteVoiceCheckUsesOneAudibleBreakId(){
   const ids=new Set(rows.map(x=>x.breakId));assert.equal(ids.size,1,'alle Voice Check-stappen moeten exact één breakId gebruiken');
   const id=[...ids][0];assert.ok(id.includes('voice-check'));
   assert.equal(h.metrics.lastOperation?.correlationId,id,'Spotify handoff-operation moet dezelfde breakId dragen');
-  for(const name of ['DJ Writer','Fish/TTS generatie','Spotify pause bevestigd','DJ playback START bewezen','DJ playback END bewezen','Spotify resume bevestigd','Volgende playback-state gezond'])assert.ok(rows.some(x=>x.name===name&&x.status==='pass'),`${name} ontbreekt`);
+  for(const name of ['DJ Writer','Stem (TTS) generatie','Spotify pause bevestigd','DJ playback START bewezen','DJ playback END bewezen','Spotify resume bevestigd','Volgende playback-state gezond'])assert.ok(rows.some(x=>x.name===name&&x.status==='pass'),`${name} ontbreekt`);
   const handoff=h.state().lastHandoff;assert.equal(handoff.breakId,id);assert.ok(handoff.playbackStartedAt>0);assert.ok(handoff.playbackEndedAt>=handoff.playbackStartedAt);assert.ok(handoff.resumeAt>=handoff.playbackEndedAt);assert.equal(handoff.terminalStatus,'VOICE_CHECK_PASS')
 }
 // Valt Claude om en vangt Groq het op, dan was de break geslaagd en verdween de

@@ -5,7 +5,7 @@
 
   function enforceFishUI(){
     const select=$('voiceMode');if(select){[...select.options].forEach(o=>{if(o.value!=='fish')o.remove()});select.value='fish';select.disabled=true}
-    const info=$('voiceInfo');if(info)info.textContent='Fish Audio is de enige DJ-stem. Bij een storing slaat Josh FM de break over en blijft de muziek spelen.';
+    const info=$('voiceInfo');if(info)info.textContent='De DJ-stem is Nederlands (Edge). Bij een storing slaat Josh FM de break over en blijft de muziek spelen.';
   }
 
   function aliasContracts(){
