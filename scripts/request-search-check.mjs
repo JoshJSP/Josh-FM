@@ -250,6 +250,7 @@ check('B1d. een tik zonder speler legt de spelerstaat vast in het foutlog', asyn
   assert.ok(!JSON.stringify(r.detail).includes('refresh'.repeat(2)), 'geen tokens in het log');
   assert.ok(read('playback-primary.js').includes("MAIRPlayerSnapshot?.('tik-'"), 'de Play-tik roept de snapshot aan');
   assert.ok(read('playback-primary.js').includes("MAIRPlayerSnapshot?.('druk-'+id"), 'elke druk op Play/Start wordt vastgelegd, ook op een uitgeschakelde of bedekte knop');
+  assert.ok(read('playback-primary.js').includes("if(!b.disabled&&raak)break;window.MAIRPlayerSnapshot?.('druk-'"), 'een gewone druk op Play die aankomt mag geen error in het foutlog zetten');
   context.MAIRPlayerSnapshot('druk-play', { knopUit: true });
   assert.equal(records.at(-1).detail.knopUit, true, 'extra velden komen mee in het log');
   assert.ok(read('stability-core.js').includes("MAIRPlayerSnapshot?.('knoppen-uit')"), 'uitgaande knoppen roepen de snapshot aan');
