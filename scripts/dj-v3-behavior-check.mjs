@@ -250,6 +250,25 @@ async function testBreakFallsBackToPauseWhenDuckingIsUnavailable(){
   assert.equal(h.metrics.djResume,1);assert.equal(h.metrics.speak,1);assert.equal(h.state().played,1);assert.equal(h.state().missed,0);
 }
 
+// iPhone 25-11-2026: Safari gaf "The operation was aborted" toen iOS het audio-element onderbrak tijdens play().
+// playBlob zag dat als annulering en sloeg Web Audio over: de DJ zei niks. Draait de echte playBlob uit debug-tts.js.
+async function testIOSPlayInterruptFallsBackToWebAudio(){
+  const tts=fs.readFileSync(new URL('../debug-tts.js',import.meta.url),'utf8'),start=tts.indexOf('async function playBlob('),end=tts.indexOf('\n',start);
+  assert.ok(start>0,'playBlob staat in debug-tts.js');
+  const make=new Function('IS_IOS','playWithMediaElement','playWithWebAudio',`let lastError='';const renderHealth=()=>{};${tts.slice(start,end)};return{playBlob,get lastError(){return lastError}}`);
+  const nativeAbort=()=>Object.assign(new Error('The operation was aborted.'),{name:'AbortError'});
+  let web=0;const api=make(true,async()=>{throw nativeAbort()},async()=>{web++;return true});
+  assert.equal(await api.playBlob({size:10},'Fish Audio',{signal:{aborted:false}}),true,'iOS-onderbreking valt terug op Web Audio');
+  assert.equal(web,1,'Web Audio speelde de stem');
+  web=0;const cancelled=make(true,async()=>{throw nativeAbort()},async()=>{web++;return true});
+  await assert.rejects(()=>cancelled.playBlob({size:10},'Fish Audio',{signal:{aborted:true}}),/aborted/,'echte annulering stopt meteen');
+  assert.equal(web,0,'na een echte annulering geen tweede route');
+  const started=make(true,async()=>{throw Object.assign(nativeAbort(),{playbackStarted:true})},async()=>{web++;return true});
+  await assert.rejects(()=>started.playBlob({size:10},'Fish Audio',{}),/aborted/,'gestarte stem wordt niet dubbel afgespeeld');
+  assert.equal(web,0);
+  assert.ok(tts.includes("await within(djContext.resume(),1500);if(djContext.state!=='running')throw"),'Web Audio-route blijft niet hangen op een iOS-resume die nooit terugkomt');
+}
+
 const tests=[
   ['automatic break uses SDK-first critical path',testSuccessfulAutomaticBreak],
   ['duplicate natural event is idempotent',testDuplicateNaturalEventCannotDoubleAir],
@@ -283,6 +302,7 @@ const tests=[
   ['background DJ (flag on, screen off) ducks; failed voice restores full volume',testBackgroundDuckVoiceFailureRestoresFullVolume],
   ['background DJ (flag on, screen off) ducks and restores after a good break',testBackgroundDuckSuccessRestoresFullVolume],
   ['flag on but screen on keeps the pause route',testScreenOnKeepsPauseRouteEvenWithFlag],
+  ['iOS play() interruption falls back to Web Audio instead of dropping the break',testIOSPlayInterruptFallsBackToWebAudio],
 ];
 let passed=0;for(const[name,test]of tests){try{await test();passed++;console.log('PASS',name)}catch(e){console.error('FAIL',name,'—',e?.stack||e);process.exitCode=1}}
 if(process.exitCode)process.exit(1);console.log(`MAIR DJ v3 behavioral simulation: ${passed}/${tests.length} PASS`);
