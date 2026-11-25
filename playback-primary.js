@@ -166,7 +166,9 @@ let volume=(()=>{try{const raw=localStorage.getItem(VOLUME_KEY);if(raw===null||r
   // Een tik terwijl er al een transportactie loopt deed niets en zei niets. Dat is de
   // meest waarschijnlijke verklaring voor "de vorige-knop doet soms niks": de watchdog
   // draait elke 5 seconden en zet busy. Nu krijgt de gebruiker in elk geval antwoord.
-  async function withBusy(fn){if(busy){info('MAIRFM is nog met de vorige opdracht bezig. Probeer het zo opnieuw.');return false}setBusy(true);try{return await fn()}finally{setBusy(false)}}
+  // Vangnet: hangt er iets anders dan een SDK-aanroep (token, apparaat, fetch), dan bleef busy eeuwig aan en deed Play niks meer. Na BUSY_MAX_MS gaan de knoppen altijd weer vrij; een te laat klaar gekomen oude opdracht zet de busy van een nieuwe niet uit.
+  const BUSY_MAX_MS=25000;let busyGen=0;
+  async function withBusy(fn){if(busy){info('MAIRFM is nog met de vorige opdracht bezig. Probeer het zo opnieuw.');return false}const gen=++busyGen,startedAt=Date.now();setBusy(true);setTimeout(()=>{/* klaar, of een nep-klok in tests die te vroeg afgaat */if(busyGen!==gen||Date.now()-startedAt<BUSY_MAX_MS-50)return;busyGen++;try{window.MAIRRuntime?.record?.('playback.busy-timeout',{ms:BUSY_MAX_MS,lastError},'error')}catch{/* diagnose mag niet gooien */}setBusy(false)},BUSY_MAX_MS);try{return await fn()}finally{if(busyGen===gen){busyGen++;setBusy(false)}}}
   function ingest(s,source='primary'){if(!s)return;const confirmed=String(s?.device?.id||'').trim();if(confirmed&&localStorage.getItem(DEVICE_KEY)!==confirmed)localStorage.setItem(DEVICE_KEY,confirmed);clearResumeGuard(String(s?.item?.id||''));try{playback=s;renderPlayback(s)}catch(e){note('render-failed',e,{source})};try{truth()?.ingest?.(s,source)}catch(e){note('state-ingest-failed',e,{source})}}
   function rememberError(e,prefix){lastError=String(e?.message||e);failures++;note('action-failed',e,{prefix:String(prefix||'').slice(0,40)});try{truth()?.error?.(lastError)}catch(inner){note('truth-error-sink',inner)};info(prefix+lastError,true);return false}
   // Niet elke lege catch is fout - try{localStorage...}catch{} vangt een bekende,
