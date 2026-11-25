@@ -10,7 +10,7 @@ MAIR is een persoonlijke Nederlandse AI-radio boven op een Spotify Premium-accou
 - `queue-core.js` serialiseert queue-wijzigingen; Spotify blijft de bron voor wat daadwerkelijk als volgende klaarstaat.
 - `mair-dj-v2.js` plant en speelt DJ-breaks. `mair-dj-schedule-sync.js` levert één gededupliceerd fallback-signaal als een primair trackeinde-event ontbreekt.
 - `/api/dj-writer` genereert uitsluitend Nederlandse DJ-copy via Groq. Als de writer faalt, blijft de muziek spelen en gebruikt MAIR een korte lokale Nederlandse fallback.
-- `/api/tts` genereert MP3 via Edge (Microsoft Read Aloud, gratis en zonder sleutel) met de nl-NL-stemmen Maarten (Josh), Fenna (Maya) en Colette (Max). Edge is onofficieel: faalt hij, dan neemt Fish Audio het over. Faalt die ook, dan slaat de DJ de break over en speelt de muziek door. In de browser krijgt elke stem dezelfde radiobewerking (EQ, compressie, vast niveau).
+- `/api/tts` genereert MP3 via Edge (Microsoft Read Aloud, gratis en zonder sleutel) met de nl-NL-stemmen Maarten (Josh), Fenna (Maya) en Colette (Max). Edge is onofficieel: faalt hij, dan slaat de DJ de break over en speelt de muziek door. In de browser krijgt elke stem dezelfde radiobewerking (EQ, compressie, vast niveau).
 - De diagnosekaart toont playback-, queue-, DJ-, writer-, voice-, TTS-, cache- en herstelstatus zonder secrets te tonen.
 - De service worker maakt de hoofdinterface installeerbaar als PWA en bewaakt release/cacheversies.
 
@@ -24,7 +24,6 @@ Vereist voor de volledige ervaring:
 - `MAPBOX_PUBLIC_TOKEN`: Mapbox Directions + Geocoding voor de navigatie in Car Mode. Dit hoort een publiek `pk.`-token te zijn met een URL-restrictie op het eigen domein, want `/api/config` geeft het runtime aan de browser. Zonder dit token meldt Car Mode "Mapbox-token ontbreekt" en werkt bestemmingszoeken en routering niet; de radio zelf blijft normaal doorspelen.
 - `ANTHROPIC_API_KEY`: Claude schrijft DJ-copy, nieuws, discovery en de categoriefilters. Zonder deze sleutel neemt Groq alles over.
 - `GROQ_API_KEY`: vangnet achter Claude voor `/api/dj-writer`, `/api/news-bulletin`, `/api/discover` en `/api/category-filter`. Houd deze ingevuld: hij houdt de radio aan de praat als Anthropic eruit ligt of te traag is.
-- `FISH_AUDIO_API_KEY`: Nederlandse DJ-audio via `/api/tts`.
 
 Optioneel:
 
@@ -32,11 +31,8 @@ Optioneel:
 - `MAIR_ALLOWED_SPOTIFY_USERS`: komma-gescheiden Spotify-gebruikers-id's die de AI-routes mogen gebruiken. Zonder lijst mag elke geldige Spotify-sessie erdoor. **Zet dit voordat er een `ANTHROPIC_API_KEY` in gaat**, anders kan iedere Spotify-gebruiker met curl op jouw kosten tekst laten schrijven.
 - `MAIR_ALLOWED_ORIGINS`: extra origins naast het eigen domein (komma-gescheiden, exact). Normaal niet nodig: de app en de Capacitor-shell draaien allebei op het eigen domein.
 
-De AI-routes (`/api/dj-writer`, `/api/discover`, `/api/category-filter`, `/api/news-bulletin`) en de routes die externe diensten of Fish Audio-tegoed gebruiken (`/api/tts`, `/api/fact`) eisen een eigen `Origin` en een Spotify-token (`api/_guard.js`; de client zet dat via `mair-ai-auth.js`). Daarboven staat in de Vercel Firewall de regel *AI-routes rate limit*: 30 verzoeken per minuut per IP, over alle instances heen.
+De AI-routes (`/api/dj-writer`, `/api/discover`, `/api/category-filter`, `/api/news-bulletin`) en de routes die externe diensten gebruiken (`/api/tts`, `/api/fact`) eisen een eigen `Origin` en een Spotify-token (`api/_guard.js`; de client zet dat via `mair-ai-auth.js`). Daarboven staat in de Vercel Firewall de regel *AI-routes rate limit*: 30 verzoeken per minuut per IP, over alle instances heen.
 - `GROQ_DJ_MODEL`: expliciet ondersteund Groq-model. Zonder override probeert MAIR `openai/gpt-oss-120b` en daarna `openai/gpt-oss-20b`.
-- `FISH_AUDIO_MODEL`: expliciet Fish-model. Zonder override probeert MAIR `s2.1-pro-free` en daarna `s2-pro`.
-- `FISH_AUDIO_VOICE_JOSH`, `FISH_AUDIO_VOICE_MAYA`, `FISH_AUDIO_VOICE_MAX`: per-DJ voice override.
-- `FISH_AUDIO_VOICE_ID`: algemene voice override als geen profieloverride bestaat.
 
 Een ontbrekende AI- of TTS-key mag playback niet stoppen. MAIR slaat de break over of gebruikt lokale copy en meldt de oorzaak in Diagnose.
 

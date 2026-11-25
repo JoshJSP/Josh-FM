@@ -3,12 +3,12 @@
 1. Open de gedeployde MAIR-URL in Safari.
 2. Ga naar `Instellingen` en kopieer de getoonde Redirect URL.
 3. Voeg die URL exact toe aan Redirect URIs in je Spotify Developer-app.
-4. Zorg dat `SPOTIFY_CLIENT_ID`, `GROQ_API_KEY` en `FISH_AUDIO_API_KEY` als Vercel Environment Variables zijn ingesteld en redeploy na een wijziging.
+4. Zorg dat `SPOTIFY_CLIENT_ID` en `GROQ_API_KEY` als Vercel Environment Variables zijn ingesteld en redeploy na een wijziging.
 5. Kies in MAIR `Koppel Spotify` en rond Spotify OAuth af.
 6. Start MAIR eenmaal via een zichtbare tik; daarmee mag iOS muziek en DJ-audio afspelen.
 7. Kies in Safari Deel → `Zet op beginscherm`.
 
-De DJ-writer gebruikt Claude, met Groq als vangnet; Fish Audio verzorgt de vier Nederlandse DJ-stemmen. Zonder `ANTHROPIC_API_KEY` schrijft Groq alles, precies zoals voorheen.
+De DJ-writer gebruikt Claude, met Groq als vangnet; Edge verzorgt de Nederlandse DJ-stemmen. Zonder `ANTHROPIC_API_KEY` schrijft Groq alles, precies zoals voorheen.
 
 Bij problemen open je `Instellingen` → `Diagnose`. Controleer daar Spotify-device, playback, queue, DJ-writer, stem en TTS-status. `Herstel MAIR` synchroniseert veilig cache, device, playerstate en wachtrij zonder persoonlijke voorkeuren te wissen.
 

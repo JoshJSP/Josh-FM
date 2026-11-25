@@ -4,38 +4,33 @@ import tts,{sayText} from '../api/tts.js';
 import writer from '../api/dj-writer.js';
 
 const originalFetch=globalThis.fetch,originalWebSocket=globalThis.WebSocket;
-// Edge is de eerste stem. Standaard valt hij hier uit, zodat de Fish-terugval getest wordt; een test zet hem expliciet aan.
+// Edge is de enige stem. Standaard valt hij hier uit; een test zet hem expliciet aan.
 class DeadEdge{constructor(){throw new Error('edge down')}}
 // Nep-Edge: stuurt een audioframe (2 bytes headerlengte, headers, mp3) en daarna turn.end.
 function fakeEdge(sent){return class{constructor(url,opt){sent.push({url,opt,messages:[]});this.sent=sent.at(-1);setTimeout(()=>this.onopen?.(),0)}send(m){this.sent.messages.push(m);if(!m.includes('Path:ssml'))return;const head=Buffer.from('X-RequestId:x\r\nContent-Type:audio/mpeg\r\nPath:audio'),frame=Buffer.concat([Buffer.from([head.length>>8,head.length&255]),head,Buffer.from([0xff,0xf3,0x64,1])]);setTimeout(()=>{this.onmessage?.({data:frame.buffer.slice(frame.byteOffset,frame.byteOffset+frame.length)});this.onmessage?.({data:'X-RequestId:x\r\nPath:turn.end\r\n\r\n{}'})},0)}close(){}}}
 globalThis.WebSocket=DeadEdge;
-// De Fish-tests hieronder gaan over de terugval; die staat sinds 20-10-2026 alleen aan met FISH_AUDIO_FALLBACK=1.
-process.env.FISH_AUDIO_FALLBACK='1';
 const originalEnv={...process.env};
 function response(){return{statusCode:0,headers:{},body:null,status(code){this.statusCode=code;return this},setHeader(name,value){this.headers[name]=value},json(value){this.body=value;return this},send(value){this.body=value;return this}}}
 async function call(handler,req){const res=response();await handler(withAI(req),res);return res}
 await primeAIGuard();
-function fishResponse(body,{status=200,type='audio/mpeg'}={}){const data=Buffer.isBuffer(body)?body:Buffer.from(String(body));return{ok:status>=200&&status<300,status,headers:{get:name=>name.toLowerCase()==='content-type'?type:null},text:async()=>data.toString(),arrayBuffer:async()=>data}}
 function writerBody(id='api-test'){return{breakId:id,breakType:'FORWARD_ANNOUNCE',targetWords:16,energy:'NORMAL',context:{schemaVersion:'1.0.0',break:{breakType:'FORWARD_ANNOUNCE',targetWords:16,maxDurationSeconds:10,energy:'NORMAL',mustMention:[],permittedTopics:['music'],prohibitedTopics:[]},onAir:{previous:{id:'a',name:'Eerste',artists:['Artiest A']},next:{id:'b',name:'Tweede',artists:['Artiest B']},future:[],relationship:null},session:{station:'MAIR',localTime:'10:15',day:'woensdag',daypart:'ochtend',durationMinutes:20,narrative:{}},memory:{revision:0,recentBreaks:[],usedFactIds:[]},allowedFacts:[],doNot:[]}}}
 function restoreEnv(){for(const key of Object.keys(process.env))if(!(key in originalEnv))delete process.env[key];Object.assign(process.env,originalEnv)}
 
-// Uitspraaklijst: alleen hele woorden, voor Edge en Fish.
+// Uitspraaklijst: alleen hele woorden.
 assert.equal(sayText('Froukje met Davina Michelle en S10.'),'Frauwkje met Davina Mischèl en Es-tien.');assert.equal(sayText('Michelle zingt'),'Michelle zingt');assert.equal(sayText('Froukjes S100'),'Froukjes S100');
 
-// Alleen nl-NL: zonder FISH_AUDIO_FALLBACK geen Fish, ook niet als Edge faalt en er een Fish-sleutel is; elke DJ heeft een nl-NL-stem.
+// Alleen nl-NL: valt Edge uit, dan 503 en geen andere stem; elke DJ heeft een nl-NL-stem.
 {
-  delete process.env.FISH_AUDIO_FALLBACK;process.env.FISH_AUDIO_API_KEY='fish-key';let fished=0;globalThis.fetch=async()=>{fished++;return fishResponse(Buffer.from([0x49,0x44,0x33,1]))};
+  let called=0;globalThis.fetch=async()=>{called++;throw new Error('geen externe stem')};
   const r=await call(tts,{method:'POST',body:{text:'Hallo',djProfile:'maya'}});
-  assert.equal(r.statusCode,503);assert.equal(r.body.error,'edge_tts_failed');assert.equal(fished,0,'Fish mag niet worden aangeroepen');
-  for(const dj of ['josh','maya','max']){const h=await call(tts,{method:'GET',query:{djProfile:dj}});assert.match(h.body.edge.voice,/^nl-NL-/,`${dj} heeft een nl-NL-stem`);assert.equal(h.body.fallback.configured,false)}
+  assert.equal(r.statusCode,503);assert.equal(r.body.error,'edge_tts_failed');assert.ok(r.body.edge?.detail,'de Edge-fout staat in het antwoord');assert.equal(called,0,'geen andere stemdienst');
+  for(const dj of ['josh','maya','max']){const h=await call(tts,{method:'GET',query:{djProfile:dj}});assert.match(h.body.edge.voice,/^nl-NL-/,`${dj} heeft een nl-NL-stem`);assert.equal('fallback' in h.body,false)}
   globalThis.fetch=originalFetch;restoreEnv();
 }
 try{
-  delete process.env.FISH_AUDIO_API_KEY;
-  let res=await call(tts,{method:'POST',body:{text:'Hallo'}});
-  assert.equal(res.statusCode,503);assert.equal(res.body.error,'fish_key_missing');assert.ok(res.body.edge?.detail,'de Edge-fout staat in het antwoord');
 
-  // Edge werkt: geen Fish-sleutel nodig, juiste stem per DJ, MAIR wordt Mair en tekst wordt ge-escaped.
+  // Edge werkt: juiste stem per DJ, MAIR wordt Mair en tekst wordt ge-escaped.
+  let res,calls=[];
   let sent=[];globalThis.WebSocket=fakeEdge(sent);
   res=await call(tts,{method:'POST',body:{text:'Dit is MAIR met Simon & Garfunkel <live>.',djProfile:'max'}});
   assert.equal(res.statusCode,200);assert.equal(res.headers['X-JoshFM-TTS'],'edge');assert.equal(res.headers['X-JoshFM-Voice'],'nl-NL-ColetteNeural');assert.equal(res.headers['X-MAIR-DJ'],'max');assert.ok(Buffer.isBuffer(res.body)&&res.body[0]===0xff);
@@ -44,43 +39,10 @@ try{
   for(const[dj,voice]of[['josh','Maarten'],['maya','Fenna'],['max','Colette']]){sent=[];globalThis.WebSocket=fakeEdge(sent);res=await call(tts,{method:'POST',body:{text:'Hoi.',djProfile:dj}});assert.equal(res.headers['X-JoshFM-Voice'],`nl-NL-${voice}Neural`)}
   globalThis.WebSocket=DeadEdge;
 
-  process.env.FISH_AUDIO_API_KEY='test-key';delete process.env.FISH_AUDIO_MODEL;
-  let calls=[];
-  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});if(url.includes('/model/'))return fishResponse(JSON.stringify({_id:'voice-josh',title:'Josh',languages:['nl']}),{type:'application/json'});return fishResponse('unexpected')};
   res=await call(tts,{method:'GET',query:{djProfile:'UNKNOWN'}});
-  assert.equal(res.statusCode,200);assert.equal(res.body.djProfile,'josh');assert.match(calls[0].url,/\/model\//);
-
-  process.env.FISH_AUDIO_VOICE_MAX='802e3bc2b27e49c2995d23ef70e6ac89';calls=[];
-  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return fishResponse(JSON.stringify({_id:'149694610a7449b6b2c5aef22859e2d3',title:'Jonge Nederlandse Stem',languages:['nl']}),{type:'application/json'})};
-  res=await call(tts,{method:'GET',query:{djProfile:'max'}});assert.equal(res.statusCode,200);assert.equal(res.body.djProfile,'max');assert.equal(res.body.voiceId,'a8673b1ff5e640c8abb9d3af550a46e9');assert.equal(res.body.edge.voice,'nl-NL-ColetteNeural');assert.equal(res.body.voice.dutchReady,true);delete process.env.FISH_AUDIO_VOICE_MAX;
-
-  process.env.FISH_AUDIO_VOICE_MAX='custom-english-only';
-  globalThis.fetch=async()=>fishResponse(JSON.stringify({_id:'custom-english-only',title:'English only',languages:['en']}),{type:'application/json'});
-  res=await call(tts,{method:'GET',query:{djProfile:'max'}});assert.equal(res.statusCode,200,'Fish is de terugval: een Fish-probleem maakt de health niet rood');assert.equal(res.body.provider,'edge');assert.equal(res.body.edge.voice,'nl-NL-ColetteNeural');assert.equal(res.body.voice.dutchReady,false);assert.match(res.body.voice.detail,/geen Nederlandse/);delete process.env.FISH_AUDIO_VOICE_MAX;
+  assert.equal(res.statusCode,200);assert.equal(res.body.djProfile,'josh');
   res=await call(tts,{method:'GET',query:{djProfile:'noah'}});assert.equal(res.body.djProfile,'josh','Noah bestaat niet meer: terugval op Josh');assert.equal(res.body.edge.voice,'nl-NL-MaartenNeural');
 
-  calls=[];
-  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return calls.length===1?fishResponse(JSON.stringify({message:'temporary'}),{status:500,type:'application/json'}):fishResponse(Buffer.from([0x49,0x44,0x33,1]))};
-  res=await call(tts,{method:'POST',body:{text:'Dit is een test.',djProfile:'maya'}});
-  assert.equal(res.statusCode,200);assert.equal(calls.length,2);assert.equal(res.headers['X-JoshFM-TTS'],'fish-audio','Edge valt uit, Fish neemt het over');assert.equal(res.headers['X-MAIR-DJ'],'maya');assert.equal(res.headers['X-JoshFM-Fish-Model'],'s2-pro');assert.ok(res.headers['X-MAIR-Request-ID']);assert.ok(Buffer.isBuffer(res.body));
-
-  calls=[];globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return fishResponse(Buffer.from('not-an-mp3'))};
-  res=await call(tts,{method:'POST',body:{text:'Malformed audio.'}});assert.equal(res.statusCode,502);assert.equal(calls.length,2);assert.match(res.body.detail,/malformed MP3/i);
-
-  calls=[];
-  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return fishResponse(JSON.stringify({message:'invalid token'}),{status:401,type:'application/json'})};
-  res=await call(tts,{method:'POST',body:{text:'Dit faalt veilig.'}});
-  assert.equal(res.statusCode,401);assert.equal(calls.length,1);assert.equal(res.body.error,'fish_tts_failed');
-
-  calls=[];
-  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return fishResponse('',{type:'audio/mpeg'})};
-  res=await call(tts,{method:'POST',body:{text:'Lege audio.'}});
-  assert.equal(res.statusCode,502);assert.equal(calls.length,2);assert.equal(res.body.attempts.length,2);assert.match(res.body.detail,/empty audio/i);
-
-  calls=[];
-  globalThis.fetch=async(url,opt)=>{calls.push({url,opt});return fishResponse('<html>upstream proxy error</html>',{type:'text/html'})};
-  res=await call(tts,{method:'POST',body:{text:'Geen HTML als audio.'}});
-  assert.equal(res.statusCode,502);assert.equal(calls.length,2);assert.match(res.body.detail,/instead of audio/i);
 
   process.env.GROQ_API_KEY='test-key';delete process.env.ANTHROPIC_API_KEY;delete process.env.ANTHROPIC_TEXT_MODEL;
   globalThis.fetch=async()=>({ok:false,status:429,json:async()=>({error:{message:'rate limited'}})});
@@ -103,8 +65,8 @@ try{
   for(let i=0;i<20;i++){res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.20'},body:writerBody(`limit-${i}`)});assert.equal(res.statusCode,200)}
   res=await call(writer,{method:'POST',headers:{'x-forwarded-for':'198.51.100.20'},body:{}});assert.equal(res.statusCode,429);assert.equal(res.body.error,'rate_limited');assert.ok(Number(res.headers['Retry-After'])>=1);
 
-  globalThis.fetch=async()=>fishResponse(Buffer.from([0x49,0x44,0x33,1]));
-  for(let i=0;i<20;i++){res=await call(tts,{method:'POST',headers:{'x-forwarded-for':'198.51.100.21'},body:{text:'Limiettest.'}});assert.equal(res.statusCode,200)}
+  globalThis.WebSocket=fakeEdge([]);
+  for(let i=0;i<20;i++){res=await call(tts,{method:'POST',headers:{'x-forwarded-for':'198.51.100.21'},body:{text:'Limiettest.'}});assert.equal(res.statusCode,200)}globalThis.WebSocket=DeadEdge;
   res=await call(tts,{method:'POST',headers:{'x-forwarded-for':'198.51.100.21'},body:{text:'Limiettest.'}});assert.equal(res.statusCode,429);assert.equal(res.body.error,'rate_limited');assert.ok(Number(res.headers['Retry-After'])>=1);
 
   // Claude schrijft de break; Groq wordt dan niet eens gebeld.

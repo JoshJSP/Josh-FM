@@ -58,6 +58,6 @@ ok(integration.includes('window.JFMDJAuthoritative||window.MAIRDJ')&&health.incl
 ok(diagnostics.includes("['Huidige track'")&&diagnostics.includes("['Volgende track'")&&diagnostics.includes("['DJ-fase'")&&diagnostics.includes("['TTS-status'")&&diagnostics.includes('esc(v)'),'Diagnostics must expose playback/DJ/TTS context and HTML-escape runtime metadata');
 ok(health.includes('currentTrack:')&&health.includes('nextTrack:')&&health.includes('dj:djState'),'Machine-readable station health must expose current/next/DJ state');
 ok(discovery.includes("await api('/search?type=track&limit=50&q='")&&channel.includes("boundedFetch('/api/nl-charts")&&purity.includes("boundedFetch('/api/category-filter'")&&app.includes('async function timedFetch(input,opt={},timeoutMs=12000)'),'Optional enrichment must use either a local bounded fetch or the central bounded Spotify API route');
-ok(ttsApi.includes('normalizeProfile')&&ttsApi.includes("Object.hasOwn(DJ_ENV,id)?id:'josh'"),'TTS API must normalize unknown profiles to the actual Josh fallback voice');
-ok(ttsApi.includes('NON_DUTCH_VOICES')&&ttsApi.includes("languages.includes('nl')")&&ttsApi.includes('dutchReady'),'TTS API must reject the known English Max voice and diagnose Dutch readiness');
+ok(ttsApi.includes('normalizeProfile')&&ttsApi.includes("Object.hasOwn(EDGE_VOICES,id)?id:'josh'"),'TTS API must normalize unknown profiles to the actual Josh fallback voice');
+ok(!/fish/i.test(ttsApi)&&(ttsApi.match(/voice:'nl-NL-/g)||[]).length===3,'TTS API gebruikt alleen nl-NL-stemmen van Edge, geen Fish');
 if(fail.length){console.error('MAIR DJ v3.2 regression FAILED');for(const x of fail)console.error('-',x);process.exit(1)}console.log('MAIR DJ v3.2 regression OK');
