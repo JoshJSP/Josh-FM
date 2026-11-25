@@ -34,7 +34,7 @@
  async function speakSafe(text,{breakId='',label='DJ-stem',startMs=8000,maxMs=150000}={}){
   if(typeof window.speakText!=='function')throw Error(`${label}: Voice Engine is niet klaar`);
   const c=new AbortController(),t0=Date.now();let reason='';const stop=why=>{if(c.signal.aborted)return;reason=why;c.abort(why);try{window.JFMDJAudio?.cancel?.(why,breakId)}catch{/* niets om te stoppen */}};
-  const startTimer=setTimeout(()=>{if(!(Number(window.JFMDJAudio?.status?.lastPlaybackAt)>=t0))stop(`${label} startte niet binnen ${Math.round(startMs/1000)} s`)},startMs),maxTimer=setTimeout(()=>stop(`${label} duurde te lang`),maxMs);
+  const startTimer=setTimeout(()=>{if(!(Number(window.JFMDJAudio?.status?.lastPlaybackAt)>=t0))stop(`${label} startte niet binnen ${Math.round(startMs/1000)} s${window.JFMDJAudio?.status?.speakStage?` (hing bij: ${window.JFMDJAudio.status.speakStage})`:''}`)},startMs),maxTimer=setTimeout(()=>stop(`${label} duurde te lang`),maxMs);
   const aborted=new Promise(r=>c.signal.addEventListener('abort',()=>r(false),{once:true}));
   try{const ok=await Promise.race([window.speakText(text,false,{signal:c.signal,breakId}),aborted]);if(!ok)throw Error(reason||window.JFMDJAudio?.status?.error||`${label} werd niet hoorbaar afgespeeld`);return true}
   finally{clearTimeout(startTimer);clearTimeout(maxTimer)}
